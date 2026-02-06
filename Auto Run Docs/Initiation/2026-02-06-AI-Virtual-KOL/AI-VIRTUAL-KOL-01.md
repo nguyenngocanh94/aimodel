@@ -17,7 +17,8 @@ This phase sets up the entire project from scratch — Python project structure,
   - Create `kol-creator/.env.example` with placeholder keys: `GEMINI_API_KEY`, `KLING_API_KEY`, `OPENAI_API_KEY` (for future use)
   - Create `kol-creator/.gitignore` to exclude `.env`, `__pycache__/`, `.venv/`, `*.pyc`, `output/`
 
-- [ ] Create the core application directory structure and base modules:
+- [x] Create the core application directory structure and base modules:
+  <!-- COMPLETED: Created all core modules - __init__.py (v0.1.0), cli.py (Click groups: kol, generate, publish, config), config.py (Pydantic Settings with env loading), and models/ (kol.py, content.py, prompt.py with all Pydantic models). Fixed pyproject.toml build-backend from invalid setuptools.backends._legacy to setuptools.build_meta. All imports verified working, CLI commands registered correctly. -->
   - `kol-creator/src/kol_creator/__init__.py` — package init with version
   - `kol-creator/src/kol_creator/cli.py` — Click CLI entry point with command groups: `kol` (persona management), `generate` (content creation), `publish` (social posting)
   - `kol-creator/src/kol_creator/config.py` — Pydantic Settings class loading from `.env`, holding API keys and default preferences (default_image_provider, default_video_provider, output_dir)
