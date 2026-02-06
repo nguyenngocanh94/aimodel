@@ -28,7 +28,8 @@ This phase sets up the entire project from scratch — Python project structure,
     - `content.py` — Pydantic models: `ContentRequest` (description, content_type enum [image/video], aspect_ratio, provider), `ContentResult` (prompt_used, provider, output_path, metadata dict)
     - `prompt.py` — Pydantic models: `SAPELTPrompt` (subject, action, place, environment, lighting, technical fields), `PromptRequest` (user_description, persona reference, target_provider, content_type), `PromptResult` (optimized_prompt string, sapelt_breakdown, provider_specific_notes)
 
-- [ ] Build the Adapter Layer — abstract base and first concrete adapters:
+- [x] Build the Adapter Layer — abstract base and first concrete adapters:
+  <!-- COMPLETED: Created full adapter layer with 4 files. base.py defines ImageAdapter(ABC), VideoAdapter(ABC), and CLIToolAdapter(ABC) with all specified abstract methods. mock.py implements MockImageAdapter and MockVideoAdapter returning realistic fake ContentResult with UUIDs, timestamps, resolution metadata. registry.py implements AdapterRegistry with auto-registration of mock adapters, get/register/list methods for both image and video adapters, with descriptive KeyError messages. All imports verified, ruff lint/format clean. -->
   - `kol-creator/src/kol_creator/adapters/__init__.py`
   - `kol-creator/src/kol_creator/adapters/base.py` — Define abstract base classes:
     - `ImageAdapter(ABC)` with methods: `async generate(prompt, reference_images, options) -> ContentResult`, `name() -> str`, `supports_reference_images() -> bool`
