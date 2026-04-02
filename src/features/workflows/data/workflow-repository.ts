@@ -43,6 +43,12 @@ export interface WorkflowRepository {
   /** Load the latest recovery snapshot for a workflow. */
   loadLatestSnapshot(workflowId: string): Promise<WorkflowSnapshot | null>;
 
+  /** List all snapshots for a workflow (sorted by savedAt desc). */
+  listSnapshots(workflowId: string): Promise<readonly WorkflowSnapshot[]>;
+
+  /** Delete a specific snapshot by ID. */
+  deleteSnapshot(snapshotId: string): Promise<void>;
+
   /** Check if the repository is operational. */
   isAvailable(): boolean;
 }
@@ -103,6 +109,18 @@ class IndexedDbRepository implements WorkflowRepository {
     return snapshots[0] ?? null;
   }
 
+  async listSnapshots(workflowId: string): Promise<readonly WorkflowSnapshot[]> {
+    const snapshots = await this.db.workflowSnapshots
+      .where('workflowId')
+      .equals(workflowId)
+      .toArray();
+    return snapshots.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+  }
+
+  async deleteSnapshot(snapshotId: string): Promise<void> {
+    await this.db.workflowSnapshots.delete(snapshotId);
+  }
+
   isAvailable(): boolean {
     return this.db.isOpen();
   }
@@ -152,7 +170,23 @@ class MemoryRepository implements WorkflowRepository {
   async loadLatestSnapshot(workflowId: string): Promise<WorkflowSnapshot | null> {
     const list = this.snapshots.get(workflowId) ?? [];
     if (list.length === 0) return null;
-    return list.sort((a, b) => b.savedAt.localeCompare(a.savedAt))[0];
+    return [...list].sort((a, b) => b.savedAt.localeCompare(a.savedAt))[0];
+  }
+
+  async listSnapshots(workflowId: string): Promise<readonly WorkflowSnapshot[]> {
+    const list = this.snapshots.get(workflowId) ?? [];
+    return [...list].sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+  }
+
+  async deleteSnapshot(snapshotId: string): Promise<void> {
+    for (const [wfId, list] of this.snapshots.entries()) {
+      const idx = list.findIndex((s) => s.id === snapshotId);
+      if (idx !== -1) {
+        list.splice(idx, 1);
+        if (list.length === 0) this.snapshots.delete(wfId);
+        return;
+      }
+    }
   }
 
   isAvailable(): boolean {

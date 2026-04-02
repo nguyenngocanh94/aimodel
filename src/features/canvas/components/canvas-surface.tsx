@@ -21,6 +21,7 @@ import { WorkflowNodeCard, type WorkflowNodeType } from './workflow-node-card';
 import { WorkflowEdge, type WorkflowEdgeType } from './workflow-edge';
 import { useCanvasShortcuts } from '../hooks/use-canvas-shortcuts';
 import { useConnectionValidation } from '../hooks/use-connection-validation';
+import { CanvasEmptyState } from './canvas-empty-state';
 import { checkCompatibility } from '@/features/workflows/domain/type-compatibility';
 import type { WorkflowNode, WorkflowEdge as WfEdge, NodeRunRecord } from '@/features/workflows/domain/workflow-types';
 import type { WorkflowEdgeData } from './workflow-edge';
@@ -348,8 +349,10 @@ function CanvasSurfaceInner() {
     onRedo: redo,
   });
 
+  const isEmpty = document.nodes.length === 0;
+
   return (
-    <div ref={wrapperRef} className="h-full w-full" data-testid="canvas-surface">
+    <div ref={wrapperRef} className="h-full w-full relative" data-testid="canvas-surface">
       <ReactFlow<WorkflowNodeType, WorkflowEdgeType>
         nodes={rfNodes}
         edges={rfEdges}
@@ -376,14 +379,21 @@ function CanvasSurfaceInner() {
         proOptions={{ hideAttribution: true }}
       >
         <Background gap={15} size={1} />
-        <Controls />
-        <MiniMap
-          nodeStrokeWidth={3}
-          zoomable
-          pannable
-          className="!bottom-20"
-        />
+        {!isEmpty && <Controls />}
+        {!isEmpty && (
+          <MiniMap
+            nodeStrokeWidth={3}
+            zoomable
+            pannable
+            className="!bottom-20"
+          />
+        )}
       </ReactFlow>
+      {isEmpty && (
+        <div className="absolute inset-0 z-10">
+          <CanvasEmptyState onAddNode={() => {/* TODO: open node palette */}} />
+        </div>
+      )}
     </div>
   );
 }

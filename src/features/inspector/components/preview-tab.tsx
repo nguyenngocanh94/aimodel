@@ -6,6 +6,8 @@ import { useWorkflowStore } from '@/features/workflow/store/workflow-store';
 import { selectDocument } from '@/features/workflow/store/workflow-selectors';
 import { computeAllPreviews } from '@/features/workflows/domain/preview-engine';
 import { getTemplate } from '@/features/node-registry/node-registry';
+import { StoryboardPlayer } from '@/features/preview/components/storyboard-player';
+import type { VideoAssetPayload } from '@/features/node-registry/templates/video-composer';
 import type { WorkflowNode, PortPayload } from '@/features/workflows/domain/workflow-types';
 
 interface PreviewTabProps {
@@ -133,23 +135,40 @@ function PayloadCard({
         <span className="font-mono">{payload.schemaType}</span>
       </div>
 
-      {payload.previewText && (
-        <p className="text-xs text-foreground line-clamp-3">
-          {payload.previewText}
-        </p>
-      )}
+      {/* Storyboard player for videoAsset payloads */}
+      {payload.schemaType === 'videoAsset' && payload.value !== null && isVideoAssetPayload(payload.value) ? (
+        <StoryboardPlayer videoAsset={payload.value} />
+      ) : (
+        <>
+          {payload.previewText && (
+            <p className="text-xs text-foreground line-clamp-3">
+              {payload.previewText}
+            </p>
+          )}
 
-      {payload.errorMessage && (
-        <p className="text-xs text-destructive">{payload.errorMessage}</p>
-      )}
+          {payload.errorMessage && (
+            <p className="text-xs text-destructive">{payload.errorMessage}</p>
+          )}
 
-      {payload.value !== null && !payload.previewText && (
-        <pre className="text-[10px] text-muted-foreground bg-muted/50 rounded p-1 max-h-32 overflow-auto">
-          {typeof payload.value === 'string'
-            ? payload.value.slice(0, 500)
-            : JSON.stringify(payload.value, null, 2).slice(0, 500)}
-        </pre>
+          {payload.value !== null && !payload.previewText && (
+            <pre className="text-[10px] text-muted-foreground bg-muted/50 rounded p-1 max-h-32 overflow-auto">
+              {typeof payload.value === 'string'
+                ? payload.value.slice(0, 500)
+                : JSON.stringify(payload.value, null, 2).slice(0, 500)}
+            </pre>
+          )}
+        </>
       )}
     </div>
   );
+}
+
+function isVideoAssetPayload(value: unknown): value is VideoAssetPayload {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'timeline' in value &&
+    'posterFrameUrl' in value &&
+    'storyboardPreview' in value
+  )
 }

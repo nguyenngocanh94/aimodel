@@ -1,40 +1,226 @@
-# Agent Instructions
+# AGENTS.md — AI Video Workflow Builder
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+> Read this ENTIRE file before doing anything else.
 
-## Quick Reference
+## What This Repository Does
 
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress  # Claim work
-bd close <id>         # Complete work
-bd sync               # Sync with git
+This repo builds an **AI Video Workflow Builder** — a browser-based visual pipeline editor where developers drag-drop nodes onto a canvas, connect them, and compose AI video generation workflows. Each node is a discrete processing step (script generation, image creation, audio synthesis, video composition) with typed inputs/outputs visible in a Data Inspector.
+
+**Key product principles:**
+- Builder-first, not platform-first
+- Local-first, single-user, no backend in v1
+- Mock execution (no real AI provider calls in v1)
+- Data Inspector is the core differentiator
+- DAG-only, max ~15 nodes per workflow
+
+## Tech Stack
+
+- **React** + **Vite** + **TypeScript** (strict mode)
+- **@xyflow/react** (React Flow) for the canvas
+- **Tailwind CSS** + **shadcn/ui** for styling
+- **Zustand** for state (2 stores: workflow + run)
+- **Dexie** on IndexedDB for persistence
+- **Zod** for runtime schemas and config validation
+- **React Hook Form** for inspector forms
+- **Vitest** + **React Testing Library** + **Playwright** for testing
+
+## Project Structure
+
+```
+plans/                          # Planning documents (do NOT modify)
+plans/06-final-plan.md          # THE authoritative spec (3,613 lines)
+resources/                      # Implementation goes here
+src/                            # Source code (created during implementation)
+  app/                          # App shell, providers, routes
+  features/
+    canvas/                     # React Flow canvas, node cards, edges
+    node-library/               # Sidebar with draggable nodes
+    inspector/                  # Node config inspector
+    data-inspector/             # Payload viewer, schema diff, lineage
+    workflow/                   # Zustand workflow store, commands
+    execution/                  # Run store, planner, mock executor, cache
+    workflows/                  # Persistence, migrations, recovery
+    node-registry/              # Node templates + fixtures
+    templates/                  # Built-in workflow templates
+  shared/                       # Shared UI components, utilities
 ```
 
-## Landing the Plane (Session Completion)
+## Non-Negotiable Rules
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+1. **Read the plan first.** Before implementing ANY bead, read the relevant section of `plans/06-final-plan.md`. The plan is authoritative.
+2. **No real AI providers in v1.** Do not add OpenAI, Runway, ElevenLabs, or any external API calls. Mock execution only.
+3. **No backend.** V1 is a static SPA. No server, no auth, no credentials.
+4. **All types are readonly/immutable.** Use `readonly` on all interfaces per the plan.
+5. **Every node template must have:** configSchema (Zod), buildPreview, fixtures, and mockExecute (if executable).
+6. **Two Zustand stores.** Never mix workflow state and run state. Undo/redo applies only to workflow store.
+7. **Test what matters.** Unit test: validation, execution, compatibility, migrations. E2E test: core user journeys. Don't chase vanity coverage.
+8. **Do not modify planning documents.** Files in `plans/` are final. If you find a plan issue, note it in a comment on the bead.
 
-**MANDATORY WORKFLOW:**
+## How to Find Work
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd sync
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
+Use `bd` (beads) to find and claim tasks:
 
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
+```bash
+# See what's ready to work on (no blockers)
+bd ready
 
+# Get details on a specific bead
+bd show <bead-id>
+
+# Claim a bead
+bd update <bead-id> --status=in_progress
+
+# When done
+bd close <bead-id>
+
+# See the full dependency graph
+bv
+```
+
+**Always use `bd ready` or `bv` to pick your next task.** Do not pick randomly or by convenience. The dependency graph exists for a reason.
+
+## How to Use Agent Mail
+
+Agent Mail coordinates multi-agent work via MCP tools. The server runs at `http://127.0.0.1:8765/mcp/`.
+
+### At Session Start
+
+Register yourself (if not already registered). Use the MCP tool `register_agent`:
+```json
+{"project_key": "AiModel", "program": "claude-code", "model": "your-model", "name": "YourName", "task_description": "what you're working on"}
+```
+
+Check your inbox with `check_inbox` or search messages with `search_messages`.
+
+### When Starting a Bead
+
+Announce what you're working on by sending a message to all other agents:
+```json
+{"project_key": "AiModel", "sender_name": "YourName", "to": ["all-agents"], "subject": "Claiming AiModel-xxx: task name", "body_md": "Starting work on this bead. Files I'll touch: src/features/..."}
+```
+
+### Reserve Files Before Editing
+
+Before editing shared files, reserve them with `file_reservation_paths`:
+```json
+{"project_key": "AiModel", "agent_name": "YourName", "paths": ["src/features/workflows/domain/workflow-types.ts"], "mode": "exclusive"}
+```
+
+Release when done with `release_file_reservations`.
+
+### When Completing a Bead
+
+Send a completion message so other agents know the dependency is satisfied:
+```json
+{"project_key": "AiModel", "sender_name": "YourName", "to": ["all-agents"], "subject": "Completed AiModel-xxx", "body_md": "Done. Key files created: ... Other agents can now use these exports."}
+```
+
+### Registered Agents
+
+| Name | Program | Role |
+|------|---------|------|
+| Claude1 | claude-code | Implementation |
+| OpenCode1 | opencode | Implementation |
+
+## How to Work on a Bead
+
+1. **Claim it:** `bd update <id> --status=in_progress`
+2. **Read the plan:** Open `plans/06-final-plan.md` and find the section referenced in the bead description
+3. **Implement:** Write code in the correct `src/` path as specified in the bead
+4. **Test:** Write tests alongside implementation. Run `npm test` or `npx vitest`
+5. **Verify acceptance criteria:** Check every item in the bead's acceptance list
+6. **Close:** `bd close <id>`
+7. **Pick next:** `bd ready` or `bv`
+
+## Coding Standards
+
+- **TypeScript strict mode.** No `any`, no `@ts-ignore`.
+- **Feature-oriented file structure.** Code goes in `src/features/<domain>/`.
+- **Named exports only.** No default exports.
+- **Zod for all runtime validation.** Config schemas, import validation, etc.
+- **shadcn/ui for UI primitives.** Button, Dialog, Tabs, Badge — use shadcn, don't reinvent.
+- **Tailwind for styling.** No CSS modules, no styled-components.
+- **Small, focused commits.** One bead = one commit (or a few).
+
+## Milestone Order
+
+Work proceeds through 6 milestones in sequence:
+
+1. **Document Model & Registry** — Types, node templates, registry (Epic: AiModel-9wx)
+2. **Canvas & Authoring Shell** — React Flow, Zustand, commands (Epic: AiModel-k6g)
+3. **Validation & Preview** — Graph validator, preview engine, data inspector (Epic: AiModel-1n1)
+4. **Mock Execution** — Run planner, executor, cache, toolbar (Epic: AiModel-ecs)
+5. **Persistence & Recovery** — Dexie, boot, import/export, crash recovery (Epic: AiModel-e0x)
+6. **Templates & Polish** — Built-in templates, shortcuts, a11y (Epic: AiModel-537)
+
+Each milestone's tasks have explicit dependencies. Trust the graph.
+
+## When You're Stuck
+
+- Re-read the relevant plan section
+- Check if a dependency bead has context you need
+- Ask via Agent Mail if another agent has worked on related code
+- If the plan is ambiguous, make a reasonable decision and note it in a comment on the bead
+
+<!-- bv-agent-instructions-v1 -->
+
+---
+
+## Beads Workflow Integration
+
+This project uses [beads_viewer](https://github.com/Dicklesworthstone/beads_viewer) for issue tracking. Issues are stored in `.beads/` and tracked in git.
+
+### Essential Commands
+
+```bash
+# View issues (launches TUI - avoid in automated sessions)
+bv
+
+# CLI commands for agents (use these instead)
+bd ready              # Show issues ready to work (no blockers)
+bd list --status=open # All open issues
+bd show <id>          # Full issue details with dependencies
+bd create --title="..." --type=task --priority=2
+bd update <id> --status=in_progress
+bd close <id> --reason="Completed"
+bd close <id1> <id2>  # Close multiple issues at once
+bd sync               # Commit and push changes
+```
+
+### Workflow Pattern
+
+1. **Start**: Run `bd ready` to find actionable work
+2. **Claim**: Use `bd update <id> --status=in_progress`
+3. **Work**: Implement the task
+4. **Complete**: Use `bd close <id>`
+5. **Sync**: Always run `bd sync` at session end
+
+### Key Concepts
+
+- **Dependencies**: Issues can block other issues. `bd ready` shows only unblocked work.
+- **Priority**: P0=critical, P1=high, P2=medium, P3=low, P4=backlog (use numbers, not words)
+- **Types**: task, bug, feature, epic, question, docs
+- **Blocking**: `bd dep add <issue> <depends-on>` to add dependencies
+
+### Session Protocol
+
+**Before ending any session, run this checklist:**
+
+```bash
+git status              # Check what changed
+git add <files>         # Stage code changes
+bd sync                 # Commit beads changes
+git commit -m "..."     # Commit code
+bd sync                 # Commit any new beads changes
+git push                # Push to remote
+```
+
+### Best Practices
+
+- Check `bd ready` at session start to find available work
+- Update status as you work (in_progress → closed)
+- Create new issues with `bd create` when you discover tasks
+- Use descriptive titles and set appropriate priority/type
+- Always `bd sync` before ending session
+
+<!-- end-bv-agent-instructions -->

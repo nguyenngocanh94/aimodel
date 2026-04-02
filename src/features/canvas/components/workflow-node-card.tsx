@@ -99,8 +99,9 @@ function RunStatusBadge({
       variant={entry.variant}
       className="h-5 w-5 p-0 flex items-center justify-center"
       title={entry.title}
+      aria-label={entry.title}
     >
-      <Icon className={cn('h-3 w-3', entry.className)} />
+      <Icon className={cn('h-3 w-3', entry.className)} aria-hidden="true" />
     </Badge>
   );
 }
@@ -126,6 +127,9 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
 
   return (
     <div
+      role="button"
+      aria-label={`${node.label}${disabled ? ' (disabled)' : ''}${runStatus && runStatus !== 'idle' ? `, status: ${runStatus}` : ''}`}
+      aria-selected={selected}
       className={cn(
         'relative min-w-[180px] max-w-[240px] rounded-lg border-2 bg-card shadow-sm transition-all',
         borderColor,
@@ -149,8 +153,9 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
               <Badge
                 variant="destructive"
                 className="h-5 w-5 p-0 flex items-center justify-center"
+                aria-label={`${validationIssues} validation ${validationIssues === 1 ? 'issue' : 'issues'}`}
               >
-                <AlertCircle className="h-3 w-3" />
+                <AlertCircle className="h-3 w-3" aria-hidden="true" />
               </Badge>
             )}
 
