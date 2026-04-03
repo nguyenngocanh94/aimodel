@@ -5,7 +5,7 @@
  * Per plan section 6.7
  */
 
-import { Workflow, Plus, Keyboard, Sparkles } from 'lucide-react'
+import { Workflow, Plus, Keyboard, Sparkles, Film, Megaphone, GraduationCap } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { builtInTemplates, type WorkflowTemplate } from '@/features/templates/built-in-templates'
 import { SHORTCUT_DEFINITIONS } from '@/features/canvas/hooks/use-canvas-shortcuts'
@@ -13,6 +13,13 @@ import { SHORTCUT_DEFINITIONS } from '@/features/canvas/hooks/use-canvas-shortcu
 interface CanvasEmptyStateProps {
   readonly onSelectTemplate?: (template: WorkflowTemplate) => void
   readonly onAddNode?: () => void
+}
+
+/** Template ID → icon and color mapping per design system */
+const templateIcons: Record<string, { icon: typeof Film; color: string }> = {
+  'marketing-clip': { icon: Film, color: 'text-node-video' },        // amber
+  'social-ad': { icon: Megaphone, color: 'text-node-visuals' },     // violet
+  'educational-explainer': { icon: GraduationCap, color: 'text-cyan-400' }, // cyan
 }
 
 export function CanvasEmptyState({ onSelectTemplate, onAddNode }: CanvasEmptyStateProps) {
@@ -40,32 +47,41 @@ export function CanvasEmptyState({ onSelectTemplate, onAddNode }: CanvasEmptySta
             Start from template
           </div>
           <div className="grid gap-2">
-            {builtInTemplates.map((template) => (
-              <button
-                key={template.id}
-                className="flex items-start gap-3 rounded-lg border p-3 text-left hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 transition-colors"
-                onClick={() => onSelectTemplate?.(template)}
-                aria-label={`Start from template: ${template.name}`}
-                data-testid={`template-${template.id}`}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-foreground">{template.name}</div>
-                  <div className="text-xs text-muted-foreground line-clamp-1">
-                    {template.description}
+            {builtInTemplates.map((template) => {
+              const iconConfig = templateIcons[template.id]
+              const Icon = iconConfig?.icon ?? Sparkles
+              const iconColor = iconConfig?.color ?? 'text-muted-foreground'
+              
+              return (
+                <button
+                  key={template.id}
+                  className="flex items-start gap-3 rounded-lg border border-border p-3 text-left hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 transition-colors"
+                  onClick={() => onSelectTemplate?.(template)}
+                  aria-label={`Start from template: ${template.name}`}
+                  data-testid={`template-${template.id}`}
+                >
+                  <div className={`shrink-0 ${iconColor}`}>
+                    <Icon className="h-5 w-5" aria-hidden="true" />
                   </div>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {template.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="text-[9px] bg-muted rounded px-1 py-0.5 text-muted-foreground"
-                      >
-                        {tag}
-                      </span>
-                    ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-foreground">{template.name}</div>
+                    <div className="text-xs text-muted-foreground line-clamp-1">
+                      {template.description}
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {template.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="text-[9px] bg-muted rounded px-1 py-0.5 text-muted-foreground"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              )
+            })}
           </div>
         </div>
 
