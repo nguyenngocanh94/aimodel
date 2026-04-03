@@ -8,7 +8,7 @@ import type {
 } from '@/features/workflows/domain/workflow-types'
 
 /** Inspector tab selection; authoring-adjacent but not part of undo/redo. */
-export type InspectorTab = 'config' | 'validation' | 'metadata' | 'data'
+export type InspectorTab = 'config' | 'preview' | 'data' | 'validation' | 'metadata'
 
 export interface LibraryUiState {
   readonly searchQuery: string

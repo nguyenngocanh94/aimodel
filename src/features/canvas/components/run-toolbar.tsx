@@ -139,7 +139,7 @@ export function RunToolbar() {
         </span>
         {isDirty && (
           <span
-            className="rounded-sm border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-200"
+            className="rounded-sm border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning"
             data-testid="workflow-dirty-indicator"
             title="Unsaved local snapshot"
           >

@@ -20,12 +20,12 @@ function resolveCategory(dataType?: string): EdgeDataCategory {
   return 'data';
 }
 
-/* ── Pill color lookup ── */
+/* ── Pill color lookup — uses node category tokens from design system ── */
 const pillStyles: Record<EdgeDataCategory, string> = {
-  video: 'border-amber-400/40 text-amber-200',
-  audio: 'border-teal-400/40 text-teal-200',
-  image: 'border-sky-400/40 text-sky-200',
-  data: 'border-violet-400/40 text-violet-200',
+  video: 'border-node-video/40 text-node-video',
+  audio: 'border-node-audio/40 text-node-audio',
+  image: 'border-node-script/40 text-node-script',
+  data: 'border-node-visuals/40 text-node-visuals',
   control: 'border-border text-muted-foreground',
 };
 
@@ -47,6 +47,7 @@ export interface WorkflowEdgeData {
   readonly blocked?: boolean;
   readonly sourceDataType?: string;
   readonly targetDataType?: string;
+  // Index signature required by React Flow's Edge<T> constraint
   [key: string]: unknown;
 }
 
