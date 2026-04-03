@@ -328,7 +328,7 @@ function StatBox({
   readonly color: string
 }) {
   return (
-    <div className="rounded border p-1.5">
+    <div className="border border-border rounded-md p-1.5">
       <div className={`text-base font-semibold ${color}`}>{value}</div>
       <div className="text-[10px] text-muted-foreground">{label}</div>
     </div>

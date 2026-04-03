@@ -173,7 +173,7 @@ export function PayloadViewer({ portKey, payload, source, showProducer = true }:
           {viewMode === 'json' ? (
             <pre className="font-mono text-[11px] bg-muted border border-border rounded-md p-3 max-h-48 overflow-auto whitespace-pre-wrap break-all">
               <code className="text-muted-foreground">{jsonString.slice(0, isLarge ? 10_000 : 5_000)}</code>
-              {jsonString.length > (isLarge ? 10_000 : 5_000) && <span className="text-muted-foreground">\n… truncated</span>}
+              {jsonString.length > (isLarge ? 10_000 : 5_000) && <span className="text-muted-foreground">{'\n'}… truncated</span>}
             </pre>
           ) : (
             <pre className="font-mono text-[11px] bg-muted border border-border rounded-md p-3 max-h-32 overflow-auto">

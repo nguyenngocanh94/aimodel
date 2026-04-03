@@ -139,7 +139,7 @@
 
 /* ── Motion Keyframes ── */
 @keyframes execution-trace {
-  0% { stroke-dashoffset: 24; }
+  0% { stroke-dashoffset: 20; }
   100% { stroke-dashoffset: 0; }
 }
 

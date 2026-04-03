@@ -53,6 +53,7 @@ export interface WorkflowNodeData {
   readonly staleData?: boolean;
   readonly previewAvailable?: boolean;
   readonly footerMeta?: string;
+  readonly errorMessage?: string;
   readonly thumbnailUrls?: readonly string[];
   readonly videoPreviewUrl?: string;
   readonly videoDuration?: string;
@@ -203,6 +204,7 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
     staleData,
     previewAvailable,
     footerMeta,
+    errorMessage,
     thumbnailUrls,
     videoPreviewUrl,
     videoDuration,
@@ -237,7 +239,7 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
         // Disabled
         disabled && 'opacity-55 pointer-events-auto',
         // Error
-        isError && 'border-destructive/60',
+        isError && 'border-2 border-destructive/50',
         // Stale data
         staleData && 'border-dashed',
         // Running — thin amber left rule
@@ -332,6 +334,14 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
         >
           {previewText}
         </p>
+      )}
+
+      {/* Inline error message */}
+      {isError && errorMessage && (
+        <div className="mx-3 mb-2 rounded-sm bg-destructive/[0.06] px-2 py-1.5 flex items-start gap-1.5">
+          <XCircle className="h-3 w-3 shrink-0 text-destructive mt-px" aria-hidden="true" />
+          <span className="text-[11px] text-destructive">{errorMessage}</span>
+        </div>
       )}
 
       {/* Image thumbnail grid (image-generator nodes) */}

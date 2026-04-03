@@ -90,7 +90,11 @@ export const WorkflowEdge = memo(function WorkflowEdge({
 
   /* ── Stroke styling ── */
   const strokeWidth = selected ? 2 : 1.5;
-  const strokeDasharray = isControl || disabled || blocked ? '6 4' : undefined;
+  const strokeDasharray = isRunning
+    ? '12 8'
+    : isControl || disabled || blocked
+      ? '6 4'
+      : undefined;
 
   return (
     <>
