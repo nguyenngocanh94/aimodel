@@ -1,27 +1,20 @@
 import { useMemo } from 'react';
-import { AlertCircle, AlertTriangle, Info } from 'lucide-react';
-import { Badge } from '@/shared/ui/badge';
+import { AlertTriangle, CheckCircle2, Info, XCircle } from 'lucide-react';
 import { useWorkflowStore } from '@/features/workflow/store/workflow-store';
 import { selectDocument } from '@/features/workflow/store/workflow-selectors';
 import { validateWorkflow } from '@/features/workflows/domain/graph-validator';
 import type { ValidationIssue, ValidationSeverity } from '@/features/workflows/domain/workflow-types';
 
-const severityIcons: Record<ValidationSeverity, typeof AlertCircle> = {
-  error: AlertCircle,
+const severityIcons: Record<ValidationSeverity, typeof XCircle> = {
+  error: XCircle,
   warning: AlertTriangle,
   info: Info,
 };
 
 const severityColors: Record<ValidationSeverity, string> = {
   error: 'text-destructive',
-  warning: 'text-amber-500',
-  info: 'text-blue-500',
-};
-
-const severityBadgeVariant: Record<ValidationSeverity, 'destructive' | 'secondary' | 'default'> = {
-  error: 'destructive',
-  warning: 'secondary',
-  info: 'default',
+  warning: 'text-warning',
+  info: 'text-muted-foreground',
 };
 
 /**
@@ -55,10 +48,9 @@ export function ValidationTab({ nodeId }: { readonly nodeId?: string }) {
 
   if (issues.length === 0) {
     return (
-      <div className="text-center py-6">
-        <p className="text-sm text-muted-foreground">
-          No validation issues found.
-        </p>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+        <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
+        No blocking issues
       </div>
     );
   }
@@ -75,22 +67,22 @@ export function ValidationTab({ nodeId }: { readonly nodeId?: string }) {
 
   return (
     <div className="space-y-3">
-      {/* Summary badges */}
-      <div className="flex items-center gap-2">
+      {/* Summary row */}
+      <div className="flex items-center gap-3 pb-3 border-b border-border mb-3 text-xs">
         {errors.length > 0 && (
-          <Badge variant="destructive" className="text-xs">
+          <span className="text-destructive font-medium">
             {errors.length} error{errors.length !== 1 ? 's' : ''}
-          </Badge>
+          </span>
         )}
         {warnings.length > 0 && (
-          <Badge variant="secondary" className="text-xs">
+          <span className="text-warning font-medium">
             {warnings.length} warning{warnings.length !== 1 ? 's' : ''}
-          </Badge>
+          </span>
         )}
         {infos.length > 0 && (
-          <Badge variant="default" className="text-xs">
+          <span className="text-muted-foreground font-medium">
             {infos.length} info
-          </Badge>
+          </span>
         )}
       </div>
 
@@ -113,7 +105,7 @@ export function ValidationTab({ nodeId }: { readonly nodeId?: string }) {
                   key={issue.id}
                   type="button"
                   onClick={() => handleIssueClick(issue)}
-                  className="w-full text-left flex items-start gap-2 rounded-md border p-2 transition-colors hover:bg-accent/50"
+                  className="w-full text-left flex items-start gap-2 rounded-md border border-border p-2 transition-colors hover:bg-accent/50"
                   data-testid={`validation-item-${issue.code}`}
                 >
                   <Icon
@@ -126,15 +118,12 @@ export function ValidationTab({ nodeId }: { readonly nodeId?: string }) {
                         {issue.suggestion}
                       </p>
                     )}
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <Badge
-                        variant={severityBadgeVariant[issue.severity]}
-                        className="h-4 px-1 text-[9px]"
-                      >
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="font-mono text-[10px] text-muted-foreground">
                         {issue.code}
-                      </Badge>
+                      </span>
                       {issue.nodeId && (
-                        <span className="text-[9px] text-muted-foreground font-mono">
+                        <span className="text-primary text-[10px] hover:underline cursor-pointer">
                           {issue.nodeId}
                         </span>
                       )}

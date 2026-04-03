@@ -4,7 +4,7 @@
  * Per plan section 6.5
  */
 
-import { useMemo, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import { Copy, Download, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
@@ -61,7 +61,7 @@ export function PayloadViewer({ portKey, payload, source, showProducer = true }:
   }
 
   return (
-    <div className="rounded-md border p-2 space-y-1.5" data-testid={`payload-${portKey}`}>
+    <div className="rounded-md border p-2 space-y-1.5 transition-pulse" data-testid={`payload-${portKey}`}>
       {/* Header row */}
       <div className="flex items-center justify-between gap-1">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -172,8 +172,8 @@ export function PayloadViewer({ portKey, payload, source, showProducer = true }:
 
           {viewMode === 'json' ? (
             <pre className="font-mono text-[11px] bg-muted border border-border rounded-md p-3 max-h-48 overflow-auto whitespace-pre-wrap break-all">
-              <code className="text-muted-foreground">{jsonString.slice(0, isLarge ? 10_000 : 5_000)}</code>
-              {jsonString.length > (isLarge ? 10_000 : 5_000) && <span className="text-muted-foreground">{'\n'}… truncated</span>}
+              <code>{syntaxHighlightJson(jsonString.slice(0, isLarge ? 10_000 : 5_000))}</code>
+              {jsonString.length > (isLarge ? 10_000 : 5_000) && <span className="text-muted-foreground">{'\n'}... truncated</span>}
             </pre>
           ) : (
             <pre className="font-mono text-[11px] bg-muted border border-border rounded-md p-3 max-h-32 overflow-auto">
@@ -181,7 +181,7 @@ export function PayloadViewer({ portKey, payload, source, showProducer = true }:
                 {typeof payload.value === 'string'
                   ? payload.value.slice(0, 500)
                   : jsonString.slice(0, 500)}
-                {jsonString.length > 500 && '…'}
+                {jsonString.length > 500 && '...'}
               </code>
             </pre>
           )}
@@ -235,4 +235,65 @@ function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+/**
+ * Tokenise a JSON string and return syntax-highlighted React nodes.
+ *
+ * Colour mapping (design-system tokens + Tailwind):
+ *   Keys        text-cyan-400
+ *   Strings     text-green-400
+ *   Numbers     text-amber-400
+ *   Booleans    text-violet-400
+ *   Null        text-muted-foreground
+ *   Brackets    text-foreground/60
+ */
+const JSON_TOKEN_RE =
+  /("(?:\\.|[^"\\])*"\s*:)|("(?:\\.|[^"\\])*")|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b|(true|false)|(null)|([[\]{}])|([,:])|([ \t\n\r]+)/g
+
+function syntaxHighlightJson(raw: string): ReactNode[] {
+  const nodes: ReactNode[] = []
+  let match: RegExpExecArray | null
+  let lastIndex = 0
+
+  // Reset regex state for each call
+  JSON_TOKEN_RE.lastIndex = 0
+
+  while ((match = JSON_TOKEN_RE.exec(raw)) !== null) {
+    // Any text between matches (shouldn't happen for valid JSON, but be safe)
+    if (match.index > lastIndex) {
+      nodes.push(raw.slice(lastIndex, match.index))
+    }
+    lastIndex = JSON_TOKEN_RE.lastIndex
+
+    const idx = match.index
+    if (match[1] !== undefined) {
+      // Object key (includes trailing colon)
+      const colonIdx = match[1].lastIndexOf(':')
+      nodes.push(
+        <span key={`k${idx}`} className="text-cyan-400">{match[1].slice(0, colonIdx)}</span>,
+        <span key={`c${idx}`} className="text-foreground/60">{match[1].slice(colonIdx)}</span>,
+      )
+    } else if (match[2] !== undefined) {
+      nodes.push(<span key={`s${idx}`} className="text-green-400">{match[2]}</span>)
+    } else if (match[3] !== undefined) {
+      nodes.push(<span key={`n${idx}`} className="text-amber-400">{match[3]}</span>)
+    } else if (match[4] !== undefined) {
+      nodes.push(<span key={`b${idx}`} className="text-violet-400">{match[4]}</span>)
+    } else if (match[5] !== undefined) {
+      nodes.push(<span key={`x${idx}`} className="text-muted-foreground">{match[5]}</span>)
+    } else if (match[6] !== undefined) {
+      nodes.push(<span key={`br${idx}`} className="text-foreground/60">{match[6]}</span>)
+    } else {
+      // Punctuation (comma, colon) or whitespace - no special colouring
+      nodes.push(match[0])
+    }
+  }
+
+  // Trailing text
+  if (lastIndex < raw.length) {
+    nodes.push(raw.slice(lastIndex))
+  }
+
+  return nodes
 }

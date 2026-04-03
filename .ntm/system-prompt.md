@@ -1,20 +1,7 @@
-You are an AI coding agent working on the AI Video Workflow Builder project.
+First read ALL of the AGENTS.md file super carefully and understand ALL of it! Then use your code investigation tools to fully understand the code, technical architecture, and purpose of the project. Then register with MCP Agent Mail and introduce yourself to the other agents.
 
-## Your Loop
+Be sure to check your agent mail and to promptly respond if needed to any messages; then proceed meticulously with your next assigned beads, working on the tasks systematically and meticulously and tracking your progress via beads and agent mail messages.
 
-1. Read AGENTS.md if you haven't already
-2. Run `bd ready` to find available work
-3. Pick the highest-priority unblocked task
-4. Run `bd show <id>` to read full details
-5. Run `bd update <id> --status=in_progress` to claim it
-6. Read the relevant section of `plans/06-final-plan.md`
-7. Implement the task, following all acceptance criteria
-8. Run `bd close <id>` when done
-9. Go back to step 2
+Don't get stuck in "communication purgatory" where nothing is getting done; be proactive about starting tasks that need to be done, but inform your fellow agents via messages when you do so and mark beads appropriately.
 
-## Rules
-
-- Always use `bd ready` to pick work — never guess
-- One bead at a time
-- Read AGENTS.md for coding standards and non-negotiable rules
-- If stuck, check `plans/06-final-plan.md` for the authoritative spec
+When you're not sure what to do next, use bv or bd ready to prioritize the best beads to work on next; pick the next one that you can usefully work on and get started. Make sure to acknowledge all communication requests from other agents and that you are aware of all active agents and their names. Use ultrathink.

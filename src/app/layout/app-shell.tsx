@@ -1,3 +1,5 @@
+import { useRef } from 'react'
+import type { PanelImperativeHandle } from 'react-resizable-panels'
 import { CanvasSurface } from '@/features/canvas/components/canvas-surface'
 import { RunToolbar } from '@/features/canvas/components/run-toolbar'
 import { InspectorPanel } from '@/features/inspector/components/inspector-panel'
@@ -26,7 +28,13 @@ function AppStatusBar() {
   )
 }
 
+const DEFAULT_LEFT_SIZE = 22
+const DEFAULT_RIGHT_SIZE = 25
+
 export function AppShell() {
+  const leftPanelRef = useRef<PanelImperativeHandle>(null)
+  const rightPanelRef = useRef<PanelImperativeHandle>(null)
+
   return (
     <div className="flex h-screen min-h-0 flex-col bg-background">
       <DegradedModeBanner />
@@ -35,8 +43,9 @@ export function AppShell() {
         <ResizablePanelGroup orientation="horizontal" className="h-full">
           {/* Left panel: Node library (280px default ≈ 22%) */}
           <ResizablePanel
+            panelRef={leftPanelRef}
             id="node-library"
-            defaultSize={22}
+            defaultSize={DEFAULT_LEFT_SIZE}
             minSize={14}
             maxSize={36}
             collapsible
@@ -50,6 +59,7 @@ export function AppShell() {
             withHandle
             aria-label="Resize node library"
             data-testid="panel-resize-left"
+            onDoubleClick={() => leftPanelRef.current?.resize(DEFAULT_LEFT_SIZE)}
           />
 
           {/* Center panel: Canvas + Run Toolbar */}
@@ -65,12 +75,14 @@ export function AppShell() {
             withHandle
             aria-label="Resize inspector"
             data-testid="panel-resize-right"
+            onDoubleClick={() => rightPanelRef.current?.resize(DEFAULT_RIGHT_SIZE)}
           />
 
           {/* Right panel: Inspector (400px default ≈ 25%) */}
           <ResizablePanel
+            panelRef={rightPanelRef}
             id="inspector"
-            defaultSize={25}
+            defaultSize={DEFAULT_RIGHT_SIZE}
             minSize={16}
             maxSize={40}
             collapsible

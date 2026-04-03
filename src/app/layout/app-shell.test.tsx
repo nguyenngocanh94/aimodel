@@ -21,7 +21,7 @@ describe('AppShell', () => {
     // Node library and inspector both show "Nodes"
     expect(screen.getAllByText('Nodes').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByTestId('canvas-surface')).toBeInTheDocument()
-    expect(screen.getByTestId('inspector')).toBeInTheDocument()
+    expect(screen.getByTestId('inspector-panel-content')).toBeInTheDocument()
     expect(screen.getByTestId('run-toolbar')).toBeInTheDocument()
     expect(screen.getByText('No selection')).toBeInTheDocument()
   })

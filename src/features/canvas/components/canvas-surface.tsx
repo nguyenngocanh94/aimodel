@@ -515,14 +515,20 @@ function CanvasSurfaceInner() {
         }}
         proOptions={{ hideAttribution: true }}
       >
-        <Background gap={15} size={1} />
-        {!isEmpty && <Controls />}
+        <Background gap={15} size={1} color="#1A2230" />
+        {!isEmpty && (
+          <Controls
+            className="!bg-card !border !border-border !rounded-md !shadow-sm [&>button]:!bg-card [&>button]:!text-foreground [&>button]:!border-border [&>button:hover]:!bg-accent"
+          />
+        )}
         {!isEmpty && (
           <MiniMap
             nodeStrokeWidth={3}
             zoomable
             pannable
-            className="!bottom-20"
+            className="!bottom-20 !bg-background !border !border-border !rounded-md"
+            nodeColor="#252B36"
+            maskColor="rgba(11, 13, 18, 0.7)"
           />
         )}
       </ReactFlow>
