@@ -250,6 +250,7 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
       data-dragging={dragging || undefined}
       data-disabled={disabled || undefined}
       data-running={isRunning || undefined}
+      data-stale={staleData || undefined}
     >
       {/* Category accent line (2px top bar) */}
       <div

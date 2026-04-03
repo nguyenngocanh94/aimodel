@@ -39,7 +39,7 @@ export function InspectorPanel() {
   return (
     <aside
       className="flex h-full w-[400px] min-w-[320px] max-w-[480px] flex-col border-l border-border bg-card text-card-foreground"
-      data-testid="inspector-panel-content"
+      data-testid="inspector"
       aria-label="Inspector"
     >
       {/* Sticky header */}

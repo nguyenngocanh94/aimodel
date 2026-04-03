@@ -81,7 +81,7 @@ export function AppShell() {
           {/* Right panel: Inspector (400px default ≈ 25%) */}
           <ResizablePanel
             panelRef={rightPanelRef}
-            id="inspector"
+            id="right-panel"
             defaultSize={DEFAULT_RIGHT_SIZE}
             minSize={16}
             maxSize={40}

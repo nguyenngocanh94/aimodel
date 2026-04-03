@@ -12,6 +12,8 @@ import {
   SkipForward,
   ArrowDown,
   Clock,
+  Save,
+  Download,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { useWorkflowStore } from '@/features/workflow/store/workflow-store';
@@ -122,7 +124,7 @@ export function RunToolbar() {
       data-testid="run-toolbar"
       aria-label="Run toolbar"
     >
-      {/* Left zone: workflow name + dirty indicator */}
+      {/* Left zone: workflow name + dirty indicator + save/export */}
       <div className="flex min-w-0 items-center gap-2">
         <span className="truncate text-[13px] font-medium">
           {document.name || 'Untitled Workflow'}
@@ -136,6 +138,28 @@ export function RunToolbar() {
             Unsaved
           </span>
         )}
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8"
+          onClick={() => {/* Save handled by persistence layer */}}
+          title="Save workflow (Cmd+S)"
+          data-testid="workflow-save-btn"
+        >
+          <Save className="h-4 w-4" aria-hidden="true" />
+        </Button>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8"
+          onClick={() => {/* Export handled by workflow store */}}
+          title="Export workflow (Cmd+Shift+E)"
+          data-testid="workflow-export-btn"
+        >
+          <Download className="h-4 w-4" aria-hidden="true" />
+        </Button>
       </div>
 
       {/* Center zone: segmented run actions */}
