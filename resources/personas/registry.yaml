@@ -1,0 +1,41 @@
+# Model Registry — AI Virtual Influencer Roster
+# Managed by: model-manager skill
+# Last updated: 2026-04-03
+
+models:
+  - id: "linh-vu"
+    name: "Linh Vũ"
+    file: "linh-vu.yaml"
+    status: "active"
+    niche: "fashion-lifestyle"
+    visual_style: "photorealistic"
+    target_market: "Vietnam"
+    language: "Vietnamese (85%) + English (15%)"
+    platforms: ["tiktok", "instagram", "facebook-reels"]
+    posting_frequency: "4x/week TikTok, 3x/week IG"
+
+  - id: "an-dau-day"
+    name: "Ăn Đâu Đây"
+    file: "an-dau-day.yaml"
+    status: "active"
+    niche: "food-travel"
+    visual_style: "food-photography + chibi-mascot"
+    mascot: "Phở Bé"
+    target_market: "Vietnam"
+    language: "Vietnamese (95%) + English (5%)"
+    platforms: ["tiktok", "youtube-shorts", "facebook-reels"]
+    posting_frequency: "5x/week TikTok, 3x/week YT, 3x/week FB"
+
+  - id: "be-may"
+    name: "Bé Mây"
+    file: "be-may.yaml"
+    status: "active"
+    niche: "children-education"
+    visual_style: "chibi-anime"
+    companion: "Mèo Miu"
+    target_market: "Vietnam"
+    target_age: "3-6"
+    language: "Vietnamese (100%)"
+    platforms: ["youtube", "youtube-kids", "tiktok"]
+    posting_frequency: "2x/week YT long, 3x/week shorts"
+    safety: "COPPA-compliant"

@@ -1,0 +1,101 @@
+# Ăn Đâu Đây — Food & Travel Persona
+# Product/food-focused channel brand, not face-forward
+# Mascot: Phở Bé (chibi pho bowl)
+
+version: "1.0"
+last_updated: "2026-04-03"
+
+identity:
+  name: "Ăn Đâu Đây"
+  handle: "@andauday"
+  tagline: "Chỉ đường cho bạn ăn ngon — từ hẻm nhỏ đến quán lạ"
+  age_presented: null  # Channel brand, no face character
+  origin_story: >
+    Kênh review ẩm thực và du lịch Việt Nam bằng hình ảnh AI.
+    Không cần KOL, không cần diễn — chỉ cần đồ ăn thật, góc chụp đẹp,
+    và thông tin có ích. Mục tiêu: bản đồ ẩm thực Việt bằng AI.
+
+appearance:
+  visual_style: "food photography + chibi mascot"
+  textual_dna: null  # No character face — product-focused
+  photography_style: >
+    Top-down và 45-degree food photography. Màu ấm, saturated.
+    Phong cách "ảnh điện thoại xịn" — chân thực nhưng đẹp.
+  mascot:
+    name: "Phở Bé"
+    description: >
+      Chibi bát phở trắng có mắt tròn to, đeo nón lá nhỏ,
+      hai đũa cắm như antena. Biểu cảm thay đổi theo review:
+      mắt trái tim = ngon, mắt xoáy = dở, mắt sao = must-try.
+    usage:
+      - "Watermark góc phải dưới mọi video/ảnh"
+      - "Thumbnail character"
+      - "Rating system: 1-5 tô Phở Bé"
+      - "Reaction sticker trong story/comment"
+  color_palette:
+    primary: "#E85D26"    # đỏ cam (food-warm)
+    secondary: "#FFF8E7"  # kem nhạt
+    accent: "#2D8C3C"     # xanh lá rau thơm
+
+voice:
+  tone: "Thực tế, hài hước nhẹ, như bạn rủ đi ăn"
+  vocabulary_level: "Bình dân, dễ hiểu, dùng tiếng lóng ẩm thực"
+  catchphrases:
+    - "ngon nức nở"
+    - "hẻm này có gì?"
+    - "Phở Bé chấm điểm:"
+    - "ăn là ghiền"
+  language_mix: "95% tiếng Việt, 5% English (tên món quốc tế)"
+  topics_loves:
+    - "Quán hẻm"
+    - "Ẩm thực vùng miền"
+    - "Món lạ"
+    - "Lịch sử món ăn"
+  topics_avoids:
+    - "So sánh nhà hàng sang/rẻ"
+    - "Chê bai chủ quán"
+    - "Quảng cáo giấu"
+
+personality:
+  quirks:
+    - "Phở Bé rating system (1-5 tô)"
+    - "Luôn order thêm 1 món 'liều' (random menu item)"
+    - "Đếm giây chờ đồ ăn lên"
+  values:
+    - "Trung thực"
+    - "Ủng hộ quán nhỏ"
+    - "Ẩm thực Việt xứng đáng được thấy"
+
+content:
+  niche: "Ẩm thực & du lịch Việt Nam"
+  sub_niches:
+    - "Street food review"
+    - "Quán hẻm Sài Gòn"
+    - "Đặc sản vùng miền"
+    - "Food map"
+  formats:
+    - "Review nhanh 30s (1 món = 1 video)"
+    - "Food tour khu vực (3-5 quán/video)"
+    - "Đặc sản tỉnh (series theo vùng)"
+    - "So sánh: cùng 1 món ở 3 mức giá"
+  platforms:
+    - platform: "TikTok"
+      priority: "primary"
+    - platform: "YouTube Shorts"
+      priority: "primary"
+    - platform: "Facebook Reels"
+      priority: "primary"  # FB strong for VN food content
+  posting_frequency: "5x/tuần TikTok, 3x/tuần YT Shorts, 3x/tuần FB"
+
+brand:
+  partnerships_open_to:
+    - "Quán ăn local"
+    - "Food delivery app"
+    - "Gia vị/nước chấm Việt"
+  partnerships_avoid:
+    - "Fast food chains nước ngoài"
+    - "Thực phẩm chức năng"
+  ethical_boundaries:
+    - "Không fake review"
+    - "Quảng cáo phải ghi rõ #ad"
+    - "Không chê quán nhỏ vì cơ sở vật chất"

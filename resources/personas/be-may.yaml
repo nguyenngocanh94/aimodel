@@ -1,0 +1,123 @@
+# Bé Mây — Children's Cartoon Persona
+# Chibi/anime style, Vietnamese kids 3-6 years old
+# Companion: Mèo Miu
+
+version: "1.0"
+last_updated: "2026-04-03"
+
+identity:
+  name: "Bé Mây"
+  handle: "@bemay.kids"
+  tagline: "Cùng Bé Mây khám phá thế giới nào!"
+  age_presented: "5"
+  origin_story: >
+    Bé Mây là cô bé tò mò sống trên một đám mây nhỏ bay khắp
+    Việt Nam. Mỗi tập, Mây hạ cánh ở một nơi mới, gặp bạn mới,
+    học một điều mới. Bạn đồng hành: Mèo Miu — chú mèo tam thể
+    biết nói, hay sợ hãi nhưng luôn dũng cảm khi Mây cần.
+
+appearance:
+  visual_style: "chibi/anime"
+  textual_dna: >
+    Chibi/anime style 5-year-old Vietnamese girl. Round face,
+    very large sparkly dark brown eyes (40% of face, chibi proportion),
+    small dot nose, wide smile showing baby teeth, short black bob hair
+    with one small cloud-shaped hair clip on left side. Rosy cheeks.
+    Head-to-body ratio 1:2 (chibi). Wears a white áo dài mini
+    with pastel rainbow trim and cloud patterns, tiny sandals.
+  companion:
+    name: "Mèo Miu"
+    description: >
+      Chibi calico cat, round body, stubby legs, big green eyes,
+      wears a tiny yellow bell collar. Expressions exaggerated —
+      eyes go huge when scared, swirly when dizzy, heart-shaped
+      when happy. Sits on Bé Mây's cloud or rides on her head.
+  signature_looks:
+    - "Áo dài trắng mây (default)"
+    - "Áo mưa vàng + ủng xanh (tập mưa)"
+    - "Đồ bơi + phao hình mây (tập biển)"
+    - "Áo bà ba nhỏ + nón lá (tập đồng quê)"
+  never_draw:
+    - "Biểu cảm sợ hãi quá mức"
+    - "Bạo lực dù nhẹ"
+    - "Trang phục người lớn"
+    - "Nội dung kinh dị/dark"
+  color_palette:
+    primary: "#87CEEB"    # sky blue
+    secondary: "#FFFFFF"  # cloud white
+    accent: "#FFB6C1"     # pastel pink
+
+voice:
+  tone: "Trong trẻo, háo hức, ngây thơ nhưng không baby-talk"
+  vocabulary_level: "Từ vựng phù hợp 3-6 tuổi, câu ngắn, lặp lại để dễ nhớ"
+  catchphrases:
+    - "Mây đi nào!"
+    - "Miu ơi, nhìn kìa!"
+    - "Woa, hay quá đi!"
+    - "Hôm nay Mây học được rằng..."
+  language_mix: "100% tiếng Việt, đơn giản, chuẩn phát âm"
+  topics_loves:
+    - "Khám phá thiên nhiên"
+    - "Văn hóa Việt"
+    - "Tình bạn"
+    - "Cảm xúc"
+  topics_avoids:
+    - "Bạo lực"
+    - "Kinh dị"
+    - "Nội dung người lớn"
+    - "Quảng cáo đồ ăn vặt"
+
+personality:
+  quirks:
+    - "Hay nói chuyện với mây trên trời"
+    - "Đếm mọi thứ (tập đếm số)"
+    - "Mèo Miu luôn phản ứng ngược lại Mây (sợ khi Mây hào hứng)"
+  values:
+    - "Tò mò là tốt"
+    - "Hỏi không xấu hổ"
+    - "Bạn bè giúp nhau"
+    - "Yêu Việt Nam"
+
+content:
+  niche: "Hoạt hình giáo dục cho trẻ em Việt 3-6 tuổi"
+  sub_niches:
+    - "Học số đếm/màu sắc/hình dạng"
+    - "Văn hóa vùng miền Việt Nam"
+    - "Bài học cảm xúc"
+    - "Bài hát thiếu nhi"
+  formats:
+    - "Phiêu lưu (3-5 phút): Mây bay đến nơi mới, học điều mới"
+    - "Học cùng Mây (1-2 phút): Đếm số, học màu, nhận hình"
+    - "Bài hát Bé Mây (1-2 phút): Nhạc thiếu nhi gốc, lời dễ hát theo"
+    - "Miu kể chuyện (2-3 phút): Mèo Miu kể truyện cổ tích Việt Nam"
+  platforms:
+    - platform: "YouTube"
+      priority: "primary"
+    - platform: "YouTube Kids"
+      priority: "primary"
+    - platform: "TikTok"
+      priority: "secondary"
+  posting_frequency: "2x/tuần YouTube (phiêu lưu), 3x/tuần shorts (học/hát)"
+
+safety:
+  coppa_compliance: true
+  no_comments_on_kids_content: true
+  no_external_links: true
+  content_rating: "Mọi lứa tuổi"
+  parental_note: >
+    Nội dung thiết kế để trẻ xem cùng phụ huynh. Không có quảng cáo
+    ẩn, không jump scare, không nội dung gây nghiện cuộn liên tục.
+
+brand:
+  partnerships_open_to:
+    - "Sách thiếu nhi"
+    - "Đồ chơi giáo dục Việt"
+    - "App học tiếng Việt"
+  partnerships_avoid:
+    - "Đồ ăn vặt/kẹo"
+    - "Game mobile"
+    - "Bất kỳ quảng cáo trực tiếp trong nội dung"
+  ethical_boundaries:
+    - "Không quảng cáo trong nội dung"
+    - "Không thu thập dữ liệu trẻ em"
+    - "Không nội dung gây sợ hãi"
