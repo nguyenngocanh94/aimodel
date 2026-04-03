@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { runBootSequence, type BootSequenceArgs, type BootState } from './boot-provider'
 import { createMemoryRepository } from '@/features/workflows/data/workflow-repository'
 import type { WorkflowDocument } from '@/features/workflows/domain/workflow-types'

@@ -53,7 +53,7 @@ export function writeRecoveryOnUnload(repository: WorkflowRepository): void {
   const snapshot = buildRecoverySnapshot(
     workflowState.document,
     workflowState.dirty,
-    runState.activeRun?.runId,
+    runState.activeRun?.id,
   )
 
   if (!snapshot) return

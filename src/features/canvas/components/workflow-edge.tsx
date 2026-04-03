@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState, useCallback } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -7,28 +7,51 @@ import {
   type EdgeProps,
 } from '@xyflow/react';
 import { cn } from '@/shared/lib/utils';
-import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
+import { XCircle } from 'lucide-react';
+
+/* ── Edge type → pill display category ── */
+type EdgeDataCategory = 'video' | 'audio' | 'image' | 'data' | 'control';
+
+function resolveCategory(dataType?: string): EdgeDataCategory {
+  if (!dataType) return 'data';
+  if (dataType.startsWith('video')) return 'video';
+  if (dataType.startsWith('audio')) return 'audio';
+  if (dataType.startsWith('image') || dataType === 'imageFrame' || dataType === 'imageFrameList' || dataType === 'imageAsset' || dataType === 'imageAssetList') return 'image';
+  return 'data';
+}
+
+/* ── Pill color lookup ── */
+const pillStyles: Record<EdgeDataCategory, string> = {
+  video: 'border-amber-400/40 text-amber-200',
+  audio: 'border-teal-400/40 text-teal-200',
+  image: 'border-sky-400/40 text-sky-200',
+  data: 'border-violet-400/40 text-violet-200',
+  control: 'border-border text-muted-foreground',
+};
+
+const pillLabels: Record<EdgeDataCategory, string> = {
+  video: 'VIDEO',
+  audio: 'AUDIO',
+  image: 'IMAGE',
+  data: 'DATA',
+  control: 'CTRL',
+};
 
 export interface WorkflowEdgeData {
   readonly validationStatus?: 'valid' | 'invalid' | 'warning';
   readonly carryingData?: boolean;
   readonly lastRunStatus?: 'success' | 'error' | null;
+  readonly isRunning?: boolean;
+  readonly isControl?: boolean;
+  readonly disabled?: boolean;
+  readonly blocked?: boolean;
+  readonly sourceDataType?: string;
+  readonly targetDataType?: string;
   [key: string]: unknown;
 }
 
 export type WorkflowEdgeType = Edge<WorkflowEdgeData, 'workflowEdge'>;
 
-/**
- * WorkflowEdge - Custom React Flow edge component
- *
- * Visual states per plan section 6.3:
- * - default
- * - selected
- * - invalid
- * - warning
- * - carrying data
- * - last-run success/error indicators
- */
 export const WorkflowEdge = memo(function WorkflowEdge({
   id,
   sourceX,
@@ -40,9 +63,17 @@ export const WorkflowEdge = memo(function WorkflowEdge({
   selected,
   data,
 }: EdgeProps<WorkflowEdgeType>) {
+  const [hovered, setHovered] = useState(false);
+
   const validationStatus = data?.validationStatus;
-  const carryingData = data?.carryingData;
+  const isRunning = data?.isRunning ?? false;
+  const isControl = data?.isControl ?? false;
+  const disabled = data?.disabled ?? false;
+  const blocked = data?.blocked ?? false;
   const lastRunStatus = data?.lastRunStatus;
+  const sourceDataType = data?.sourceDataType;
+
+  const category = isControl ? 'control' : resolveCategory(sourceDataType);
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -53,77 +84,106 @@ export const WorkflowEdge = memo(function WorkflowEdge({
     targetPosition,
   });
 
-  // Determine edge styling based on state
-  let strokeColor = 'stroke-border';
-  let strokeWidth = 2;
+  const onMouseEnter = useCallback(() => setHovered(true), []);
+  const onMouseLeave = useCallback(() => setHovered(false), []);
 
-  if (selected) {
-    strokeColor = 'stroke-primary';
-    strokeWidth = 3;
-  } else if (validationStatus === 'invalid') {
-    strokeColor = 'stroke-destructive';
-  } else if (validationStatus === 'warning') {
-    strokeColor = 'stroke-amber-500';
-  } else if (carryingData) {
-    strokeColor = 'stroke-blue-500';
-  } else if (lastRunStatus === 'success') {
-    strokeColor = 'stroke-green-500';
-  } else if (lastRunStatus === 'error') {
-    strokeColor = 'stroke-destructive';
-  }
-
-  const showIndicator = validationStatus || carryingData || lastRunStatus;
+  /* ── Stroke styling ── */
+  const strokeWidth = selected ? 2 : 1.5;
+  const strokeDasharray = isControl || disabled || blocked ? '6 4' : undefined;
 
   return (
     <>
+      {/* Invisible wide hit area for hover */}
+      <path
+        d={edgePath}
+        fill="none"
+        strokeWidth={20}
+        stroke="transparent"
+        className="pointer-events-stroke"
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+      />
+
       <BaseEdge
         id={id}
         path={edgePath}
-        className={cn(strokeColor)}
-        style={{ strokeWidth }}
+        className={cn(
+          'transition-[stroke,stroke-width,opacity] duration-150 ease-out',
+          /* Default */
+          'stroke-border/80',
+          /* Hover */
+          hovered && 'stroke-foreground/70',
+          /* Selected */
+          selected && 'stroke-primary',
+          /* Invalid */
+          validationStatus === 'invalid' && 'stroke-destructive',
+          /* Running */
+          isRunning && 'stroke-signal animate-execution-trace',
+          /* Disabled / blocked */
+          (disabled || blocked) && 'opacity-40',
+        )}
+        style={{
+          strokeWidth,
+          strokeDasharray,
+        }}
+        data-testid={`edge-${id}`}
+        data-hovered={hovered || undefined}
+        data-selected={selected || undefined}
+        data-invalid={validationStatus === 'invalid' || undefined}
+        data-running={isRunning || undefined}
       />
 
-      {/* Status indicators on edge */}
-      {showIndicator && (
-        <EdgeLabelRenderer>
+      {/* Edge label pill + status indicators */}
+      <EdgeLabelRenderer>
+        <div
+          className="nodrag nopan"
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            pointerEvents: 'all',
+          }}
+          onMouseEnter={onMouseEnter}
+          onMouseLeave={onMouseLeave}
+          data-testid={`edge-label-${id}`}
+        >
+          {/* Type pill — visible on hover or when selected */}
           <div
-            className="nodrag nopan pointer-events-none"
-            style={{
-              position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-            }}
+            className={cn(
+              'rounded-sm border bg-card/95 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide shadow-sm backdrop-blur',
+              'transition-opacity duration-150 ease-out',
+              hovered || selected ? 'opacity-100' : 'opacity-0',
+              pillStyles[category],
+            )}
+            data-type={category}
           >
-            <div
-              className={cn(
-                'flex items-center justify-center w-5 h-5 rounded-full bg-background border-2',
-                validationStatus === 'invalid'
-                  ? 'border-destructive text-destructive'
-                  : validationStatus === 'warning'
-                    ? 'border-amber-500 text-amber-500'
-                    : lastRunStatus === 'success'
-                      ? 'border-green-500 text-green-500'
-                      : lastRunStatus === 'error'
-                        ? 'border-destructive text-destructive'
-                        : carryingData
-                          ? 'border-blue-500 text-blue-500'
-                          : 'border-border',
-              )}
-            >
-              {validationStatus === 'invalid' && <XCircle className="w-3 h-3" />}
-              {validationStatus === 'warning' && (
-                <AlertTriangle className="w-3 h-3" />
-              )}
-              {lastRunStatus === 'success' && (
-                <CheckCircle2 className="w-3 h-3" />
-              )}
-              {lastRunStatus === 'error' && <XCircle className="w-3 h-3" />}
-              {carryingData && !validationStatus && !lastRunStatus && (
-                <div className="w-2 h-2 rounded-full bg-current" />
-              )}
-            </div>
+            {pillLabels[category]}
           </div>
-        </EdgeLabelRenderer>
-      )}
+
+          {/* Error marker at midpoint */}
+          {validationStatus === 'invalid' && (
+            <div
+              className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-background border-2 border-destructive text-destructive"
+              title={
+                data?.sourceDataType && data?.targetDataType
+                  ? `Incompatible: expected ${data.targetDataType}`
+                  : 'Incompatible connection'
+              }
+            >
+              <XCircle className="w-3 h-3" aria-hidden="true" />
+            </div>
+          )}
+
+          {/* Success / error last-run markers */}
+          {lastRunStatus === 'error' && validationStatus !== 'invalid' && (
+            <div
+              className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-background border-2 border-destructive text-destructive"
+              title="Last run failed here"
+            >
+              <XCircle className="w-3 h-3" aria-hidden="true" />
+            </div>
+          )}
+        </div>
+      </EdgeLabelRenderer>
     </>
   );
 });

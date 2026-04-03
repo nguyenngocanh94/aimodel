@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ReactFlowProvider } from '@xyflow/react'
 
@@ -20,8 +21,8 @@ describe('AppShell', () => {
     // Node library and inspector both show "Nodes"
     expect(screen.getAllByText('Nodes').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByTestId('canvas-surface')).toBeInTheDocument()
-    expect(screen.getByText('Inspector')).toBeInTheDocument()
+    expect(screen.getByTestId('inspector')).toBeInTheDocument()
     expect(screen.getByTestId('run-toolbar')).toBeInTheDocument()
-    expect(screen.getByText('Nothing selected')).toBeInTheDocument()
+    expect(screen.getByText('No selection')).toBeInTheDocument()
   })
 })

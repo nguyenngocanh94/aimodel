@@ -115,7 +115,7 @@ export function migrateNodeConfig(
   const migratedConfig = migration(node.type, node.config, currentTemplateVersion);
   if (migratedConfig === null) return node;
 
-  return { ...node, config: migratedConfig };
+  return { ...node, config: migratedConfig as WorkflowNode['config'] };
 }
 
 // ============================================================

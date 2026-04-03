@@ -95,18 +95,24 @@ export function PreviewTab({ node }: PreviewTabProps) {
 
       {/* Preview outputs */}
       {nodePreview ? (
-        <div className="space-y-2">
-          <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+        <div className="space-y-2" data-testid={`node-preview-${node.id}`}>
+          <h4 className="section-label">
             Outputs
           </h4>
           {Object.entries(nodePreview).map(([portKey, payload]) => (
-            <PayloadCard key={portKey} portKey={portKey} payload={payload} />
+            <PayloadCard key={portKey} portKey={portKey} payload={payload} nodeId={node.id} />
           ))}
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">
-          No preview available. Connect inputs or select a fixture.
-        </p>
+        /* No preview yet: 16:9 muted frame per section 14 */
+        <div
+          className="aspect-video rounded-md border border-border bg-muted flex items-center justify-center"
+          data-testid={`node-preview-${node.id}`}
+        >
+          <p className="text-xs text-muted-foreground">
+            No preview yet. Run node or select a fixture.
+          </p>
+        </div>
       )}
     </div>
   );
@@ -115,12 +121,14 @@ export function PreviewTab({ node }: PreviewTabProps) {
 function PayloadCard({
   portKey,
   payload,
+  nodeId,
 }: {
   readonly portKey: string;
   readonly payload: PortPayload;
+  readonly nodeId: string;
 }) {
   return (
-    <div className="rounded-md border p-2 space-y-1">
+    <div className="rounded-md border p-2 space-y-1" data-testid={`preview-thumbnail-${nodeId}`}>
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium">{portKey}</span>
         <Badge

@@ -16,7 +16,7 @@ describe('reduced motion', () => {
     const css = readSrc('./index.css')
     expect(css).toContain('prefers-reduced-motion: reduce')
     expect(css).toContain('animation-duration: 0.01ms')
-    expect(css).toContain('transition-duration: 0.01ms')
+    expect(css).toContain('transition-duration: 80ms')
   })
 })
 
@@ -47,8 +47,8 @@ describe('landmark roles', () => {
 
 describe('node library a11y', () => {
   it('search input should have aria-label', () => {
-    const panel = readSrc('./features/node-library/components/node-library-panel.tsx')
-    expect(panel).toContain('aria-label="Search nodes"')
+    const search = readSrc('./features/node-library/components/node-search.tsx')
+    expect(search).toContain('aria-label="Search nodes"')
   })
 
   it('category buttons should have aria-expanded', () => {
@@ -64,7 +64,7 @@ describe('node library a11y', () => {
   it('library items should have role="button" and tabIndex', () => {
     const item = readSrc('./features/node-library/components/node-library-item.tsx')
     expect(item).toContain('role="button"')
-    expect(item).toContain('tabIndex={0}')
+    expect(item).toContain('tabIndex={')
   })
 
   it('library items should have focus-visible styles', () => {

@@ -1,12 +1,10 @@
 import { useMemo } from 'react';
-import { Settings2, Info, Workflow, Eye, AlertTriangle, Database } from 'lucide-react';
-import { Panel, PanelContent, PanelHeader, PanelTitle } from '@/shared/ui/panel';
+import { Settings2, Info, Eye, AlertTriangle, Database } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs';
 import { useWorkflowStore } from '@/features/workflow/store/workflow-store';
 import {
   selectDocument,
   selectSelectedNodeIds,
-  selectSelectedEdgeId,
 } from '@/features/workflow/store/workflow-selectors';
 import { NodeConfigTab } from './node-config-tab';
 import { MetadataTab } from './metadata-tab';
@@ -15,17 +13,12 @@ import { ValidationTab } from './validation-tab';
 import { DataInspectorPanel } from '@/features/data-inspector/components/data-inspector-panel';
 
 /**
- * InspectorPanel - Right panel with context-sensitive inspection
- *
- * Modes per plan section 6.4:
- * - node selected: Config, Metadata tabs
- * - edge selected: edge info
- * - workflow selected / nothing: workflow summary
+ * InspectorPanel - Right panel per design system section 12.
+ * Fixed-width, sticky header + sticky tab list, scroll only inside tab content.
  */
 export function InspectorPanel() {
   const document = useWorkflowStore(selectDocument);
   const selectedNodeIds = useWorkflowStore(selectSelectedNodeIds);
-  const selectedEdgeId = useWorkflowStore(selectSelectedEdgeId);
   const inspectorTab = useWorkflowStore((s) => s.inspectorTab);
   const setInspectorTab = useWorkflowStore((s) => s.setInspectorTab);
 
@@ -34,76 +27,111 @@ export function InspectorPanel() {
     return document.nodes.find((n) => n.id === selectedNodeIds[0]) ?? null;
   }, [document.nodes, selectedNodeIds]);
 
-  const selectedEdge = useMemo(() => {
-    if (!selectedEdgeId) return null;
-    return document.edges.find((e) => e.id === selectedEdgeId) ?? null;
-  }, [document.edges, selectedEdgeId]);
-
   return (
-    <Panel
-      variant="ghost"
-      className="flex h-full min-h-0 flex-col rounded-none border-0 border-l"
+    <aside
+      className="flex h-full w-[400px] min-w-[320px] max-w-[480px] flex-col border-l border-border bg-card text-card-foreground"
+      data-testid="inspector-panel"
+      aria-label="Inspector"
     >
-      <PanelHeader className="border-b px-3 py-2">
-        <PanelTitle className="text-sm font-medium">Inspector</PanelTitle>
-      </PanelHeader>
+      {/* Sticky header */}
+      <div className="sticky top-0 z-10 border-b border-border bg-card/95 px-4 py-3 backdrop-blur">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            {selectedNode ? (
+              <>
+                <h2 className="truncate text-sm font-medium">
+                  {selectedNode.label}
+                </h2>
+                <p className="truncate font-mono text-[11px] text-muted-foreground">
+                  {selectedNode.id}
+                </p>
+              </>
+            ) : (
+              <h2 className="text-sm font-medium text-muted-foreground">
+                No selection
+              </h2>
+            )}
+          </div>
+        </div>
+      </div>
 
-      <PanelContent className="flex flex-1 flex-col overflow-hidden p-0">
-        {/* Node selected */}
-        {selectedNode && (
-          <Tabs
-            value={inspectorTab}
-            onValueChange={(v) => setInspectorTab(v as typeof inspectorTab)}
-            className="flex flex-1 flex-col overflow-hidden"
+      {/* Tabs when node is selected */}
+      {selectedNode ? (
+        <Tabs
+          value={inspectorTab}
+          onValueChange={(v) => setInspectorTab(v as typeof inspectorTab)}
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          <TabsList
+            className="grid grid-cols-5 rounded-none border-b border-border bg-card px-2 py-1"
+            data-testid="inspector-tabs"
           >
-            <TabsList className="mx-3 mt-2 h-8">
-              <TabsTrigger value="config" className="text-xs h-6 gap-1">
-                <Settings2 className="h-3 w-3" />
-                Config
-              </TabsTrigger>
-              <TabsTrigger value="validation" className="text-xs h-6 gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                Valid
-              </TabsTrigger>
-              <TabsTrigger value="data" className="text-xs h-6 gap-1">
-                <Eye className="h-3 w-3" />
-                Preview
-              </TabsTrigger>
-              <TabsTrigger value="inspect" className="text-xs h-6 gap-1">
-                <Database className="h-3 w-3" />
-                Data
-              </TabsTrigger>
-              <TabsTrigger value="metadata" className="text-xs h-6 gap-1">
-                <Info className="h-3 w-3" />
-                Meta
-              </TabsTrigger>
-            </TabsList>
+            <TabsTrigger
+              value="config"
+              className="text-xs gap-1 transition-tab"
+              data-testid="inspector-tab-config"
+            >
+              <Settings2 className="h-3 w-3" aria-hidden="true" />
+              Config
+            </TabsTrigger>
+            <TabsTrigger
+              value="data"
+              className="text-xs gap-1 transition-tab"
+              data-testid="inspector-tab-preview"
+            >
+              <Eye className="h-3 w-3" aria-hidden="true" />
+              Preview
+            </TabsTrigger>
+            <TabsTrigger
+              value="inspect"
+              className="text-xs gap-1 transition-tab"
+              data-testid="inspector-tab-data"
+            >
+              <Database className="h-3 w-3" aria-hidden="true" />
+              Data
+            </TabsTrigger>
+            <TabsTrigger
+              value="validation"
+              className="text-xs gap-1 transition-tab"
+              data-testid="inspector-tab-validation"
+            >
+              <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+              Valid
+            </TabsTrigger>
+            <TabsTrigger
+              value="metadata"
+              className="text-xs gap-1 transition-tab"
+              data-testid="inspector-tab-metadata"
+            >
+              <Info className="h-3 w-3" aria-hidden="true" />
+              Meta
+            </TabsTrigger>
+          </TabsList>
 
-            <div className="flex-1 overflow-y-auto px-3 py-2">
-              <TabsContent value="config" className="m-0">
-                <NodeConfigTab node={selectedNode} />
-              </TabsContent>
-              <TabsContent value="validation" className="m-0">
-                <ValidationTab nodeId={selectedNode.id} />
-              </TabsContent>
-              <TabsContent value="data" className="m-0">
-                <PreviewTab node={selectedNode} />
-              </TabsContent>
-              <TabsContent value="inspect" className="m-0">
-                <DataInspectorPanel />
-              </TabsContent>
-              <TabsContent value="metadata" className="m-0">
-                <MetadataTab node={selectedNode} />
-              </TabsContent>
-            </div>
-          </Tabs>
-        )}
-
-        {/* Edge selected or nothing selected: show Data Inspector */}
-        {!selectedNode && (
+          <div className="min-h-0 flex-1 overflow-auto bg-card px-4 py-4">
+            <TabsContent value="config" className="m-0">
+              <NodeConfigTab node={selectedNode} />
+            </TabsContent>
+            <TabsContent value="data" className="m-0">
+              <PreviewTab node={selectedNode} />
+            </TabsContent>
+            <TabsContent value="inspect" className="m-0">
+              <DataInspectorPanel />
+            </TabsContent>
+            <TabsContent value="validation" className="m-0">
+              <ValidationTab nodeId={selectedNode.id} />
+            </TabsContent>
+            <TabsContent value="metadata" className="m-0">
+              <MetadataTab node={selectedNode} />
+            </TabsContent>
+          </div>
+        </Tabs>
+      ) : (
+        /* No selection: show data inspector or guidance */
+        <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
           <DataInspectorPanel />
-        )}
-      </PanelContent>
-    </Panel>
+        </div>
+      )}
+    </aside>
   );
 }

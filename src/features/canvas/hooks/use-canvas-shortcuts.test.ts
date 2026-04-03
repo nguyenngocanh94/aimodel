@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useCanvasShortcuts, SHORTCUT_DEFINITIONS, type CanvasShortcutsOptions } from './use-canvas-shortcuts'
 import { useWorkflowStore } from '@/features/workflow/store/workflow-store'

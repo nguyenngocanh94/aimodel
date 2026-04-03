@@ -80,6 +80,7 @@ export function CanvasEmptyState({ onSelectTemplate, onAddNode }: CanvasEmptySta
           variant="outline"
           className="gap-2"
           onClick={onAddNode}
+          data-testid="canvas-empty-cta"
         >
           <Plus className="h-4 w-4" />
           Add first node

@@ -1,5 +1,4 @@
-import { render, screen, act } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act as actHook } from '@testing-library/react'
 import { StoryboardPlayer, useStoryboardPlayback } from './storyboard-player'

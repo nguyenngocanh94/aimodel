@@ -114,6 +114,7 @@ export function ValidationTab({ nodeId }: { readonly nodeId?: string }) {
                   type="button"
                   onClick={() => handleIssueClick(issue)}
                   className="w-full text-left flex items-start gap-2 rounded-md border p-2 transition-colors hover:bg-accent/50"
+                  data-testid={`validation-item-${issue.code}`}
                 >
                   <Icon
                     className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${severityColors[issue.severity]}`}

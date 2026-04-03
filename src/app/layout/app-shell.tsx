@@ -33,32 +33,47 @@ export function AppShell() {
       <AppHeader />
       <main className="min-h-0 flex-1" aria-label="Workflow editor">
         <ResizablePanelGroup orientation="horizontal" className="h-full">
+          {/* Left panel: Node library (280px default ≈ 22%) */}
           <ResizablePanel
             id="node-library"
             defaultSize={22}
             minSize={14}
             maxSize={36}
+            collapsible
             className="min-w-[12rem]"
           >
             <nav aria-label="Node library">
               <NodeLibraryPanel />
             </nav>
           </ResizablePanel>
-          <ResizableHandle withHandle aria-label="Resize node library" />
+          <ResizableHandle
+            withHandle
+            aria-label="Resize node library"
+            data-testid="panel-resize-left"
+          />
+
+          {/* Center panel: Canvas + Run Toolbar */}
           <ResizablePanel id="canvas" defaultSize={53} minSize={35} className="min-w-0">
             <div className="flex h-full min-h-0 flex-col">
+              <RunToolbar />
               <div className="min-h-0 flex-1">
                 <CanvasSurface />
               </div>
-              <RunToolbar />
             </div>
           </ResizablePanel>
-          <ResizableHandle withHandle aria-label="Resize inspector" />
+          <ResizableHandle
+            withHandle
+            aria-label="Resize inspector"
+            data-testid="panel-resize-right"
+          />
+
+          {/* Right panel: Inspector (400px default ≈ 25%) */}
           <ResizablePanel
             id="inspector"
             defaultSize={25}
             minSize={16}
             maxSize={40}
+            collapsible
             className="min-w-[14rem]"
           >
             <section aria-label="Inspector">

@@ -11,28 +11,29 @@ import {
   StopCircle,
   PauseCircle,
   Clock,
+  MoreVertical,
 } from 'lucide-react';
 import type { WorkflowNode, NodeRunRecord } from '@/features/workflows/domain/workflow-types';
 
-// Map category to color
-const categoryColors: Record<string, string> = {
-  input: 'bg-blue-500',
-  script: 'bg-amber-500',
-  visuals: 'bg-purple-500',
-  audio: 'bg-pink-500',
-  video: 'bg-red-500',
-  utility: 'bg-gray-500',
-  output: 'bg-green-500',
+/* ── Category accent colors (from design-system tokens) ── */
+const categoryAccentBg: Record<string, string> = {
+  input: 'bg-node-input/70',
+  script: 'bg-node-script/70',
+  visuals: 'bg-node-visuals/70',
+  audio: 'bg-node-audio/70',
+  video: 'bg-node-video/70',
+  utility: 'bg-node-utility/70',
+  output: 'bg-node-output/70',
 };
 
-const categoryBorderColors: Record<string, string> = {
-  input: 'border-blue-500/50',
-  script: 'border-amber-500/50',
-  visuals: 'border-purple-500/50',
-  audio: 'border-pink-500/50',
-  video: 'border-red-500/50',
-  utility: 'border-gray-500/50',
-  output: 'border-green-500/50',
+const categoryIconTint: Record<string, string> = {
+  input: 'text-node-input',
+  script: 'text-node-script',
+  visuals: 'text-node-visuals',
+  audio: 'text-node-audio',
+  video: 'text-node-video',
+  utility: 'text-node-utility',
+  output: 'text-node-output',
 };
 
 export type NodeRunStatus = NodeRunRecord['status'] | 'idle';
@@ -47,28 +48,47 @@ export interface WorkflowNodeData {
   readonly skipReason?: NodeRunRecord['skipReason'];
   readonly disabled?: boolean;
   readonly previewText?: string;
+  readonly staleData?: boolean;
+  readonly previewAvailable?: boolean;
+  readonly footerMeta?: string;
   [key: string]: unknown;
 }
 
 export type WorkflowNodeType = Node<WorkflowNodeData, 'workflowNode'>;
 
-/**
- * WorkflowNodeCard - Custom React Flow node component
- *
- * Visual features per plan section 6.3:
- * - Title
- * - Category color/icon accent
- * - Validation badge
- * - Run status badge
- * - Disabled state
- * - Compact port labels
- */
+/* ── Skip reason labels ── */
 const skipReasonLabels: Record<string, string> = {
   disabled: 'Skipped: node is disabled',
   missingRequiredInputs: 'Skipped: missing required inputs',
   upstreamFailed: 'Skipped: upstream node failed',
 };
 
+/* ── Status dot component ── */
+function StatusDot({ runStatus }: { readonly runStatus: NodeRunStatus }) {
+  if (runStatus === 'idle') return null;
+
+  const isRunning = runStatus === 'running';
+  const isPending = runStatus === 'pending';
+  const isSuccess = runStatus === 'success';
+  const isError = runStatus === 'error';
+
+  return (
+    <span
+      className={cn(
+        'h-2 w-2 shrink-0 rounded-full',
+        isRunning && 'bg-signal animate-status-dot',
+        isPending && 'bg-signal/60',
+        isSuccess && 'bg-success',
+        isError && 'bg-destructive',
+        !isRunning && !isPending && !isSuccess && !isError && 'bg-muted-foreground',
+      )}
+      data-running={isRunning || undefined}
+      aria-hidden="true"
+    />
+  );
+}
+
+/* ── Run status badge ── */
 function RunStatusBadge({
   runStatus,
   skipReason,
@@ -80,7 +100,7 @@ function RunStatusBadge({
     string,
     { icon: typeof CheckCircle2; variant: 'default' | 'destructive' | 'secondary'; className?: string; title: string }
   > = {
-    pending: { icon: Clock, variant: 'secondary', title: 'Pending' },
+    pending: { icon: Clock, variant: 'secondary', title: 'Queued' },
     running: { icon: Loader2, variant: 'secondary', className: 'animate-spin', title: 'Running...' },
     success: { icon: CheckCircle2, variant: 'default', title: 'Succeeded' },
     error: { icon: XCircle, variant: 'destructive', title: 'Error' },
@@ -97,18 +117,21 @@ function RunStatusBadge({
   return (
     <Badge
       variant={entry.variant}
-      className="h-5 w-5 p-0 flex items-center justify-center"
+      className="h-5 px-1.5 py-0 gap-1 text-[10px] font-medium"
       title={entry.title}
       aria-label={entry.title}
     >
       <Icon className={cn('h-3 w-3', entry.className)} aria-hidden="true" />
+      <span className="sr-only">{entry.title}</span>
     </Badge>
   );
 }
 
+/* ── Main node card ── */
 export const WorkflowNodeCard = memo(function WorkflowNodeCard({
   data,
   selected,
+  dragging,
 }: NodeProps<WorkflowNodeType>) {
   const {
     node,
@@ -116,78 +139,156 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
     inputPorts,
     outputPorts,
     validationIssues,
-    runStatus,
+    runStatus = 'idle',
     skipReason,
     disabled,
     previewText,
+    staleData,
+    previewAvailable,
+    footerMeta,
   } = data;
 
-  const categoryColor = categoryColors[category] ?? 'bg-gray-500';
-  const borderColor = categoryBorderColors[category] ?? 'border-gray-500/50';
+  const accentBg = categoryAccentBg[category] ?? 'bg-node-utility/70';
+  const iconTint = categoryIconTint[category] ?? 'text-node-utility';
+  const isRunning = runStatus === 'running';
+  const isError = runStatus === 'error';
+  const hasValidationIssues = validationIssues != null && validationIssues > 0;
 
   return (
     <div
       role="button"
-      aria-label={`${node.label}${disabled ? ' (disabled)' : ''}${runStatus && runStatus !== 'idle' ? `, status: ${runStatus}` : ''}`}
+      aria-label={`${node.label}${disabled ? ' (disabled)' : ''}${runStatus !== 'idle' ? `, status: ${runStatus}` : ''}`}
       aria-selected={selected}
       className={cn(
-        'relative min-w-[180px] max-w-[240px] rounded-lg border-2 bg-card shadow-sm transition-all',
-        borderColor,
-        selected && 'ring-2 ring-primary ring-offset-2',
-        disabled && 'opacity-50',
+        // Base
+        'group relative w-[280px] rounded-md border bg-card text-card-foreground shadow-sm',
+        // Transitions
+        'transition-[border-color,box-shadow,opacity,transform] duration-150 ease-out',
+        // Default border
+        'border-border',
+        // Hover
+        'hover:border-foreground/20',
+        // Focus-visible
+        'focus-within:ring-2 focus-within:ring-ring',
+        // Selected
+        selected && 'border-primary/50 ring-2 ring-primary/70',
+        // Dragging
+        dragging && 'opacity-95 shadow-lg',
+        // Disabled
+        disabled && 'opacity-55 pointer-events-auto',
+        // Error
+        isError && 'border-destructive/60',
+        // Stale data
+        staleData && 'border-dashed',
+        // Running — thin amber left rule
+        isRunning && 'border-l-2 border-l-signal',
       )}
+      data-testid={`node-card-${node.id}`}
+      data-selected={selected || undefined}
+      data-dragging={dragging || undefined}
+      data-disabled={disabled || undefined}
+      data-running={isRunning || undefined}
     >
-      {/* Category accent bar */}
-      <div className={cn('h-1.5 rounded-t-md', categoryColor)} />
+      {/* Category accent line (2px top bar) */}
+      <div
+        className={cn('absolute inset-x-0 top-0 h-0.5 rounded-t-md', accentBg)}
+        aria-hidden="true"
+      />
 
       {/* Header */}
-      <div className="px-3 py-2 border-b">
-        <div className="flex items-center justify-between gap-2">
-          <span className="font-medium text-sm truncate" title={node.label}>
-            {node.label}
-          </span>
-
-          {/* Status badges */}
-          <div className="flex items-center gap-1 shrink-0">
-            {validationIssues != null && validationIssues > 0 && (
-              <Badge
-                variant="destructive"
-                className="h-5 w-5 p-0 flex items-center justify-center"
-                aria-label={`${validationIssues} validation ${validationIssues === 1 ? 'issue' : 'issues'}`}
-              >
-                <AlertCircle className="h-3 w-3" aria-hidden="true" />
-              </Badge>
-            )}
-
-            {runStatus && runStatus !== 'idle' && (
-              <RunStatusBadge runStatus={runStatus} skipReason={skipReason} />
-            )}
-          </div>
+      <div className="flex items-start gap-2 px-3 pb-2 pt-3">
+        {/* Icon placeholder with category tint */}
+        <div className={cn('mt-0.5 shrink-0', iconTint)} aria-hidden="true">
+          <div className="h-4 w-4 rounded-sm bg-current opacity-40" />
         </div>
 
-        {/* Preview text */}
-        {previewText && (
-          <p
-            className="text-xs text-muted-foreground mt-1 truncate"
-            title={previewText}
-          >
-            {previewText}
+        {/* Title + status dot */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="truncate text-sm font-medium">{node.label}</h3>
+            <StatusDot runStatus={runStatus} />
+          </div>
+
+          {/* Subtitle: type + category */}
+          <p className="truncate font-mono text-[11px] text-muted-foreground">
+            {category.toUpperCase()} · {node.type}
           </p>
-        )}
+        </div>
+
+        {/* Quick menu button */}
+        <button
+          className="rounded-sm p-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-accent-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-hover"
+          data-testid={`node-menu-btn-${node.id}`}
+          aria-label={`Menu for ${node.label}`}
+        >
+          <MoreVertical className="h-4 w-4" aria-hidden="true" />
+        </button>
       </div>
 
-      {/* Input ports */}
+      {/* Inline badges */}
+      {(hasValidationIssues || staleData || previewAvailable || (runStatus !== 'idle' && runStatus !== 'running')) && (
+        <div className="flex flex-wrap gap-1 px-3 pb-2">
+          {hasValidationIssues && (
+            <Badge
+              variant="destructive"
+              className="h-5 px-1.5 py-0 gap-1 text-[10px] font-medium"
+              aria-label={`${validationIssues} validation ${validationIssues === 1 ? 'issue' : 'issues'}`}
+              title="Resolve validation issues to run this node"
+            >
+              <AlertCircle className="h-3 w-3" aria-hidden="true" />
+              {validationIssues}
+            </Badge>
+          )}
+
+          {runStatus !== 'idle' && runStatus !== 'running' && (
+            <RunStatusBadge runStatus={runStatus} skipReason={skipReason} />
+          )}
+
+          {staleData && (
+            <span
+              className="rounded-sm border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+              title="Output no longer matches current configuration"
+            >
+              Stale
+            </span>
+          )}
+
+          {previewAvailable && (
+            <span
+              className="rounded-sm border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+              title="Latest mock output available"
+            >
+              Preview
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Preview text */}
+      {previewText && (
+        <p
+          className="px-3 pb-2 text-xs text-muted-foreground truncate"
+          title={previewText}
+        >
+          {previewText}
+        </p>
+      )}
+
+      {/* Input port rail */}
       {inputPorts.length > 0 && (
-        <div className="px-2 py-1 space-y-0.5">
+        <div className="border-t border-border px-2 py-1 space-y-0.5">
           {inputPorts.map((port) => (
-            <div key={port.key} className="relative flex items-center">
+            <div key={port.key} className="relative flex items-center" data-testid={`node-port-in-${node.id}-${port.key}`}>
               <Handle
                 type="target"
                 position={Position.Left}
                 id={port.key}
-                className="!w-3 !h-3 !bg-background !border-2 !border-primary"
+                className={cn(
+                  '!w-3 !h-3 !bg-background !border-2 !border-primary',
+                  disabled && '!border-muted-foreground',
+                )}
               />
-              <span className="text-[10px] text-muted-foreground ml-4">
+              <span className="font-mono text-[10px] text-muted-foreground ml-4">
                 {port.label}
               </span>
             </div>
@@ -195,22 +296,32 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
         </div>
       )}
 
-      {/* Output ports */}
+      {/* Output port rail */}
       {outputPorts.length > 0 && (
-        <div className="px-2 py-1 border-t space-y-0.5">
+        <div className="border-t border-border px-2 py-1 space-y-0.5">
           {outputPorts.map((port) => (
-            <div key={port.key} className="relative flex items-center justify-end">
-              <span className="text-[10px] text-muted-foreground mr-4">
+            <div key={port.key} className="relative flex items-center justify-end" data-testid={`node-port-out-${node.id}-${port.key}`}>
+              <span className="font-mono text-[10px] text-muted-foreground mr-4">
                 {port.label}
               </span>
               <Handle
                 type="source"
                 position={Position.Right}
                 id={port.key}
-                className="!w-3 !h-3 !bg-background !border-2 !border-primary"
+                className={cn(
+                  '!w-3 !h-3 !bg-background !border-2 !border-primary',
+                  disabled && '!border-muted-foreground',
+                )}
               />
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Footer metadata row */}
+      {footerMeta && (
+        <div className="border-t border-border px-3 py-2 font-mono text-[11px] text-muted-foreground tabular-nums">
+          {footerMeta}
         </div>
       )}
     </div>

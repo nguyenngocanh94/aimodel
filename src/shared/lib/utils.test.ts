@@ -4,6 +4,7 @@ import { cn } from './utils'
 describe('cn utility', () => {
   it('should merge class names correctly', () => {
     expect(cn('foo', 'bar')).toBe('foo bar')
-    expect(cn('foo', false && 'bar', 'baz')).toBe('foo baz')
+    const includeBar = false
+    expect(cn('foo', includeBar && 'bar', 'baz')).toBe('foo baz')
   })
 })

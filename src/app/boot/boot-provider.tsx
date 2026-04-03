@@ -6,7 +6,7 @@
  */
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { usePersistence, type PersistenceState } from './persistence-provider'
+import { usePersistence } from './persistence-provider'
 import type { WorkflowRepository, PersistenceMode } from '@/features/workflows/data/workflow-repository'
 import type { WorkflowDocument } from '@/features/workflows/domain/workflow-types'
 import { useWorkflowStore } from '@/features/workflow/store/workflow-store'

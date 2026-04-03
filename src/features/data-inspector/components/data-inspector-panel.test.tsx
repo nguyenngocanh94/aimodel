@@ -4,7 +4,7 @@ import { ReactFlowProvider } from '@xyflow/react'
 import { useWorkflowStore } from '@/features/workflow/store/workflow-store'
 import { useRunStore } from '@/features/execution/store/run-store'
 import { DataInspectorPanel } from './data-inspector-panel'
-import type { WorkflowDocument, NodeRunRecord, EdgePayloadSnapshot } from '@/features/workflows/domain/workflow-types'
+import type { WorkflowDocument, EdgePayloadSnapshot } from '@/features/workflows/domain/workflow-types'
 
 function makeDocument(overrides: Partial<WorkflowDocument> = {}): WorkflowDocument {
   return {

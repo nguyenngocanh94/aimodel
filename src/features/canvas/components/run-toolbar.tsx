@@ -1,7 +1,8 @@
 /**
- * RunToolbar - AiModel-ecs.5
- * Toolbar above the canvas for triggering mock execution runs.
- * Per plan section 6.6
+ * RunToolbar - Three-zone layout per design system section 13
+ * Left: workflow name + dirty indicator
+ * Center: segmented run actions
+ * Right: status chip + timer
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -10,15 +11,12 @@ import {
   Square,
   SkipForward,
   ArrowDown,
-  ArrowUp,
-  FlaskConical,
   CheckCircle2,
   XCircle,
-  Clock,
   Loader2,
+  Clock,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
-import { Badge } from '@/shared/ui/badge';
 import { useWorkflowStore } from '@/features/workflow/store/workflow-store';
 import {
   selectDocument,
@@ -46,6 +44,7 @@ function formatElapsed(ms: number): string {
 export function RunToolbar() {
   const document = useWorkflowStore(selectDocument);
   const selectedNodeIds = useWorkflowStore(selectSelectedNodeIds);
+  const isDirty = useWorkflowStore((s) => s.dirty);
   const activeRun = useRunStore(selectActiveRun);
   const isRunning = useRunStore(selectIsRunning);
   const canCancel = useRunStore(selectCanCancel);
@@ -79,7 +78,6 @@ export function RunToolbar() {
       return;
     }
 
-    // Update every 100ms while running
     const interval = setInterval(() => {
       setElapsed(Date.now() - startTime);
     }, 100);
@@ -111,163 +109,142 @@ export function RunToolbar() {
     controller?.abort('User cancelled');
   }, []);
 
-  // Status indicator
+  // Derive status chip text
   const runStatus = activeRun?.status;
-  const StatusIcon =
-    runStatus === 'success'
-      ? CheckCircle2
+  const statusText = isRunning
+    ? `Running ${statusCounts.success}/${statusCounts.total}`
+    : runStatus === 'success'
+      ? `Done ${statusCounts.success}/${statusCounts.total}`
       : runStatus === 'error'
-        ? XCircle
-        : runStatus === 'running'
-          ? Loader2
-          : null;
+        ? `Failed ${statusCounts.error} err`
+        : 'Idle';
 
-  const statusColor =
-    runStatus === 'success'
-      ? 'text-green-500'
-      : runStatus === 'error'
-        ? 'text-destructive'
-        : runStatus === 'running'
-          ? 'text-amber-500'
-          : 'text-muted-foreground';
+  const StatusIcon = runStatus === 'success'
+    ? CheckCircle2
+    : runStatus === 'error'
+      ? XCircle
+      : runStatus === 'running'
+        ? Loader2
+        : null;
 
   return (
-    <div
-      className="flex shrink-0 items-center gap-2 border-t bg-card px-3 py-1.5"
+    <header
+      className="sticky top-0 z-10 flex h-12 items-center justify-between gap-3 border-b border-border/80 bg-background/95 px-3 text-foreground backdrop-blur supports-[backdrop-filter]:bg-background/80"
       data-testid="run-toolbar"
     >
-      {/* Run Workflow */}
-      <Button
-        type="button"
-        size="sm"
-        variant="default"
-        className="h-7 gap-1 text-xs"
-        disabled={isRunning || document.nodes.length === 0}
-        onClick={() => handleRun('runWorkflow')}
-        title="Run all nodes in the workflow"
-      >
-        <Play className="h-3 w-3" />
-        Run
-      </Button>
-
-      {/* Run Selected Node */}
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        className="h-7 gap-1 text-xs"
-        disabled={isRunning || !hasSelectedNode}
-        onClick={() => handleRun('runNode')}
-        title={
-          hasSelectedNode
-            ? 'Run the selected node and its upstream dependencies'
-            : 'Select a node to run it'
-        }
-      >
-        <SkipForward className="h-3 w-3" />
-        Node
-      </Button>
-
-      {/* Run From Here */}
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        className="h-7 gap-1 text-xs"
-        disabled={isRunning || !hasSelectedNode}
-        onClick={() => handleRun('runFromHere')}
-        title={
-          hasSelectedNode
-            ? 'Run from the selected node downstream'
-            : 'Select a node to run from'
-        }
-      >
-        <ArrowDown className="h-3 w-3" />
-        From
-      </Button>
-
-      {/* Run Up To Here */}
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        className="h-7 gap-1 text-xs"
-        disabled={isRunning || !hasSelectedNode}
-        onClick={() => handleRun('runUpToHere')}
-        title={
-          hasSelectedNode
-            ? 'Run up to and including the selected node'
-            : 'Select a node to run up to'
-        }
-      >
-        <ArrowUp className="h-3 w-3" />
-        Up To
-      </Button>
-
-      {/* Cancel */}
-      {isRunning && (
-        <Button
-          type="button"
-          size="sm"
-          variant="destructive"
-          className="h-7 gap-1 text-xs"
-          disabled={!canCancel}
-          onClick={handleCancel}
-          title="Cancel the current run"
-        >
-          <Square className="h-3 w-3" />
-          Cancel
-        </Button>
-      )}
-
-      {/* Separator */}
-      <div className="mx-1 h-4 w-px bg-border" />
-
-      {/* Mock mode indicator */}
-      <div className="flex items-center gap-1" title="Running in mock mode">
-        <FlaskConical className="h-3 w-3 text-muted-foreground" />
-        <span className="text-[10px] text-muted-foreground">Mock</span>
-      </div>
-
-      {/* Status and elapsed */}
-      <div className="ml-auto flex items-center gap-2">
-        {StatusIcon && (
-          <StatusIcon
-            className={`h-3.5 w-3.5 ${statusColor} ${runStatus === 'running' ? 'animate-spin' : ''}`}
-          />
-        )}
-
-        {activeRun && statusCounts.total > 0 && (
-          <div className="flex items-center gap-1">
-            {statusCounts.success > 0 && (
-              <Badge
-                variant="secondary"
-                className="h-4 px-1 text-[9px] text-green-600"
-              >
-                {statusCounts.success}/{statusCounts.total}
-              </Badge>
-            )}
-            {statusCounts.error > 0 && (
-              <Badge variant="destructive" className="h-4 px-1 text-[9px]">
-                {statusCounts.error} err
-              </Badge>
-            )}
-          </div>
-        )}
-
-        {elapsed !== null && (
-          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-            <Clock className="h-3 w-3" />
-            {formatElapsed(elapsed)}
-          </div>
-        )}
-
-        {runStatus && !isRunning && (
-          <span className={`text-[10px] capitalize ${statusColor}`}>
-            {runStatus}
+      {/* Left zone: workflow name + dirty indicator */}
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="truncate text-sm font-medium">
+          {document.name || 'Untitled Workflow'}
+        </span>
+        {isDirty && (
+          <span
+            className="rounded-sm border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-200"
+            data-testid="workflow-dirty-indicator"
+            title="Unsaved local snapshot"
+          >
+            Unsaved
           </span>
         )}
       </div>
-    </div>
+
+      {/* Center zone: segmented run actions */}
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="default"
+          className="h-8 gap-1.5 px-3 text-sm font-medium"
+          disabled={isRunning || document.nodes.length === 0}
+          onClick={() => handleRun('runWorkflow')}
+          title="Run the full workflow"
+          data-testid="run-btn-workflow"
+        >
+          <Play className="h-3.5 w-3.5" aria-hidden="true" />
+          Run Workflow
+        </Button>
+
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="h-8 gap-1.5 border border-input px-3 text-sm"
+          disabled={isRunning || !hasSelectedNode}
+          onClick={() => handleRun('runNode')}
+          title="Run the selected node"
+          data-testid="run-btn-node"
+        >
+          <SkipForward className="h-3.5 w-3.5" aria-hidden="true" />
+          Run Node
+        </Button>
+
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="h-8 gap-1.5 border border-input px-3 text-sm"
+          disabled={isRunning || !hasSelectedNode}
+          onClick={() => handleRun('runFromHere')}
+          title="Run downstream from current selection"
+          data-testid="run-btn-from-here"
+        >
+          <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
+          Run From Here
+        </Button>
+
+        {isRunning && (
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            className="h-8 gap-1.5 px-3 text-sm"
+            disabled={!canCancel}
+            onClick={handleCancel}
+            title="Stop active execution"
+            data-testid="run-btn-cancel"
+          >
+            <Square className="h-3.5 w-3.5" aria-hidden="true" />
+            Cancel
+          </Button>
+        )}
+      </div>
+
+      {/* Right zone: status chip + timer */}
+      <div className="flex items-center gap-2">
+        <span
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 font-mono text-[11px] text-muted-foreground"
+          data-testid="run-status-chip"
+        >
+          {StatusIcon && (
+            <StatusIcon
+              className={`h-3 w-3 ${
+                runStatus === 'success'
+                  ? 'text-success'
+                  : runStatus === 'error'
+                    ? 'text-destructive'
+                    : runStatus === 'running'
+                      ? 'text-signal animate-spin'
+                      : ''
+              }`}
+              aria-hidden="true"
+            />
+          )}
+          {statusText}
+        </span>
+
+        {elapsed !== null && (
+          <span className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground tabular-nums">
+            <Clock className="h-3 w-3" aria-hidden="true" />
+            {formatElapsed(elapsed)}
+          </span>
+        )}
+
+        {activeRun && (
+          <span className="font-mono text-[10px] text-muted-foreground/60">
+            {activeRun.id.slice(0, 8)}
+          </span>
+        )}
+      </div>
+    </header>
   );
 }

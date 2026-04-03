@@ -35,7 +35,7 @@ export function AppHeader({
         <Button type="button" variant="outline" size="sm" disabled aria-label="Import workflow">
           <Upload className="h-4 w-4" />
         </Button>
-        <Button type="button" variant="outline" size="sm" disabled aria-label="Export workflow">
+        <Button type="button" variant="outline" size="sm" disabled aria-label="Export workflow" data-testid="workflow-export-btn">
           <Download className="h-4 w-4" />
         </Button>
         <Button type="button" variant="outline" size="sm" disabled aria-label="Templates">

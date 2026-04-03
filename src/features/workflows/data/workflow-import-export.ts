@@ -6,8 +6,6 @@
 
 import type {
   WorkflowDocument,
-  WorkflowNode,
-  WorkflowEdge,
 } from '@/features/workflows/domain/workflow-types';
 import { getTemplate } from '@/features/node-registry/node-registry';
 import { checkCompatibility } from '@/features/workflows/domain/type-compatibility';
