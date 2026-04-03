@@ -11,9 +11,6 @@ import {
   Square,
   SkipForward,
   ArrowDown,
-  CheckCircle2,
-  XCircle,
-  Loader2,
   Clock,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
@@ -119,14 +116,6 @@ export function RunToolbar() {
         ? `Failed ${statusCounts.error} err`
         : 'Idle';
 
-  const StatusIcon = runStatus === 'success'
-    ? CheckCircle2
-    : runStatus === 'error'
-      ? XCircle
-      : runStatus === 'running'
-        ? Loader2
-        : null;
-
   return (
     <header
       className="sticky top-0 z-10 flex h-12 items-center justify-between gap-3 border-b border-border/80 bg-background/95 px-3 text-foreground backdrop-blur supports-[backdrop-filter]:bg-background/80"
@@ -134,7 +123,7 @@ export function RunToolbar() {
     >
       {/* Left zone: workflow name + dirty indicator */}
       <div className="flex min-w-0 items-center gap-2">
-        <span className="truncate text-sm font-medium">
+        <span className="truncate text-[13px] font-medium">
           {document.name || 'Untitled Workflow'}
         </span>
         {isDirty && (
@@ -215,20 +204,19 @@ export function RunToolbar() {
           className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 font-mono text-[11px] text-muted-foreground"
           data-testid="run-status-chip"
         >
-          {StatusIcon && (
-            <StatusIcon
-              className={`h-3 w-3 ${
-                runStatus === 'success'
-                  ? 'text-success'
-                  : runStatus === 'error'
-                    ? 'text-destructive'
-                    : runStatus === 'running'
-                      ? 'text-signal animate-spin'
-                      : ''
-              }`}
-              aria-hidden="true"
-            />
-          )}
+          {/* Status dot - 6px colored indicator */}
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              !runStatus
+                ? 'bg-muted-foreground/50'
+                : runStatus === 'running'
+                  ? 'bg-signal animate-status-dot'
+                  : runStatus === 'success'
+                    ? 'bg-success'
+                    : 'bg-destructive'
+            }`}
+            aria-hidden="true"
+          />
           {statusText}
         </span>
 
