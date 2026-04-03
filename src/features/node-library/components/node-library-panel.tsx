@@ -8,6 +8,28 @@ import { useWorkflowStore } from '@/features/workflow/store/workflow-store';
 import { NodeLibraryItem } from './node-library-item';
 import { NodeSearch } from './node-search';
 
+/** Category → design system accent bar class */
+const categoryAccentClasses: Record<string, string> = {
+  input: 'bg-node-input',
+  script: 'bg-node-script',
+  visuals: 'bg-node-visuals',
+  audio: 'bg-node-audio',
+  video: 'bg-node-video',
+  utility: 'bg-node-utility',
+  output: 'bg-node-output',
+};
+
+/** Category → icon/text tint class */
+const categoryIconClasses: Record<string, string> = {
+  input: 'text-node-input',
+  script: 'text-node-script',
+  visuals: 'text-node-visuals',
+  audio: 'text-node-audio',
+  video: 'text-node-video',
+  utility: 'text-node-utility',
+  output: 'text-node-output',
+};
+
 const categoryOrder: readonly string[] = [
   'input',
   'script',
@@ -195,7 +217,7 @@ export function NodeLibraryPanel({
     return (
       <Panel
         variant="ghost"
-        className="flex h-full min-h-0 flex-col rounded-none border-0 border-r border-border bg-card"
+        className="flex h-full min-h-0 w-[280px] min-w-[240px] max-w-[360px] flex-col rounded-none border-0 border-r border-border bg-card"
         data-testid="node-library-panel"
       >
         <PanelHeader className="border-b border-border px-3 py-2">
@@ -218,7 +240,7 @@ export function NodeLibraryPanel({
   return (
     <Panel
       variant="ghost"
-      className="flex h-full min-h-0 flex-col rounded-none border-0 border-r border-border bg-card"
+      className="flex h-full min-h-0 w-[280px] min-w-[240px] max-w-[360px] flex-col rounded-none border-0 border-r border-border bg-card"
       data-testid="node-library-panel"
     >
       {/* Header */}
@@ -289,14 +311,20 @@ export function NodeLibraryPanel({
                     onClick={() => toggleCategory(category)}
                     aria-expanded={expanded}
                     aria-label={`${categoryLabels[category] ?? category} nodes (${templates.length})`}
-                    className="flex w-full items-center gap-1 rounded px-1 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex w-full items-center gap-1.5 rounded px-1 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
+                    <span
+                      className={`h-3 w-0.5 rounded-full ${categoryAccentClasses[category] ?? 'bg-muted-foreground'}`}
+                      aria-hidden="true"
+                    />
                     {expanded ? (
                       <ChevronDown className="h-3 w-3" aria-hidden="true" />
                     ) : (
                       <ChevronRight className="h-3 w-3" aria-hidden="true" />
                     )}
-                    {categoryLabels[category] ?? category}
+                    <span className={categoryIconClasses[category] ?? ''}>
+                      {categoryLabels[category] ?? category}
+                    </span>
                     <span className="ml-auto font-mono text-[10px]">
                       {templates.length}
                     </span>

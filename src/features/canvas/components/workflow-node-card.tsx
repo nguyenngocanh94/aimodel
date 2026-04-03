@@ -161,7 +161,7 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
       aria-selected={selected}
       className={cn(
         // Base
-        'group relative w-[280px] rounded-md border bg-card text-card-foreground shadow-sm',
+        'group relative w-[260px] rounded-lg border bg-card text-card-foreground shadow-sm',
         // Transitions
         'transition-[border-color,box-shadow,opacity,transform] duration-150 ease-out',
         // Default border
@@ -169,9 +169,9 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
         // Hover
         'hover:border-foreground/20',
         // Focus-visible
-        'focus-within:ring-2 focus-within:ring-ring',
+        'focus-within:ring-[1.5px] focus-within:ring-ring',
         // Selected
-        selected && 'border-primary/50 ring-2 ring-primary/70',
+        selected && 'border-[1.5px] border-primary/50 ring-[1.5px] ring-primary/70 shadow-[0_0_12px_rgba(56,189,248,0.12)]',
         // Dragging
         dragging && 'opacity-95 shadow-lg',
         // Disabled
@@ -191,7 +191,7 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
     >
       {/* Category accent line (2px top bar) */}
       <div
-        className={cn('absolute inset-x-0 top-0 h-0.5 rounded-t-md', accentBg)}
+        className={cn('absolute inset-x-0 top-0 h-0.5 rounded-t-lg', accentBg)}
         aria-hidden="true"
       />
 
@@ -205,12 +205,12 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
         {/* Title + status dot */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="truncate text-sm font-medium">{node.label}</h3>
+            <h3 className="truncate text-[13px] font-medium">{node.label}</h3>
             <StatusDot runStatus={runStatus} />
           </div>
 
           {/* Subtitle: type + category */}
-          <p className="truncate font-mono text-[11px] text-muted-foreground">
+          <p className="truncate font-mono text-[10px] text-muted-foreground">
             {category.toUpperCase()} · {node.type}
           </p>
         </div>
@@ -284,7 +284,7 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
                 position={Position.Left}
                 id={port.key}
                 className={cn(
-                  '!w-3 !h-3 !bg-background !border-2 !border-primary',
+                  '!w-2 !h-2 !bg-background !border-[1.5px] !border-primary',
                   disabled && '!border-muted-foreground',
                 )}
               />
@@ -309,7 +309,7 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
                 position={Position.Right}
                 id={port.key}
                 className={cn(
-                  '!w-3 !h-3 !bg-background !border-2 !border-primary',
+                  '!w-2 !h-2 !bg-background !border-[1.5px] !border-cyan-400',
                   disabled && '!border-muted-foreground',
                 )}
               />

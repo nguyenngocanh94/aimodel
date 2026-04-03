@@ -153,7 +153,7 @@ export const NodeLibraryItem = memo(function NodeLibraryItem({
         'transition-[border-color,box-shadow,opacity,background-color] duration-150 ease-out',
         'hover:border-foreground/20 hover:bg-accent/50',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        'data-[focused=true]:ring-2 data-[focused=true]:ring-primary/70 data-[focused=true]:border-primary/40',
+        'data-[focused=true]:bg-primary/[0.06] data-[focused=true]:ring-2 data-[focused=true]:ring-primary/70 data-[focused=true]:border-primary/40',
         'data-[dragging=true]:opacity-70 data-[dragging=true]:shadow-lg',
         'data-[disabled=true]:opacity-50 data-[disabled=true]:cursor-not-allowed data-[disabled=true]:pointer-events-none',
         'data-[readonly=true]:cursor-default',
