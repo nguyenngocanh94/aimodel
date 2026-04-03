@@ -55,6 +55,18 @@ src/                            # Source code (created during implementation)
 6. **Two Zustand stores.** Never mix workflow state and run state. Undo/redo applies only to workflow store.
 7. **Test what matters.** Unit test: validation, execution, compatibility, migrations. E2E test: core user journeys. Don't chase vanity coverage.
 8. **Do not modify planning documents.** Files in `plans/` are final. If you find a plan issue, note it in a comment on the bead.
+9. **Never ask — just do.** Do not ask the user what to work on, whether to commit, or how to proceed. Run `bd ready`, pick the highest-priority ready bead, claim it, and start coding immediately. The only time to ask is when the plan is genuinely ambiguous and no reasonable default exists. Presenting a numbered menu of options is never acceptable.
+
+## At Session Start
+
+Do this immediately — no preamble, no asking for direction:
+
+1. Read this entire file
+2. Run `git status` — if there are uncommitted changes from a previous session, commit them first
+3. Run `bd ready` — pick the highest-priority ready bead
+4. Run `bd show <id>` to read the bead, then start coding
+
+**Do not present options. Do not ask what to work on. The graph decides.**
 
 ## How to Find Work
 
@@ -128,9 +140,41 @@ Send a completion message so other agents know the dependency is satisfied:
 2. **Read the plan:** Open `plans/06-final-plan.md` and find the section referenced in the bead description
 3. **Implement:** Write code in the correct `src/` path as specified in the bead
 4. **Test:** Write tests alongside implementation. Run `npm test` or `npx vitest`
-5. **Verify acceptance criteria:** Check every item in the bead's acceptance list
-6. **Close:** `bd close <id>`
-7. **Pick next:** `bd ready` or `bv`
+5. **Quality gate:** Run `npm run quality-gate` (typecheck + lint + tests). Fix all errors before proceeding.
+6. **Self-review (Fresh Eyes):** Re-read all new and modified code adversarially. Ask:
+   - **Correctness:** Does implementation match the bead description and acceptance criteria?
+   - **Edge cases:** Empty inputs, concurrent access, error paths, boundary conditions?
+   - **Pattern matching:** If you find a bug, search for identical patterns elsewhere in the codebase.
+   - **Alternatives:** Is there a simpler or more robust approach?
+   Run review rounds until no additional issues surface (typically 1–2 rounds for simple beads, 2–3 for complex).
+7. **Verify acceptance criteria:** Check every item in the bead's acceptance list
+8. **Close:** `bd close <id>`
+9. **Pick next and start immediately:** Re-read this AGENTS.md, run `bd ready`, claim the highest-priority bead, and begin coding. Do not ask the user what to do next — the dependency graph decides.
+
+## Quality Gates
+
+Before every commit, agents must pass:
+
+```bash
+npm run quality-gate    # runs: typecheck → lint → tests
+```
+
+Individual checks:
+- `npm run typecheck` — `tsc --noEmit` (no `any`, no type errors)
+- `npm run lint` — ESLint with `--max-warnings 0` (zero warnings policy)
+- `npm test -- --run` — Vitest in single-run mode
+
+If any check fails, fix the issue before committing. Do not skip or disable checks.
+
+## Cross-Agent Review Protocol
+
+After completing a milestone or every 30–60 minutes of active implementation, one agent should perform a cross-codebase review:
+
+1. **Random exploration:** Open code files you did not write. Trace functionality through imports. Look for integration bugs (incorrect argument ordering, missing error handling, type mismatches at boundaries).
+2. **Fresh eyes prompt:** Re-read modified files as if seeing them for the first time. Fix obvious bugs, errors, and problems while complying with all AGENTS.md rules.
+3. **Convergence signal:** When two consecutive review rounds return clean with zero changes, the codebase passes quality gates for that milestone.
+
+Do not halt all agents for review. Designate 1–2 agents finishing beads for review while others continue implementing.
 
 ## Coding Standards
 
