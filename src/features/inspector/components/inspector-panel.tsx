@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Settings2, Info, Eye, AlertTriangle, Database } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs';
 import { useWorkflowStore } from '@/features/workflow/store/workflow-store';
@@ -22,10 +22,19 @@ export function InspectorPanel() {
   const inspectorTab = useWorkflowStore((s) => s.inspectorTab);
   const setInspectorTab = useWorkflowStore((s) => s.setInspectorTab);
 
+  const setSelectedNodeIds = useWorkflowStore((s) => s.setSelectedNodeIds);
+
   const selectedNode = useMemo(() => {
     if (selectedNodeIds.length !== 1) return null;
     return document.nodes.find((n) => n.id === selectedNodeIds[0]) ?? null;
   }, [document.nodes, selectedNodeIds]);
+
+  // Recovery: clear stale selection if selected node was deleted
+  useEffect(() => {
+    if (selectedNodeIds.length === 1 && !selectedNode) {
+      setSelectedNodeIds([]);
+    }
+  }, [selectedNode, selectedNodeIds, setSelectedNodeIds]);
 
   return (
     <aside
@@ -75,7 +84,7 @@ export function InspectorPanel() {
               Config
             </TabsTrigger>
             <TabsTrigger
-              value="data"
+              value="preview"
               className="text-xs gap-1 transition-tab"
               data-testid="inspector-tab-preview"
             >
@@ -83,7 +92,7 @@ export function InspectorPanel() {
               Preview
             </TabsTrigger>
             <TabsTrigger
-              value="inspect"
+              value="data"
               className="text-xs gap-1 transition-tab"
               data-testid="inspector-tab-data"
             >
@@ -112,10 +121,10 @@ export function InspectorPanel() {
             <TabsContent value="config" className="m-0">
               <NodeConfigTab node={selectedNode} />
             </TabsContent>
-            <TabsContent value="data" className="m-0">
+            <TabsContent value="preview" className="m-0">
               <PreviewTab node={selectedNode} />
             </TabsContent>
-            <TabsContent value="inspect" className="m-0">
+            <TabsContent value="data" className="m-0">
               <DataInspectorPanel />
             </TabsContent>
             <TabsContent value="validation" className="m-0">

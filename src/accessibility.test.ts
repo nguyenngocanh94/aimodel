@@ -132,3 +132,33 @@ describe('empty state a11y', () => {
     expect(empty).toContain('aria-label={`Start from template:')
   })
 })
+
+describe('canvas a11y', () => {
+  it('canvas should have aria-label "Workflow canvas"', () => {
+    const surface = readSrc('./features/canvas/components/canvas-surface.tsx')
+    expect(surface).toContain('aria-label="Workflow canvas"')
+  })
+})
+
+describe('run announcer live region', () => {
+  it('should have aria-live="polite" for screen reader announcements', () => {
+    const announcer = readSrc('./features/canvas/components/run-announcer.tsx')
+    expect(announcer).toContain('aria-live="polite"')
+    expect(announcer).toContain('aria-atomic="true"')
+    expect(announcer).toContain('sr-only')
+  })
+})
+
+describe('quick-add and connect dialog a11y', () => {
+  it('quick-add dialog should have role="dialog" and aria-label', () => {
+    const dialog = readSrc('./features/canvas/components/quick-add-dialog.tsx')
+    expect(dialog).toContain('role="dialog"')
+    expect(dialog).toContain('aria-label="Quick add node"')
+  })
+
+  it('connect dialog should have role="dialog" and aria-label', () => {
+    const dialog = readSrc('./features/canvas/components/connect-dialog.tsx')
+    expect(dialog).toContain('role="dialog"')
+    expect(dialog).toContain('aria-label="Connect to node"')
+  })
+})

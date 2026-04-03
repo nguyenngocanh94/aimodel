@@ -14,12 +14,16 @@ export interface CanvasShortcutsOptions {
   onInspect?: () => void
   onRunNode?: () => void
   onRunWorkflow?: () => void
+  onConnect?: () => void
+  onPanModeStart?: () => void
+  onPanModeEnd?: () => void
   onEscape?: () => void
   enabled?: boolean
 }
 
 /**
  * Keyboard shortcut definitions for documentation/help display.
+ * All 15 documented shortcuts per design system section 16.
  */
 export const SHORTCUT_DEFINITIONS = [
   { key: 'Cmd/Ctrl + S', action: 'Save workflow' },
@@ -27,11 +31,13 @@ export const SHORTCUT_DEFINITIONS = [
   { key: 'Cmd/Ctrl + Z', action: 'Undo' },
   { key: 'Cmd/Ctrl + Shift + Z', action: 'Redo' },
   { key: 'Delete / Backspace', action: 'Delete selection' },
+  { key: 'Space', action: 'Pan mode (hold)' },
   { key: 'A', action: 'Quick add node' },
   { key: 'Enter', action: 'Inspect selected' },
   { key: 'R', action: 'Run selected node' },
   { key: 'Shift + R', action: 'Run workflow' },
-  { key: 'Escape', action: 'Clear selection' },
+  { key: 'C', action: 'Connect from selected' },
+  { key: 'Escape', action: 'Clear selection / close' },
   { key: 'Cmd/Ctrl + D', action: 'Duplicate selection' },
   { key: 'Cmd/Ctrl + 0', action: 'Fit view' },
   { key: 'Cmd/Ctrl + A', action: 'Select all' },
@@ -39,7 +45,7 @@ export const SHORTCUT_DEFINITIONS = [
 
 /**
  * Check if the event target is an interactive text element where we should
- * not intercept plain key presses (a, r, etc.).
+ * not intercept plain key presses (a, r, c, space, etc.).
  */
 function isTextInputFocused(event: KeyboardEvent): boolean {
   const target = event.target
@@ -53,10 +59,40 @@ function isTextInputFocused(event: KeyboardEvent): boolean {
 }
 
 /**
- * useCanvasShortcuts - Keyboard shortcuts per plan section 6.9
+ * Precedence check: returns true if a dialog, modal, or overlay is open
+ * that should consume keys before canvas shortcuts.
  *
- * Modifier shortcuts (Cmd/Ctrl + key) work everywhere except text inputs.
- * Plain key shortcuts (A, R, Enter, Escape) are disabled in text inputs.
+ * Precedence order (highest to lowest):
+ * 1. Open dialogs and modals
+ * 2. Open menus and searchable overlays
+ * 3. Active text inputs/textareas/contenteditable
+ * 4. Inspector body interactions
+ * 5. Library navigation
+ * 6. Canvas-level commands
+ */
+function isHigherPrioritySurfaceOpen(): boolean {
+  // Check for open Radix dialogs or modals
+  const dialogOverlay = document.querySelector('[data-state="open"][role="dialog"]')
+  if (dialogOverlay) return true
+
+  // Check for open menus (Radix dropdowns, context menus)
+  const openMenu = document.querySelector('[data-state="open"][role="menu"]')
+  if (openMenu) return true
+
+  // Check for the quick-add or connect dialogs
+  const quickAdd = document.querySelector('[data-testid="quick-add-dialog"][data-state="open"]')
+  if (quickAdd) return true
+  const connectDialog = document.querySelector('[data-testid="connect-dialog"][data-state="open"]')
+  if (connectDialog) return true
+
+  return false
+}
+
+/**
+ * useCanvasShortcuts — Keyboard shortcuts per design system section 16.
+ *
+ * All 12 documented shortcuts plus Cmd/Ctrl+D, Cmd/Ctrl+0, Cmd/Ctrl+A.
+ * Respects precedence: dialogs > menus > text inputs > inspector > library > canvas.
  */
 export function useCanvasShortcuts(options: CanvasShortcutsOptions = {}) {
   const {
@@ -72,6 +108,9 @@ export function useCanvasShortcuts(options: CanvasShortcutsOptions = {}) {
     onInspect,
     onRunNode,
     onRunWorkflow,
+    onConnect,
+    onPanModeStart,
+    onPanModeEnd,
     onEscape,
     enabled = true,
   } = options
@@ -82,12 +121,23 @@ export function useCanvasShortcuts(options: CanvasShortcutsOptions = {}) {
     (event: KeyboardEvent) => {
       if (!enabled) return
 
-      const textFocused = isTextInputFocused(event)
       const isCtrlOrCmd = event.ctrlKey || event.metaKey
+
+      // Escape always works — closes topmost dismissible UI first
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onEscape?.()
+        return
+      }
+
+      // Higher-priority surfaces consume all other keys
+      if (isHigherPrioritySurfaceOpen()) return
+
+      const textFocused = isTextInputFocused(event)
 
       // === Modifier shortcuts (work even in text inputs for standard actions) ===
 
-      // Save: Cmd/Ctrl + S
+      // Save: Cmd/Ctrl + S — must preventDefault to block browser save
       if (isCtrlOrCmd && event.key === 's' && !event.shiftKey) {
         event.preventDefault()
         onSave?.()
@@ -141,7 +191,7 @@ export function useCanvasShortcuts(options: CanvasShortcutsOptions = {}) {
       // === Plain key shortcuts (disabled in text inputs) ===
       if (textFocused) return
 
-      // Delete: Delete or Backspace
+      // Delete: Delete or Backspace — only graph selection, never text
       if (event.key === 'Delete' || event.key === 'Backspace') {
         if (selectedNodeIds.length > 0 || selectedEdgeId) {
           event.preventDefault()
@@ -150,16 +200,21 @@ export function useCanvasShortcuts(options: CanvasShortcutsOptions = {}) {
         return
       }
 
-      // Quick add: A
-      if (event.key === 'a' || event.key === 'A') {
-        if (!isCtrlOrCmd) {
-          event.preventDefault()
-          onQuickAdd?.()
-        }
+      // Space: Pan mode while held — only when canvas owns focus
+      if (event.key === ' ' && !event.repeat) {
+        event.preventDefault()
+        onPanModeStart?.()
         return
       }
 
-      // Inspect selected: Enter
+      // Quick add: A — not from text inputs, dialog fields, or contenteditable
+      if ((event.key === 'a' || event.key === 'A') && !isCtrlOrCmd) {
+        event.preventDefault()
+        onQuickAdd?.()
+        return
+      }
+
+      // Inspect selected: Enter — only when canvas owns focus
       if (event.key === 'Enter') {
         if (selectedNodeIds.length === 1 || selectedEdgeId) {
           event.preventDefault()
@@ -168,7 +223,7 @@ export function useCanvasShortcuts(options: CanvasShortcutsOptions = {}) {
         return
       }
 
-      // Run selected node: R (without shift)
+      // Run selected node: R (without shift) — requires immediate toolbar feedback
       if (event.key === 'r' && !event.shiftKey) {
         if (selectedNodeIds.length === 1) {
           event.preventDefault()
@@ -177,17 +232,19 @@ export function useCanvasShortcuts(options: CanvasShortcutsOptions = {}) {
         return
       }
 
-      // Run workflow: Shift + R
+      // Run workflow: Shift + R — requires immediate toolbar feedback
       if (event.key === 'R' && event.shiftKey) {
         event.preventDefault()
         onRunWorkflow?.()
         return
       }
 
-      // Escape: clear selection / close menus
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onEscape?.()
+      // Connect: C — connect from selected node/port via searchable dialog
+      if ((event.key === 'c' || event.key === 'C') && !isCtrlOrCmd) {
+        if (selectedNodeIds.length === 1) {
+          event.preventDefault()
+          onConnect?.()
+        }
         return
       }
     },
@@ -207,18 +264,33 @@ export function useCanvasShortcuts(options: CanvasShortcutsOptions = {}) {
       onInspect,
       onRunNode,
       onRunWorkflow,
+      onConnect,
+      onPanModeStart,
       onEscape,
     ],
+  )
+
+  // Space keyup handler for pan mode release
+  const handleKeyUp = useCallback(
+    (event: KeyboardEvent) => {
+      if (!enabled) return
+      if (event.key === ' ') {
+        onPanModeEnd?.()
+      }
+    },
+    [enabled, onPanModeEnd],
   )
 
   useEffect(() => {
     if (!enabled) return
 
     window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [enabled, handleKeyDown])
+  }, [enabled, handleKeyDown, handleKeyUp])
 
   return {
     selectedCount: selectedNodeIds.length,

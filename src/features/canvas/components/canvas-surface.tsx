@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
   Background,
@@ -22,7 +22,11 @@ import { WorkflowEdge, type WorkflowEdgeType } from './workflow-edge';
 import { useCanvasShortcuts } from '../hooks/use-canvas-shortcuts';
 import { useConnectionValidation } from '../hooks/use-connection-validation';
 import { CanvasEmptyState } from './canvas-empty-state';
+import { QuickAddDialog } from './quick-add-dialog';
+import { ConnectDialog } from './connect-dialog';
+import { RunAnnouncer } from './run-announcer';
 import { checkCompatibility } from '@/features/workflows/domain/type-compatibility';
+import { exportWorkflowAsBlob } from '@/features/workflows/data/workflow-import-export';
 import type { WorkflowNode, WorkflowEdge as WfEdge, NodeRunRecord } from '@/features/workflows/domain/workflow-types';
 import type { WorkflowEdgeData } from './workflow-edge';
 import { useRunStore } from '@/features/execution/store/run-store';
@@ -281,11 +285,13 @@ function CanvasSurfaceInner() {
           ...doc,
           nodes: [...doc.nodes, newNode],
         }));
+        // Auto-select dropped node so inspector shows Config tab
+        setSelectedNodeIds([newNode.id]);
       } catch {
         // Invalid drag data, ignore
       }
     },
-    [reactFlowInstance, commitAuthoring],
+    [reactFlowInstance, commitAuthoring, setSelectedNodeIds],
   );
 
   // Duplicate selected nodes
@@ -339,6 +345,88 @@ function CanvasSurfaceInner() {
   // Connection validation
   const isValidConnection = useConnectionValidation();
 
+  // Dialog state
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [connectDialogOpen, setConnectDialogOpen] = useState(false);
+
+  // Save: trigger committed snapshot to IndexedDB
+  const handleSave = useCallback(() => {
+    useWorkflowStore.getState().commitAuthoring((doc) => doc);
+  }, []);
+
+  // Export: download workflow as JSON
+  const handleExport = useCallback(() => {
+    const blob = exportWorkflowAsBlob(document);
+    const url = URL.createObjectURL(blob);
+    const a = globalThis.document.createElement('a');
+    a.href = url;
+    a.download = `${document.name || 'workflow'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [document]);
+
+  // Quick add: add node from template
+  const handleQuickAddSelect = useCallback(
+    (templateType: string) => {
+      const template = getTemplate(templateType);
+      if (!template) return;
+      const viewport = reactFlowInstance.getViewport();
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: globalThis.window.innerWidth / 2,
+        y: globalThis.window.innerHeight / 2,
+      });
+      const newNode: WorkflowNode = {
+        id: `node-${crypto.randomUUID().slice(0, 8)}`,
+        type: template.type,
+        label: template.title,
+        position: { x: position.x - viewport.x, y: position.y - viewport.y },
+        config: template.defaultConfig,
+      };
+      commitAuthoring((doc) => ({
+        ...doc,
+        nodes: [...doc.nodes, newNode],
+      }));
+    },
+    [reactFlowInstance, commitAuthoring],
+  );
+
+  // Connect dialog: create edge from selected node
+  const handleConnectFromDialog = useCallback(
+    (targetNodeId: string, sourcePort: string, targetPort: string) => {
+      const sourceId = useWorkflowStore.getState().selectedNodeIds[0];
+      if (!sourceId) return;
+      const edgeId = `edge-${sourceId}-${sourcePort}-${targetNodeId}-${targetPort}`;
+      commitAuthoring((doc) => ({
+        ...doc,
+        edges: [
+          ...doc.edges,
+          {
+            id: edgeId,
+            sourceNodeId: sourceId,
+            sourcePortKey: sourcePort,
+            targetNodeId: targetNodeId,
+            targetPortKey: targetPort,
+          },
+        ],
+      }));
+    },
+    [commitAuthoring],
+  );
+
+  // Escape: close dialogs first, then clear selection
+  const handleEscape = useCallback(() => {
+    if (quickAddOpen) {
+      setQuickAddOpen(false);
+      return;
+    }
+    if (connectDialogOpen) {
+      setConnectDialogOpen(false);
+      return;
+    }
+    setSelectedNodeIds([]);
+    setSelectedEdgeId(null);
+  }, [quickAddOpen, connectDialogOpen, setSelectedNodeIds, setSelectedEdgeId]);
+
   // Wire up keyboard shortcuts
   useCanvasShortcuts({
     onDuplicate: handleDuplicate,
@@ -347,12 +435,17 @@ function CanvasSurfaceInner() {
     onSelectAll: handleSelectAll,
     onUndo: undo,
     onRedo: redo,
+    onSave: handleSave,
+    onExport: handleExport,
+    onQuickAdd: () => setQuickAddOpen(true),
+    onConnect: () => setConnectDialogOpen(true),
+    onEscape: handleEscape,
   });
 
   const isEmpty = document.nodes.length === 0;
 
   return (
-    <div ref={wrapperRef} className="h-full w-full relative" data-testid="canvas-surface">
+    <div ref={wrapperRef} className="h-full w-full relative" data-testid="canvas-surface" aria-label="Workflow canvas">
       <ReactFlow<WorkflowNodeType, WorkflowEdgeType>
         nodes={rfNodes}
         edges={rfEdges}
@@ -391,9 +484,20 @@ function CanvasSurfaceInner() {
       </ReactFlow>
       {isEmpty && (
         <div className="absolute inset-0 z-10">
-          <CanvasEmptyState onAddNode={() => {/* TODO: open node palette */}} />
+          <CanvasEmptyState onAddNode={() => setQuickAddOpen(true)} />
         </div>
       )}
+      <QuickAddDialog
+        open={quickAddOpen}
+        onClose={() => setQuickAddOpen(false)}
+        onSelect={handleQuickAddSelect}
+      />
+      <ConnectDialog
+        open={connectDialogOpen}
+        onClose={() => setConnectDialogOpen(false)}
+        onConnect={handleConnectFromDialog}
+      />
+      <RunAnnouncer />
     </div>
   );
 }

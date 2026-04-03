@@ -7,7 +7,7 @@ import {
   type EdgeProps,
 } from '@xyflow/react';
 import { cn } from '@/shared/lib/utils';
-import { XCircle } from 'lucide-react';
+import { XCircle, Ban } from 'lucide-react';
 
 /* ── Edge type → pill display category ── */
 type EdgeDataCategory = 'video' | 'audio' | 'image' | 'data' | 'control';
@@ -40,7 +40,7 @@ const pillLabels: Record<EdgeDataCategory, string> = {
 export interface WorkflowEdgeData {
   readonly validationStatus?: 'valid' | 'invalid' | 'warning';
   readonly carryingData?: boolean;
-  readonly lastRunStatus?: 'success' | 'error' | null;
+  readonly lastRunStatus?: 'success' | 'error' | 'cancelled' | null;
   readonly isRunning?: boolean;
   readonly isControl?: boolean;
   readonly disabled?: boolean;
@@ -173,13 +173,23 @@ export const WorkflowEdge = memo(function WorkflowEdge({
             </div>
           )}
 
-          {/* Success / error last-run markers */}
+          {/* Error last-run marker */}
           {lastRunStatus === 'error' && validationStatus !== 'invalid' && (
             <div
               className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-background border-2 border-destructive text-destructive"
               title="Last run failed here"
             >
               <XCircle className="w-3 h-3" aria-hidden="true" />
+            </div>
+          )}
+
+          {/* Cancelled last-run marker — distinct from failed */}
+          {lastRunStatus === 'cancelled' && validationStatus !== 'invalid' && (
+            <div
+              className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center justify-center w-5 h-5 rounded-full bg-background border-2 border-warning text-warning"
+              title="Run was cancelled"
+            >
+              <Ban className="w-3 h-3" aria-hidden="true" />
             </div>
           )}
         </div>

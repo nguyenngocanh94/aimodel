@@ -7,6 +7,10 @@ function fireKey(key: string, opts: Partial<KeyboardEventInit> = {}) {
   window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...opts }))
 }
 
+function fireKeyUp(key: string, opts: Partial<KeyboardEventInit> = {}) {
+  window.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true, ...opts }))
+}
+
 function renderShortcuts(options: Partial<CanvasShortcutsOptions> = {}) {
   return renderHook(() =>
     useCanvasShortcuts({
@@ -22,6 +26,9 @@ function renderShortcuts(options: Partial<CanvasShortcutsOptions> = {}) {
       onInspect: vi.fn(),
       onRunNode: vi.fn(),
       onRunWorkflow: vi.fn(),
+      onConnect: vi.fn(),
+      onPanModeStart: vi.fn(),
+      onPanModeEnd: vi.fn(),
       onEscape: vi.fn(),
       ...options,
     }),
@@ -86,6 +93,20 @@ describe('useCanvasShortcuts', () => {
     expect(onDelete).not.toHaveBeenCalled()
   })
 
+  it('should call onPanModeStart on Space', () => {
+    const onPanModeStart = vi.fn()
+    renderShortcuts({ onPanModeStart })
+    fireKey(' ')
+    expect(onPanModeStart).toHaveBeenCalledOnce()
+  })
+
+  it('should call onPanModeEnd on Space keyup', () => {
+    const onPanModeEnd = vi.fn()
+    renderShortcuts({ onPanModeEnd })
+    fireKeyUp(' ')
+    expect(onPanModeEnd).toHaveBeenCalledOnce()
+  })
+
   it('should call onQuickAdd on A', () => {
     const onQuickAdd = vi.fn()
     renderShortcuts({ onQuickAdd })
@@ -122,6 +143,21 @@ describe('useCanvasShortcuts', () => {
     expect(onRunWorkflow).toHaveBeenCalledOnce()
   })
 
+  it('should call onConnect on C when node selected', () => {
+    const onConnect = vi.fn()
+    renderShortcuts({ onConnect })
+    fireKey('c')
+    expect(onConnect).toHaveBeenCalledOnce()
+  })
+
+  it('should not call onConnect when no node selected', () => {
+    useWorkflowStore.setState({ selectedNodeIds: [] })
+    const onConnect = vi.fn()
+    renderShortcuts({ onConnect })
+    fireKey('c')
+    expect(onConnect).not.toHaveBeenCalled()
+  })
+
   it('should call onEscape on Escape', () => {
     const onEscape = vi.fn()
     renderShortcuts({ onEscape })
@@ -143,7 +179,7 @@ describe('useCanvasShortcuts', () => {
     expect(onQuickAdd).not.toHaveBeenCalled()
   })
 
-  it('should have 13 documented shortcuts', () => {
-    expect(SHORTCUT_DEFINITIONS).toHaveLength(13)
+  it('should have 15 documented shortcuts', () => {
+    expect(SHORTCUT_DEFINITIONS).toHaveLength(15)
   })
 })
