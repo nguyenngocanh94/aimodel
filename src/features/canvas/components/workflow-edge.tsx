@@ -20,13 +20,13 @@ function resolveCategory(dataType?: string): EdgeDataCategory {
   return 'data';
 }
 
-/* ── Pill color lookup — uses node category tokens from design system ── */
+/* ── Pill color lookup — edge type specific colors per design system section 11 ── */
 const pillStyles: Record<EdgeDataCategory, string> = {
-  video: 'border-node-video/40 text-node-video',
-  audio: 'border-node-audio/40 text-node-audio',
-  image: 'border-node-script/40 text-node-script',
-  data: 'border-node-visuals/40 text-node-visuals',
-  control: 'border-border text-muted-foreground',
+  video: 'border-amber-400/40 text-amber-300',      // amber VIDEO
+  audio: 'border-teal-400/40 text-teal-300',        // teal AUDIO
+  image: 'border-cyan-400/40 text-cyan-300',        // cyan IMAGE
+  data: 'border-violet-400/40 text-violet-300',    // violet DATA
+  control: 'border-border text-muted-foreground', // neutral CONTROL
 };
 
 const pillLabels: Record<EdgeDataCategory, string> = {
@@ -150,7 +150,7 @@ export const WorkflowEdge = memo(function WorkflowEdge({
           {/* Type pill — visible on hover or when selected */}
           <div
             className={cn(
-              'rounded-sm border bg-card/95 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide shadow-sm backdrop-blur',
+              'rounded-[3px] border bg-card/95 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide shadow-sm backdrop-blur',
               'transition-opacity duration-150 ease-out',
               hovered || selected ? 'opacity-100' : 'opacity-0',
               pillStyles[category],
