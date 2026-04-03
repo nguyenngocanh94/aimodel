@@ -118,7 +118,7 @@ function NodeConfigForm({ node, template, commitAuthoring }: NodeConfigFormProps
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       {/* Node title */}
       <div>
-        <label htmlFor="node-title" className="block text-xs font-medium text-foreground mb-1">
+        <label htmlFor="node-title" className="block text-[11px] font-medium text-muted-foreground mb-1">
           Title
         </label>
         <input
@@ -126,7 +126,7 @@ function NodeConfigForm({ node, template, commitAuthoring }: NodeConfigFormProps
           type="text"
           value={node.label}
           onChange={handleTitleChange}
-          className="h-8 w-full rounded-md border bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-8 w-full rounded-md border border-input bg-muted px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
         />
       </div>
 
@@ -160,7 +160,7 @@ function NodeConfigForm({ node, template, commitAuthoring }: NodeConfigFormProps
       {/* Fixture selector */}
       {template.fixtures.length > 0 && (
         <div>
-          <label className="block text-xs font-medium text-foreground mb-1">
+          <label className="block text-[11px] font-medium text-muted-foreground mb-1">
             Fixtures
           </label>
           <div className="flex flex-wrap gap-1">

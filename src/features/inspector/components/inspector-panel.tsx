@@ -39,7 +39,7 @@ export function InspectorPanel() {
   return (
     <aside
       className="flex h-full w-[400px] min-w-[320px] max-w-[480px] flex-col border-l border-border bg-card text-card-foreground"
-      data-testid="inspector-panel"
+      data-testid="inspector"
       aria-label="Inspector"
     >
       {/* Sticky header */}
@@ -77,7 +77,7 @@ export function InspectorPanel() {
           >
             <TabsTrigger
               value="config"
-              className="text-xs gap-1 transition-tab"
+              className="text-xs gap-1 transition-tab data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary"
               data-testid="inspector-tab-config"
             >
               <Settings2 className="h-3 w-3" aria-hidden="true" />
@@ -85,7 +85,7 @@ export function InspectorPanel() {
             </TabsTrigger>
             <TabsTrigger
               value="preview"
-              className="text-xs gap-1 transition-tab"
+              className="text-xs gap-1 transition-tab data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary"
               data-testid="inspector-tab-preview"
             >
               <Eye className="h-3 w-3" aria-hidden="true" />
@@ -93,7 +93,7 @@ export function InspectorPanel() {
             </TabsTrigger>
             <TabsTrigger
               value="data"
-              className="text-xs gap-1 transition-tab"
+              className="text-xs gap-1 transition-tab data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary"
               data-testid="inspector-tab-data"
             >
               <Database className="h-3 w-3" aria-hidden="true" />
@@ -101,7 +101,7 @@ export function InspectorPanel() {
             </TabsTrigger>
             <TabsTrigger
               value="validation"
-              className="text-xs gap-1 transition-tab"
+              className="text-xs gap-1 transition-tab data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary"
               data-testid="inspector-tab-validation"
             >
               <AlertTriangle className="h-3 w-3" aria-hidden="true" />
@@ -109,7 +109,7 @@ export function InspectorPanel() {
             </TabsTrigger>
             <TabsTrigger
               value="metadata"
-              className="text-xs gap-1 transition-tab"
+              className="text-xs gap-1 transition-tab data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary"
               data-testid="inspector-tab-metadata"
             >
               <Info className="h-3 w-3" aria-hidden="true" />
