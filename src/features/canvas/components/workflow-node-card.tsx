@@ -12,6 +12,8 @@ import {
   PauseCircle,
   Clock,
   MoreVertical,
+  ImageIcon,
+  Play,
 } from 'lucide-react';
 import type { WorkflowNode, NodeRunRecord } from '@/features/workflows/domain/workflow-types';
 
@@ -51,6 +53,9 @@ export interface WorkflowNodeData {
   readonly staleData?: boolean;
   readonly previewAvailable?: boolean;
   readonly footerMeta?: string;
+  readonly thumbnailUrls?: readonly string[];
+  readonly videoPreviewUrl?: string;
+  readonly videoDuration?: string;
   [key: string]: unknown;
 }
 
@@ -127,6 +132,58 @@ function RunStatusBadge({
   );
 }
 
+/* ── Image thumbnail grid (image-generator nodes) ── */
+function ImageThumbnailGrid({ thumbnailUrls }: { readonly thumbnailUrls?: readonly string[] }) {
+  return (
+    <div className="grid grid-cols-2 gap-1 px-3 pb-2" data-testid="image-thumbnail-grid">
+      {Array.from({ length: 4 }, (_, i) => {
+        const url = thumbnailUrls?.[i];
+        return (
+          <div
+            key={i}
+            className="w-[56px] h-[56px] rounded-sm bg-border overflow-hidden flex items-center justify-center"
+          >
+            {url ? (
+              <img src={url} alt={`Generated image ${i + 1}`} className="h-full w-full object-cover" />
+            ) : (
+              <ImageIcon className="h-4 w-4 text-muted-foreground/40" aria-hidden="true" />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── Video preview frame (video-composer nodes) ── */
+function VideoPreviewFrame({
+  videoPreviewUrl,
+  videoDuration = '0:00 / 0:30',
+}: {
+  readonly videoPreviewUrl?: string;
+  readonly videoDuration?: string;
+}) {
+  return (
+    <div className="px-3 pb-2" data-testid="video-preview-frame">
+      <div className="w-[236px] h-[128px] rounded-sm bg-border relative mx-auto overflow-hidden">
+        {videoPreviewUrl ? (
+          <img src={videoPreviewUrl} alt="Video preview" className="h-full w-full object-cover" />
+        ) : null}
+        {/* Play button overlay */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-background/80 border border-border flex items-center justify-center">
+            <Play className="h-3.5 w-3.5 text-foreground ml-0.5" aria-hidden="true" />
+          </div>
+        </div>
+        {/* Timeline */}
+        <span className="absolute bottom-1 right-1.5 font-mono text-[10px] text-muted-foreground">
+          {videoDuration}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 /* ── Main node card ── */
 export const WorkflowNodeCard = memo(function WorkflowNodeCard({
   data,
@@ -146,6 +203,9 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
     staleData,
     previewAvailable,
     footerMeta,
+    thumbnailUrls,
+    videoPreviewUrl,
+    videoDuration,
   } = data;
 
   const accentBg = categoryAccentBg[category] ?? 'bg-node-utility/70';
@@ -274,6 +334,16 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
         </p>
       )}
 
+      {/* Image thumbnail grid (image-generator nodes) */}
+      {node.type === 'image-generator' && (
+        <ImageThumbnailGrid thumbnailUrls={thumbnailUrls} />
+      )}
+
+      {/* Video preview frame (video-composer nodes) */}
+      {node.type === 'video-composer' && (
+        <VideoPreviewFrame videoPreviewUrl={videoPreviewUrl} videoDuration={videoDuration} />
+      )}
+
       {/* Input port rail */}
       {inputPorts.length > 0 && (
         <div className="border-t border-border px-2 py-1 space-y-0.5">
@@ -284,7 +354,7 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
                 position={Position.Left}
                 id={port.key}
                 className={cn(
-                  '!w-2 !h-2 !bg-background !border-[1.5px] !border-primary',
+                  '!w-2 !h-2 !bg-background !border-2 !border-primary',
                   disabled && '!border-muted-foreground',
                 )}
               />
@@ -309,7 +379,7 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
                 position={Position.Right}
                 id={port.key}
                 className={cn(
-                  '!w-2 !h-2 !bg-background !border-[1.5px] !border-cyan-400',
+                  '!w-2 !h-2 !bg-background !border-2 !border-cyan-400',
                   disabled && '!border-muted-foreground',
                 )}
               />

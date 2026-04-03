@@ -161,7 +161,10 @@ function EdgeDataView({ edge }: { readonly edge: WorkflowEdge }) {
     <div className="space-y-3 p-3" data-testid="data-inspector-edge">
       <div className="flex items-center gap-2">
         <ArrowRightLeft className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-xs font-medium">Edge</span>
+        <span className="text-xs font-medium">{sourceNode?.label ?? edge.sourceNodeId}</span>
+        <span className="rounded-sm border border-cyan-400/40 bg-card px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-cyan-400">
+          {edge.sourcePortKey}
+        </span>
       </div>
 
       {/* Connection info */}
@@ -282,7 +285,7 @@ function WorkflowSummaryView() {
 
       {statusCounts.total > 0 && (
         <div className="grid grid-cols-3 gap-2 text-center">
-          <StatBox label="Success" value={statusCounts.success} color="text-green-600" />
+          <StatBox label="Success" value={statusCounts.success} color="text-success" />
           <StatBox label="Error" value={statusCounts.error} color="text-destructive" />
           <StatBox label="Pending" value={statusCounts.pending + statusCounts.running} color="text-muted-foreground" />
         </div>
@@ -359,7 +362,7 @@ function RunRecordSummary({ record }: { readonly record: NodeRunRecord }) {
         {record.usedCache && (
           <>
             <span className="text-muted-foreground">Cache</span>
-            <span className="text-green-600">Hit</span>
+            <span className="text-success">Hit</span>
           </>
         )}
         {record.errorMessage && (

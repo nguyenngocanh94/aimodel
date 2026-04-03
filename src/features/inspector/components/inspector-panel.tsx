@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { Settings2, Info, Eye, AlertTriangle, Database } from 'lucide-react';
+import { Settings2, Info, Eye, AlertTriangle, Database, MousePointer } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs';
 import { useWorkflowStore } from '@/features/workflow/store/workflow-store';
 import {
@@ -136,9 +136,11 @@ export function InspectorPanel() {
           </div>
         </Tabs>
       ) : (
-        /* No selection: show data inspector or guidance */
-        <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
-          <DataInspectorPanel />
+        /* No selection: empty state guidance */
+        <div className="flex flex-col items-center justify-center gap-3 h-full">
+          <MousePointer className="h-8 w-8 text-muted-foreground/40" aria-hidden="true" />
+          <p className="text-sm text-muted-foreground">Select a node to inspect</p>
+          <p className="text-xs text-muted-foreground/70">Click a node on the canvas or use keyboard navigation</p>
         </div>
       )}
     </aside>

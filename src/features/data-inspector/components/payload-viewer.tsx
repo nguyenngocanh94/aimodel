@@ -87,7 +87,14 @@ export function PayloadViewer({ portKey, payload, source, showProducer = true }:
           >
             {payload.status}
           </Badge>
-          <Badge variant="outline" className="text-[9px] h-4 px-1">
+          <Badge
+            variant="outline"
+            className={`rounded-sm text-[9px] h-4 px-1 py-0.5 font-mono ${
+              source === 'lastRun'
+                ? 'bg-success/10 text-success'
+                : 'bg-primary/10 text-primary'
+            }`}
+          >
             {source}
           </Badge>
         </div>
@@ -164,16 +171,18 @@ export function PayloadViewer({ portKey, payload, source, showProducer = true }:
           </div>
 
           {viewMode === 'json' ? (
-            <pre className="text-[10px] text-muted-foreground bg-muted/50 rounded p-1 max-h-48 overflow-auto whitespace-pre-wrap break-all">
-              {jsonString.slice(0, isLarge ? 10_000 : 5_000)}
-              {jsonString.length > (isLarge ? 10_000 : 5_000) && '\n… truncated'}
+            <pre className="font-mono text-[11px] bg-muted border border-border rounded-md p-3 max-h-48 overflow-auto whitespace-pre-wrap break-all">
+              <code className="text-muted-foreground">{jsonString.slice(0, isLarge ? 10_000 : 5_000)}</code>
+              {jsonString.length > (isLarge ? 10_000 : 5_000) && <span className="text-muted-foreground">\n… truncated</span>}
             </pre>
           ) : (
-            <pre className="text-[10px] text-muted-foreground bg-muted/50 rounded p-1 max-h-32 overflow-auto">
-              {typeof payload.value === 'string'
-                ? payload.value.slice(0, 500)
-                : jsonString.slice(0, 500)}
-              {jsonString.length > 500 && '…'}
+            <pre className="font-mono text-[11px] bg-muted border border-border rounded-md p-3 max-h-32 overflow-auto">
+              <code className="text-muted-foreground">
+                {typeof payload.value === 'string'
+                  ? payload.value.slice(0, 500)
+                  : jsonString.slice(0, 500)}
+                {jsonString.length > 500 && '…'}
+              </code>
             </pre>
           )}
         </div>
