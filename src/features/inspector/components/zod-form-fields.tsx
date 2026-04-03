@@ -149,7 +149,7 @@ export function ZodFormFields({
                 aria-invalid={!!error}
                 aria-describedby={error ? `${field.name}-error` : field.description ? `${field.name}-desc` : undefined}
                 {...register(field.name)}
-                className="h-8 w-full rounded-md border border-input bg-muted px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                className="h-8 w-full rounded-md border border-input bg-muted px-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
               />
             )}
 
@@ -161,7 +161,7 @@ export function ZodFormFields({
                 aria-invalid={!!error}
                 aria-describedby={error ? `${field.name}-error` : field.description ? `${field.name}-desc` : undefined}
                 {...register(field.name)}
-                className="w-full rounded-md border border-input bg-muted px-2 py-1 text-sm resize-y focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                className="w-full rounded-md border border-input bg-muted px-2 py-1 text-sm resize-y focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
               />
             )}
 
@@ -175,7 +175,7 @@ export function ZodFormFields({
                 aria-invalid={!!error}
                 aria-describedby={error ? `${field.name}-error` : field.description ? `${field.name}-desc` : undefined}
                 {...register(field.name, { valueAsNumber: true })}
-                className="h-8 w-full rounded-md border border-input bg-muted px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                className="h-8 w-full rounded-md border border-input bg-muted px-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
               />
             )}
 
@@ -186,7 +186,7 @@ export function ZodFormFields({
                 aria-invalid={!!error}
                 aria-describedby={error ? `${field.name}-error` : field.description ? `${field.name}-desc` : undefined}
                 {...register(field.name)}
-                className="h-8 w-full rounded-md border border-input bg-muted px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                className="h-8 w-full rounded-md border border-input bg-muted px-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
               >
                 {field.options.map((opt) => (
                   <option key={opt} value={opt}>

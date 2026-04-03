@@ -250,15 +250,15 @@ export function NodeLibraryPanel({
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6"
+            className="h-8 w-8"
             onClick={toggleDisplayMode}
             aria-label={isCompact ? 'Switch to expanded view' : 'Switch to compact view'}
             aria-pressed={isCompact}
           >
             {isCompact ? (
-              <LayoutGrid className="h-3.5 w-3.5" />
+              <LayoutGrid className="h-3.5 w-3.5" aria-hidden="true" />
             ) : (
-              <List className="h-3.5 w-3.5" />
+              <List className="h-3.5 w-3.5" aria-hidden="true" />
             )}
           </Button>
         </div>

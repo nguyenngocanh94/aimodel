@@ -66,7 +66,7 @@ export function NodeSearch({
           className={cn(
             'h-8 w-full rounded-md border border-input bg-muted pl-8 pr-8 text-sm',
             'placeholder:text-muted-foreground',
-            'focus:outline-none focus:ring-1 focus:ring-ring',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
             'transition-hover',
             disabled && 'cursor-not-allowed opacity-50',
           )}

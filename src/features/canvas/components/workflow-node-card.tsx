@@ -217,7 +217,7 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
 
         {/* Quick menu button */}
         <button
-          className="rounded-sm p-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-accent-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-hover"
+          className="flex h-8 w-8 items-center justify-center rounded-sm p-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-accent-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-hover"
           data-testid={`node-menu-btn-${node.id}`}
           aria-label={`Menu for ${node.label}`}
         >

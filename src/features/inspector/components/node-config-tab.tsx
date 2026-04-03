@@ -126,7 +126,7 @@ function NodeConfigForm({ node, template, commitAuthoring }: NodeConfigFormProps
           type="text"
           value={node.label}
           onChange={handleTitleChange}
-          className="h-8 w-full rounded-md border border-input bg-muted px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-8 w-full rounded-md border border-input bg-muted px-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
       </div>
 

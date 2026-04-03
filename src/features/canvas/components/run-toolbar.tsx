@@ -120,6 +120,7 @@ export function RunToolbar() {
     <header
       className="sticky top-0 z-10 flex h-12 items-center justify-between gap-3 border-b border-border/80 bg-background/95 px-3 text-foreground backdrop-blur supports-[backdrop-filter]:bg-background/80"
       data-testid="run-toolbar"
+      aria-label="Run toolbar"
     >
       {/* Left zone: workflow name + dirty indicator */}
       <div className="flex min-w-0 items-center gap-2">
