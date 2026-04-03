@@ -27,10 +27,13 @@ import { ConnectDialog } from './connect-dialog';
 import { RunAnnouncer } from './run-announcer';
 import { checkCompatibility } from '@/features/workflows/domain/type-compatibility';
 import { exportWorkflowAsBlob } from '@/features/workflows/data/workflow-import-export';
+import { planExecution } from '@/features/execution/domain/run-planner';
+import { executeMockRun } from '@/features/execution/domain/mock-executor';
+import { runCache } from '@/features/execution/domain/run-cache';
 import type { WorkflowNode, WorkflowEdge as WfEdge, NodeRunRecord } from '@/features/workflows/domain/workflow-types';
 import type { WorkflowEdgeData } from './workflow-edge';
 import { useRunStore } from '@/features/execution/store/run-store';
-import { selectNodeRunRecords } from '@/features/execution/store/run-selectors';
+import { selectNodeRunRecords, selectIsRunning } from '@/features/execution/store/run-selectors';
 
 // Custom node types
 const nodeTypes = {
@@ -125,8 +128,11 @@ function CanvasSurfaceInner() {
   const undo = useWorkflowStore((s) => s.undo);
   const redo = useWorkflowStore((s) => s.redo);
   const setViewport = useWorkflowStore((s) => s.setViewport);
+  const markSaved = useWorkflowStore((s) => s.markSaved);
+  const setInspectorTab = useWorkflowStore((s) => s.setInspectorTab);
 
   const nodeRunRecords = useRunStore(selectNodeRunRecords);
+  const isRunning = useRunStore(selectIsRunning);
 
   const reactFlowInstance = useReactFlow();
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -285,13 +291,14 @@ function CanvasSurfaceInner() {
           ...doc,
           nodes: [...doc.nodes, newNode],
         }));
-        // Auto-select dropped node so inspector shows Config tab
+        // Auto-select dropped node and switch to Config tab (design system section 15)
         setSelectedNodeIds([newNode.id]);
+        setInspectorTab('config');
       } catch {
         // Invalid drag data, ignore
       }
     },
-    [reactFlowInstance, commitAuthoring, setSelectedNodeIds],
+    [reactFlowInstance, commitAuthoring, setSelectedNodeIds, setInspectorTab],
   );
 
   // Duplicate selected nodes
@@ -349,10 +356,10 @@ function CanvasSurfaceInner() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
 
-  // Save: trigger committed snapshot to IndexedDB
+  // Save: mark current document as saved
   const handleSave = useCallback(() => {
-    useWorkflowStore.getState().commitAuthoring((doc) => doc);
-  }, []);
+    markSaved();
+  }, [markSaved]);
 
   // Export: download workflow as JSON
   const handleExport = useCallback(() => {
@@ -365,12 +372,12 @@ function CanvasSurfaceInner() {
     URL.revokeObjectURL(url);
   }, [document]);
 
-  // Quick add: add node from template
+  // Quick add: add node from template at canvas center
   const handleQuickAddSelect = useCallback(
     (templateType: string) => {
       const template = getTemplate(templateType);
       if (!template) return;
-      const viewport = reactFlowInstance.getViewport();
+      // screenToFlowPosition already accounts for viewport pan/zoom
       const position = reactFlowInstance.screenToFlowPosition({
         x: globalThis.window.innerWidth / 2,
         y: globalThis.window.innerHeight / 2,
@@ -379,15 +386,18 @@ function CanvasSurfaceInner() {
         id: `node-${crypto.randomUUID().slice(0, 8)}`,
         type: template.type,
         label: template.title,
-        position: { x: position.x - viewport.x, y: position.y - viewport.y },
+        position: { x: position.x, y: position.y },
         config: template.defaultConfig,
       };
       commitAuthoring((doc) => ({
         ...doc,
         nodes: [...doc.nodes, newNode],
       }));
+      // Select the new node and switch to Config tab
+      setSelectedNodeIds([newNode.id]);
+      setInspectorTab('config');
     },
-    [reactFlowInstance, commitAuthoring],
+    [reactFlowInstance, commitAuthoring, setSelectedNodeIds, setInspectorTab],
   );
 
   // Connect dialog: create edge from selected node
@@ -412,6 +422,37 @@ function CanvasSurfaceInner() {
     },
     [commitAuthoring],
   );
+
+  // Inspect: focus inspector on selected node's config tab
+  const handleInspect = useCallback(() => {
+    setInspectorTab('config');
+  }, [setInspectorTab]);
+
+  // Run selected node
+  const handleRunNode = useCallback(() => {
+    if (isRunning) return;
+    const selectedId = useWorkflowStore.getState().selectedNodeIds[0];
+    if (!selectedId) return;
+    const plan = planExecution({
+      workflow: document,
+      trigger: 'runNode',
+      targetNodeId: selectedId,
+    });
+    const controller = new AbortController();
+    executeMockRun({ workflow: document, plan, runCache, signal: controller.signal });
+  }, [document, isRunning]);
+
+  // Run entire workflow
+  const handleRunWorkflow = useCallback(() => {
+    if (isRunning) return;
+    const plan = planExecution({
+      workflow: document,
+      trigger: 'runWorkflow',
+      targetNodeId: undefined,
+    });
+    const controller = new AbortController();
+    executeMockRun({ workflow: document, plan, runCache, signal: controller.signal });
+  }, [document, isRunning]);
 
   // Escape: close dialogs first, then clear selection
   const handleEscape = useCallback(() => {
@@ -438,6 +479,9 @@ function CanvasSurfaceInner() {
     onSave: handleSave,
     onExport: handleExport,
     onQuickAdd: () => setQuickAddOpen(true),
+    onInspect: handleInspect,
+    onRunNode: handleRunNode,
+    onRunWorkflow: handleRunWorkflow,
     onConnect: () => setConnectDialogOpen(true),
     onEscape: handleEscape,
   });
