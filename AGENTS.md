@@ -56,6 +56,35 @@ src/                            # Source code (created during implementation)
 7. **Test what matters.** Unit test: validation, execution, compatibility, migrations. E2E test: core user journeys. Don't chase vanity coverage.
 8. **Do not modify planning documents.** Files in `plans/` are final. If you find a plan issue, note it in a comment on the bead.
 9. **Never ask — just do.** Do not ask the user what to work on, whether to commit, or how to proceed. Run `bd ready`, pick the highest-priority ready bead, claim it, and start coding immediately. The only time to ask is when the plan is genuinely ambiguous and no reasonable default exists. Presenting a numbered menu of options is never acceptable.
+10. **Targeted tests only.** NEVER run the full test suite. Only run tests for the files you changed:
+    ```bash
+    # CORRECT — run only your feature's tests
+    npx vitest run src/features/node-registry/templates/script-writer.test.ts
+    npx vitest run src/features/workflows/domain/
+
+    # WRONG — runs everything, hangs, eats RAM
+    npx vitest
+    npm test
+    npx vitest run  # full suite — still too broad
+    ```
+    Always use `npx vitest run <specific-path>`. The test must exit in under 10 seconds. If it hangs, you have a bug.
+11. **Test lock protocol.** Use a file lock to prevent concurrent test runs:
+    ```bash
+    # Before testing: acquire lock
+    if [ -f .test.lock ]; then
+      echo "Another agent is testing, waiting..."
+      while [ -f .test.lock ]; do sleep 2; done
+    fi
+    echo "$$" > .test.lock
+
+    # Run your scoped test
+    npx vitest run src/features/your-feature/
+
+    # After testing: release lock
+    rm -f .test.lock
+    ```
+    If `.test.lock` exists, wait. If it's stale (older than 60s), delete it and proceed.
+    ALWAYS remove the lock after testing, even if the test fails.
 
 ## At Session Start
 
@@ -139,7 +168,7 @@ Send a completion message so other agents know the dependency is satisfied:
 1. **Claim it:** `bd update <id> --status=in_progress`
 2. **Read the plan:** Open `plans/06-final-plan.md` and find the section referenced in the bead description
 3. **Implement:** Write code in the correct `src/` path as specified in the bead
-4. **Test:** Write tests alongside implementation. Run `npm test` or `npx vitest`
+4. **Test:** Write tests alongside implementation. Run `npx vitest run` (single run, NOT watch mode)
 5. **Quality gate:** Run `npm run quality-gate` (typecheck + lint + tests). Fix all errors before proceeding.
 6. **Self-review (Fresh Eyes):** Re-read all new and modified code adversarially. Ask:
    - **Correctness:** Does implementation match the bead description and acceptance criteria?

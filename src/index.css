@@ -5,6 +5,9 @@
 @import '@fontsource/geist-mono/400.css';
 @import '@fontsource/geist-mono/500.css';
 @import '@fontsource/geist-mono/700.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/700.css';
 
 @tailwind base;
 @tailwind components;
@@ -33,6 +36,7 @@
     --input: #C8CFD8;
     --ring: #1D8CD7;
     --radius: 0.5rem;
+    --font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, monospace;
 
     /* ── Extension Tokens ── */
     --signal: #D97706;
