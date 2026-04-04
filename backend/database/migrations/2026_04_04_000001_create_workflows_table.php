@@ -24,8 +24,10 @@ return new class extends Migration
             $table->index('updated_at');
         });
 
-        // GIN index on tags for fast JSONB containment queries
-        DB::statement('CREATE INDEX workflows_tags_gin ON workflows USING GIN (tags)');
+        // GIN index on tags for fast JSONB containment queries (PostgreSQL only)
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement('CREATE INDEX workflows_tags_gin ON workflows USING GIN (tags)');
+        }
     }
 
     public function down(): void
