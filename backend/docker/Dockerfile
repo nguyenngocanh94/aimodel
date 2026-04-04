@@ -1,4 +1,4 @@
-FROM php:8.3-fpm-alpine
+FROM php:8.4-fpm-alpine
 
 # Install system dependencies
 RUN apk add --no-cache \
@@ -46,9 +46,7 @@ RUN chown -R www-data:www-data /var/www/html && \
     chmod -R 755 /var/www/html/bootstrap/cache 2>/dev/null || true
 
 # Create start script
-RUN echo '#!/bin/sh\n\
-php-fpm -D\n\
-nginx -g "daemon off;"' > /start.sh && \
+RUN printf '#!/bin/sh\nphp-fpm -D\nnginx -g "daemon off;"\n' > /start.sh && \
     chmod +x /start.sh
 
 EXPOSE 80
