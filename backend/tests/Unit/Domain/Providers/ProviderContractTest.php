@@ -35,20 +35,19 @@ final class ProviderContractTest extends TestCase
         $router = new ProviderRouter();
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Unknown provider: nonexistent');
+        $this->expectExceptionMessage('Unknown provider driver: nonexistent');
 
         $router->resolve(Capability::TextGeneration, ['provider' => 'nonexistent']);
     }
 
     #[Test]
-    public function provider_router_throws_for_default_stub_driver(): void
+    public function provider_router_resolves_default_stub_driver(): void
     {
         $router = new ProviderRouter();
 
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Unknown provider: stub');
+        $provider = $router->resolve(Capability::TextGeneration, []);
 
-        $router->resolve(Capability::TextGeneration, []);
+        $this->assertInstanceOf(ProviderContract::class, $provider);
     }
 
     #[Test]
