@@ -1,81 +1,121 @@
+import { useCallback } from 'react'
 import { useParams } from '@tanstack/react-router'
-import { Play } from 'lucide-react'
+import { Play, Loader2, History } from 'lucide-react'
 import { toast } from 'sonner'
+
 import { AppHeader } from '@/app/layout/app-header'
 import { Button } from '@/shared/ui/button'
-import { useWorkflowRuns } from '@/shared/api/queries'
+import { useWorkflowRuns, useWorkflow } from '@/shared/api/queries'
 import { useTriggerRun, useCancelRun } from '@/shared/api/mutations'
 import { RunListItem } from '@/features/run-history/components/run-list-item'
+import type { ExecutionRun } from '@/shared/api/schemas'
 
-interface RunData {
-  readonly id: string
-  readonly status: string
-  readonly trigger: string
-  readonly targetNodeId?: string
-  readonly startedAt?: string
-  readonly completedAt?: string
-  readonly summary?: {
-    readonly successCount?: number
-    readonly errorCount?: number
-    readonly skippedCount?: number
-    readonly totalCount?: number
-  }
-}
-
+/**
+ * RunHistoryPage - Shows run history for a workflow
+ *
+ * Route: /workflows/$workflowId/runs
+ */
 export function RunHistoryPage() {
   const { workflowId } = useParams({ from: '/workflows/$workflowId/runs' })
-  const { data, isLoading, error } = useWorkflowRuns(workflowId)
+  const { data: workflowData } = useWorkflow(workflowId)
+  const { data: runsData, isLoading, isError, error } = useWorkflowRuns(workflowId)
   const triggerRun = useTriggerRun(workflowId)
 
-  const runs = ((data as { data?: RunData[] })?.data ?? []) as RunData[]
+  const workflowName =
+    (workflowData as { data?: { name?: string } })?.data?.name ??
+    `Workflow ${workflowId.slice(0, 8)}`
 
-  const handleTriggerRun = async () => {
+  const runs = ((runsData as { data?: ExecutionRun[] })?.data ?? []) as ExecutionRun[]
+
+  const handleTriggerRun = useCallback(async () => {
     try {
       await triggerRun.mutateAsync({ trigger: 'runWorkflow' })
-      toast.success('Run triggered')
+      toast.success('Workflow run started')
     } catch {
-      toast.error('Failed to trigger run')
+      toast.error('Failed to start workflow run')
     }
-  }
+  }, [triggerRun])
 
   return (
     <div className="flex h-screen w-screen flex-col bg-background">
-      <AppHeader workflowId={workflowId} workflowName={`Workflow ${workflowId.slice(0, 8)}`} />
+      <AppHeader workflowId={workflowId} workflowName={workflowName} />
 
-      <div className="flex items-center justify-between border-b px-6 py-3">
-        <h2 className="text-sm font-semibold">Run History</h2>
-        <Button size="sm" onClick={handleTriggerRun} disabled={triggerRun.isPending}>
-          <Play className="mr-1 h-3.5 w-3.5" />
-          Run Workflow
-        </Button>
-      </div>
+      <div className="flex-1 overflow-auto">
+        {/* Toolbar */}
+        <div className="flex items-center justify-between border-b px-6 py-3">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Run History</h2>
+            {!isLoading && !isError && (
+              <p className="text-xs text-muted-foreground">
+                {runs.length} {runs.length === 1 ? 'run' : 'runs'}
+              </p>
+            )}
+          </div>
+          <Button
+            onClick={handleTriggerRun}
+            disabled={triggerRun.isPending}
+            size="sm"
+            data-testid="trigger-run-btn"
+          >
+            {triggerRun.isPending ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="mr-1.5 h-4 w-4" />
+            )}
+            Run Workflow
+          </Button>
+        </div>
 
-      <div className="flex-1 overflow-auto p-6">
+        {/* Loading state */}
         {isLoading && (
-          <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
-            Loading runs...
+          <div className="flex flex-col items-center justify-center gap-3 py-20">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Loading runs...</p>
           </div>
         )}
 
-        {error && (
-          <div className="flex items-center justify-center py-20 text-sm text-destructive">
-            Failed to load runs
+        {/* Error state */}
+        {isError && (
+          <div className="flex flex-col items-center justify-center gap-3 py-20 px-6">
+            <p className="text-sm text-destructive">
+              {error instanceof Error ? error.message : 'Failed to load runs'}
+            </p>
           </div>
         )}
 
-        {!isLoading && !error && runs.length === 0 && (
-          <div className="flex flex-col items-center justify-center gap-4 py-20">
-            <h3 className="text-lg font-semibold">No runs yet</h3>
-            <p className="text-sm text-muted-foreground">Run this workflow to see execution history.</p>
-            <Button onClick={handleTriggerRun} disabled={triggerRun.isPending}>
-              <Play className="mr-1 h-4 w-4" />
+        {/* Empty state */}
+        {!isLoading && !isError && runs.length === 0 && (
+          <div
+            className="flex flex-col items-center justify-center gap-4 py-20"
+            data-testid="empty-state"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <History className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-base font-semibold text-foreground">No runs yet</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Start your first workflow run to see results here.
+              </p>
+            </div>
+            <Button
+              onClick={handleTriggerRun}
+              disabled={triggerRun.isPending}
+              data-testid="empty-trigger-run-btn"
+            >
+              {triggerRun.isPending ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="mr-1.5 h-4 w-4" />
+              )}
               Run Workflow
             </Button>
           </div>
         )}
 
-        {runs.length > 0 && (
-          <div className="space-y-2">
+        {/* Run list */}
+        {!isLoading && runs.length > 0 && (
+          <div className="space-y-2 p-6" data-testid="run-list">
             {runs.map((run) => (
               <CancelableRunItem key={run.id} run={run} />
             ))}
@@ -86,27 +126,26 @@ export function RunHistoryPage() {
   )
 }
 
-function CancelableRunItem({ run }: { readonly run: RunData }) {
+/**
+ * Wrapper that provides per-run cancel functionality via the useCancelRun hook.
+ * Hooks must be called at the component level, so each run item gets its own instance.
+ */
+function CancelableRunItem({ run }: { readonly run: ExecutionRun }) {
   const cancelRun = useCancelRun(run.id)
 
-  const handleCancel = async () => {
+  const handleCancel = useCallback(async () => {
     try {
       await cancelRun.mutateAsync()
-      toast.info('Run cancelled')
+      toast.success('Run cancelled')
     } catch {
       toast.error('Failed to cancel run')
     }
-  }
+  }, [cancelRun])
 
   return (
     <RunListItem
-      id={run.id}
-      status={run.status}
-      trigger={run.trigger}
-      targetNodeId={run.targetNodeId}
-      startedAt={run.startedAt}
-      completedAt={run.completedAt}
-      summary={run.summary}
+      run={run}
+      isCancelling={cancelRun.isPending}
       onCancel={handleCancel}
     />
   )
