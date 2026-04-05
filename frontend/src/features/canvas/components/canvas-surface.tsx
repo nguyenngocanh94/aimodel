@@ -27,9 +27,6 @@ import { ConnectDialog } from './connect-dialog';
 import { RunAnnouncer } from './run-announcer';
 import { checkCompatibility } from '@/features/workflows/domain/type-compatibility';
 import { exportWorkflowAsBlob } from '@/features/workflows/data/workflow-import-export';
-import { planExecution } from '@/features/execution/domain/run-planner';
-import { executeMockRun } from '@/features/execution/domain/mock-executor';
-import { runCache } from '@/features/execution/domain/run-cache';
 import type { WorkflowNode, WorkflowEdge as WfEdge, NodeRunRecord } from '@/features/workflows/domain/workflow-types';
 import type { WorkflowEdgeData } from './workflow-edge';
 import { useRunStore } from '@/features/execution/store/run-store';
@@ -476,31 +473,17 @@ function CanvasSurfaceInner() {
     setInspectorTab('config');
   }, [setInspectorTab]);
 
-  // Run selected node
+  // Run selected node — execution is now handled by the backend
   const handleRunNode = useCallback(() => {
     if (isRunning) return;
-    const selectedId = useWorkflowStore.getState().selectedNodeIds[0];
-    if (!selectedId) return;
-    const plan = planExecution({
-      workflow: document,
-      trigger: 'runNode',
-      targetNodeId: selectedId,
-    });
-    const controller = new AbortController();
-    executeMockRun({ workflow: document, plan, runCache, signal: controller.signal });
-  }, [document, isRunning]);
+    // TODO: dispatch run request to backend API
+  }, [isRunning]);
 
-  // Run entire workflow
+  // Run entire workflow — execution is now handled by the backend
   const handleRunWorkflow = useCallback(() => {
     if (isRunning) return;
-    const plan = planExecution({
-      workflow: document,
-      trigger: 'runWorkflow',
-      targetNodeId: undefined,
-    });
-    const controller = new AbortController();
-    executeMockRun({ workflow: document, plan, runCache, signal: controller.signal });
-  }, [document, isRunning]);
+    // TODO: dispatch run request to backend API
+  }, [isRunning]);
 
   // Escape: close dialogs first, then clear selection
   const handleEscape = useCallback(() => {

@@ -10,7 +10,7 @@ import { DegradedModeBanner } from './degraded-mode-banner'
 
 describe('DegradedModeBanner', () => {
   it('should not render when boot is ready', () => {
-    mockUseBootState.mockReturnValue({ status: 'ready', repository: {} })
+    mockUseBootState.mockReturnValue({ status: 'ready' })
     const { container } = render(<DegradedModeBanner />)
     expect(container.innerHTML).toBe('')
   })
@@ -18,7 +18,6 @@ describe('DegradedModeBanner', () => {
   it('should render warning when degraded', () => {
     mockUseBootState.mockReturnValue({
       status: 'degraded',
-      repository: {},
       reason: 'IndexedDB unavailable',
     })
     render(<DegradedModeBanner />)
@@ -30,7 +29,6 @@ describe('DegradedModeBanner', () => {
   it('should show export button when handler provided', () => {
     mockUseBootState.mockReturnValue({
       status: 'degraded',
-      repository: {},
       reason: 'test',
     })
     const onExport = vi.fn()
@@ -41,7 +39,6 @@ describe('DegradedModeBanner', () => {
   it('should show retry button when handler provided', () => {
     mockUseBootState.mockReturnValue({
       status: 'degraded',
-      repository: {},
       reason: 'test',
     })
     const onRetry = vi.fn()
@@ -49,8 +46,8 @@ describe('DegradedModeBanner', () => {
     expect(screen.getByText('Retry')).toBeInTheDocument()
   })
 
-  it('should not render during checkingPersistence', () => {
-    mockUseBootState.mockReturnValue({ status: 'checkingPersistence' })
+  it('should not render during booting', () => {
+    mockUseBootState.mockReturnValue({ status: 'booting' })
     const { container } = render(<DegradedModeBanner />)
     expect(container.innerHTML).toBe('')
   })

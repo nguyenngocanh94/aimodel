@@ -52,7 +52,7 @@ export function FatalBootErrorScreen({ message }: FatalBootErrorScreenProps) {
 export function BootGate() {
   const boot = useBootState()
 
-  if (boot.status === 'checkingPersistence' || boot.status === 'checkingRecovery') {
+  if (boot.status === 'booting') {
     return <AppSplashScreen />
   }
 

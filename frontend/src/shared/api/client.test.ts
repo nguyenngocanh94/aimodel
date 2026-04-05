@@ -124,9 +124,10 @@ describe('API Client', () => {
         await apiRequest('/workflows');
         expect.fail('Should have thrown');
       } catch (error) {
-        expect(error).toBeInstanceOf(ApiError);
-        expect(error.message).toContain('Internal Server Error');
-        expect(error.status).toBe(500);
+        const apiError = error as ApiError;
+        expect(apiError).toBeInstanceOf(ApiError);
+        expect(apiError.message).toContain('Internal Server Error');
+        expect(apiError.status).toBe(500);
       }
     });
 
@@ -188,9 +189,10 @@ describe('API Client', () => {
         await apiRequest('/workflows', { method: 'POST', body: {} });
         expect.fail('Should have thrown');
       } catch (error) {
-        expect(error).toBeInstanceOf(ApiError);
-        expect(error.status).toBe(422);
-        expect(error.data).toEqual(errorData);
+        const apiError = error as ApiError;
+        expect(apiError).toBeInstanceOf(ApiError);
+        expect(apiError.status).toBe(422);
+        expect(apiError.data).toEqual(errorData);
       }
     });
   });

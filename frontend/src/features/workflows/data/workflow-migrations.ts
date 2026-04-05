@@ -3,9 +3,8 @@
  * Per plan section 12.6
  *
  * Migration layers (kept distinct per spec):
- * 1. Dexie DB version migrations → handled in workflow-db.ts
- * 2. Workflow JSON migrations → this file (migrateDocument)
- * 3. Node-template config migrations → this file (migrateNodeConfig)
+ * 1. Workflow JSON migrations → this file (migrateDocument)
+ * 2. Node-template config migrations → this file (migrateNodeConfig)
  */
 
 import type { WorkflowDocument, WorkflowNode } from '@/features/workflows/domain/workflow-types';

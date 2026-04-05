@@ -1,14 +1,10 @@
 /**
  * BootProvider - AiModel-e0x.3
- * Runs the boot state machine: checkingPersistence → checkingRecovery → ready|degraded|fatal.
- * Hydrates workflowStore with the last-opened document.
- * Per plan sections 7.3.3 and 7.3.4
+ * Simplified boot state: no longer manages Dexie/IndexedDB persistence.
+ * The backend now handles all persistence.
  */
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { usePersistence } from './persistence-provider'
-import type { WorkflowRepository, PersistenceMode } from '@/features/workflows/data/workflow-repository'
-import type { WorkflowDocument } from '@/features/workflows/domain/workflow-types'
 import { useWorkflowStore } from '@/features/workflow/store/workflow-store'
 
 // ============================================================
@@ -16,13 +12,12 @@ import { useWorkflowStore } from '@/features/workflow/store/workflow-store'
 // ============================================================
 
 export type BootState =
-  | { status: 'checkingPersistence' }
-  | { status: 'checkingRecovery'; repository: WorkflowRepository }
-  | { status: 'ready'; repository: WorkflowRepository; initialWorkflowId?: string }
-  | { status: 'degraded'; repository: WorkflowRepository; reason: string }
+  | { status: 'booting' }
+  | { status: 'ready'; initialWorkflowId?: string }
+  | { status: 'degraded'; reason: string }
   | { status: 'fatal'; message: string }
 
-const BootContext = createContext<BootState>({ status: 'checkingPersistence' })
+const BootContext = createContext<BootState>({ status: 'booting' })
 
 export function useBootState(): BootState {
   return useContext(BootContext)
@@ -46,7 +41,7 @@ export function setLastOpenedWorkflowId(id: string): void {
   try {
     localStorage.setItem(LAST_WORKFLOW_KEY, id)
   } catch {
-    // Ignore — localStorage may be unavailable in degraded mode
+    // Ignore — localStorage may be unavailable
   }
 }
 
@@ -59,56 +54,6 @@ export function clearLastOpenedWorkflowId(): void {
 }
 
 // ============================================================
-// Boot sequence (pure async logic, testable)
-// ============================================================
-
-export interface BootSequenceArgs {
-  readonly repository: WorkflowRepository
-  readonly mode: PersistenceMode
-  readonly reason?: string
-  readonly hydrateDocument: (doc: WorkflowDocument) => void
-  readonly getLastWorkflowId: () => string | null
-  readonly onCheckingRecovery?: () => void
-}
-
-/**
- * Run the boot sequence. Returns the final boot state.
- * This is extracted as a pure async function for testability.
- */
-export async function runBootSequence(args: BootSequenceArgs): Promise<BootState> {
-  const { repository, mode, reason, hydrateDocument, getLastWorkflowId, onCheckingRecovery } = args
-  const isDegraded = mode === 'memory-fallback'
-
-  onCheckingRecovery?.()
-
-  try {
-    const lastId = getLastWorkflowId()
-
-    if (lastId) {
-      const doc = await repository.load(lastId)
-      if (doc) {
-        hydrateDocument(doc)
-        if (isDegraded) {
-          return { status: 'degraded', repository, reason: reason ?? 'Using in-memory storage' }
-        }
-        return { status: 'ready', repository, initialWorkflowId: lastId }
-      }
-    }
-
-    // No last workflow or not found → empty state
-    if (isDegraded) {
-      return { status: 'degraded', repository, reason: reason ?? 'Using in-memory storage' }
-    }
-    return { status: 'ready', repository }
-  } catch (error) {
-    return {
-      status: 'fatal',
-      message: error instanceof Error ? error.message : 'Boot failed',
-    }
-  }
-}
-
-// ============================================================
 // BootProvider component
 // ============================================================
 
@@ -117,31 +62,21 @@ interface BootProviderProps {
 }
 
 export function BootProvider({ children }: BootProviderProps) {
-  const persistence = usePersistence()
-  const [bootState, setBootState] = useState<BootState>({ status: 'checkingPersistence' })
+  const [bootState, setBootState] = useState<BootState>({ status: 'booting' })
 
   useEffect(() => {
-    if (!persistence.isReady) return
-
-    const repository = persistence.repository
-    if (!repository) {
+    try {
+      // Boot is now instant — no persistence layer to initialise.
+      // The workflow store can be hydrated later via backend API calls.
+      const lastId = getLastOpenedWorkflowId()
+      setBootState({ status: 'ready', initialWorkflowId: lastId ?? undefined })
+    } catch (error) {
       setBootState({
         status: 'fatal',
-        message: persistence.reason ?? 'Persistence unavailable',
+        message: error instanceof Error ? error.message : 'Boot failed',
       })
-      return
     }
-
-    runBootSequence({
-      repository,
-      mode: persistence.mode!,
-      reason: persistence.reason,
-      hydrateDocument: (doc) => useWorkflowStore.getState().loadDocument(doc),
-      getLastWorkflowId: getLastOpenedWorkflowId,
-      onCheckingRecovery: () =>
-        setBootState({ status: 'checkingRecovery', repository }),
-    }).then(setBootState)
-  }, [persistence.isReady, persistence.repository, persistence.mode, persistence.reason])
+  }, [])
 
   return (
     <BootContext.Provider value={bootState}>

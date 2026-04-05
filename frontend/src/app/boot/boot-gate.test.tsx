@@ -27,14 +27,8 @@ describe('FatalBootErrorScreen', () => {
 })
 
 describe('BootGate', () => {
-  it('should show splash during checkingPersistence', () => {
-    mockUseBootState.mockReturnValue({ status: 'checkingPersistence' })
-    render(<BootGate />)
-    expect(screen.getByText(/Loading workspace/)).toBeInTheDocument()
-  })
-
-  it('should show splash during checkingRecovery', () => {
-    mockUseBootState.mockReturnValue({ status: 'checkingRecovery', repository: {} })
+  it('should show splash during booting', () => {
+    mockUseBootState.mockReturnValue({ status: 'booting' })
     render(<BootGate />)
     expect(screen.getByText(/Loading workspace/)).toBeInTheDocument()
   })
@@ -46,7 +40,7 @@ describe('BootGate', () => {
   })
 
   it('should render AppShell when ready', () => {
-    mockUseBootState.mockReturnValue({ status: 'ready', repository: {} })
+    mockUseBootState.mockReturnValue({ status: 'ready' })
     render(
       <ReactFlowProvider>
         <BootGate />
@@ -58,7 +52,6 @@ describe('BootGate', () => {
   it('should render AppShell when degraded', () => {
     mockUseBootState.mockReturnValue({
       status: 'degraded',
-      repository: {},
       reason: 'Memory fallback',
     })
     render(

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Plus, Search, Trash2, MoreVertical } from 'lucide-react'
+import { Plus, Search, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/shared/ui/button'
 import { Badge } from '@/shared/ui/badge'
