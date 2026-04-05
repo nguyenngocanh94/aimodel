@@ -5,7 +5,7 @@
  * Right: status chip + timer
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Play,
   Square,
@@ -13,6 +13,7 @@ import {
   ArrowDown,
   Clock,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/shared/ui/button';
 import { useWorkflowStore } from '@/features/workflow/store/workflow-store';
 import {
@@ -26,9 +27,9 @@ import {
   selectCanCancel,
   selectNodeRunRecords,
 } from '@/features/execution/store/run-selectors';
-import { planExecution } from '@/features/execution/domain/run-planner';
-import { executeMockRun } from '@/features/execution/domain/mock-executor';
-import { runCache } from '@/features/execution/domain/run-cache';
+import { useTriggerRun, useCancelRun } from '@/shared/api/mutations';
+import { connectToRunStream } from '@/shared/api/sse';
+import { useParams } from '@tanstack/react-router';
 
 function formatElapsed(ms: number): string {
   if (ms < 1000) return `${Math.round(ms)}ms`;
@@ -56,6 +57,11 @@ export function RunToolbar() {
     };
   }, [nodeRunRecords]);
 
+  const { workflowId } = useParams({ from: '/workflows/$workflowId' });
+  const triggerRun = useTriggerRun(workflowId);
+  const cancelRun = useCancelRun(activeRun?.id ?? '');
+  const sseCleanupRef = useRef<(() => void) | null>(null);
+
   const hasSelectedNode = selectedNodeIds.length === 1;
   const selectedNodeId = hasSelectedNode ? selectedNodeIds[0] : undefined;
 
@@ -82,29 +88,87 @@ export function RunToolbar() {
     return () => clearInterval(interval);
   }, [activeRun]);
 
-  const handleRun = useCallback(
-    (trigger: 'runWorkflow' | 'runNode' | 'runFromHere' | 'runUpToHere') => {
-      const plan = planExecution({
-        workflow: document,
-        trigger,
-        targetNodeId: selectedNodeId,
-      });
+  // Clean up SSE on unmount
+  useEffect(() => {
+    return () => {
+      sseCleanupRef.current?.();
+    };
+  }, []);
 
-      const controller = new AbortController();
-      executeMockRun({
-        workflow: document,
-        plan,
-        runCache,
-        signal: controller.signal,
-      });
+  const handleRun = useCallback(
+    async (trigger: 'runWorkflow' | 'runNode' | 'runFromHere' | 'runUpToHere') => {
+      try {
+        const result = await triggerRun.mutateAsync({
+          trigger,
+          targetNodeId: selectedNodeId,
+        });
+
+        const run = (result as { data?: { id?: string } })?.data;
+        if (!run?.id) return;
+
+        toast.success('Run started');
+
+        // Connect SSE for live updates
+        sseCleanupRef.current?.();
+        const { cleanup } = connectToRunStream(run.id, {
+          onCatchup: (data) => {
+            // Hydrate run store with catchup data
+            useRunStore.getState().hydrateCatchup?.(data);
+          },
+          onRunStarted: (data) => {
+            useRunStore.getState().startRun?.({
+              id: run.id,
+              plannedNodeIds: data.plannedNodeIds,
+            });
+          },
+          onNodeStatus: (data) => {
+            useRunStore.getState().updateNodeRecord?.({
+              nodeId: data.nodeId,
+              status: data.status as 'pending' | 'running' | 'success' | 'error' | 'skipped' | 'cancelled',
+              outputPayloads: data.outputPayloads as Record<string, unknown> | undefined,
+              durationMs: data.durationMs,
+              errorMessage: data.errorMessage,
+              usedCache: data.usedCache,
+            });
+          },
+          onRunCompleted: (data) => {
+            useRunStore.getState().completeRun?.({
+              status: data.status,
+              terminationReason: data.terminationReason,
+            });
+            cleanup();
+            sseCleanupRef.current = null;
+
+            if (data.status === 'success') {
+              toast.success('Run completed successfully');
+            } else if (data.status === 'error') {
+              toast.error('Run failed');
+            } else if (data.status === 'cancelled') {
+              toast.info('Run cancelled');
+            }
+          },
+          onError: () => {
+            toast.error('Lost connection to run stream');
+          },
+        });
+        sseCleanupRef.current = cleanup;
+      } catch {
+        toast.error('Failed to start run');
+      }
     },
-    [document, selectedNodeId],
+    [triggerRun, selectedNodeId],
   );
 
-  const handleCancel = useCallback(() => {
-    const controller = useRunStore.getState().abortController;
-    controller?.abort('User cancelled');
-  }, []);
+  const handleCancel = useCallback(async () => {
+    try {
+      await cancelRun.mutateAsync();
+      sseCleanupRef.current?.();
+      sseCleanupRef.current = null;
+      toast.info('Run cancellation requested');
+    } catch {
+      toast.error('Failed to cancel run');
+    }
+  }, [cancelRun]);
 
   // Derive status chip text
   const runStatus = activeRun?.status;
