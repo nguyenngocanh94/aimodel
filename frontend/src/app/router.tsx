@@ -1,6 +1,7 @@
 import { createRootRoute, createRoute, createRouter, Outlet, redirect } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { AppProviders } from './providers'
+import { ErrorBoundary } from '@/shared/ui/error-boundary'
 import { WorkflowListPage } from '@/pages/workflow-list-page'
 import { EditorPage } from '@/pages/editor-page'
 import { RunHistoryPage } from '@/pages/run-history-page'
@@ -13,7 +14,9 @@ import { Toaster } from 'sonner'
 export const rootRoute = createRootRoute({
   component: () => (
     <AppProviders>
-      <Outlet />
+      <ErrorBoundary>
+        <Outlet />
+      </ErrorBoundary>
       <Toaster position="bottom-right" richColors />
       <TanStackRouterDevtools />
     </AppProviders>
