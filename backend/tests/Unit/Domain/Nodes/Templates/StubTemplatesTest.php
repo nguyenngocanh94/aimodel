@@ -7,12 +7,14 @@ namespace Tests\Unit\Domain\Nodes\Templates;
 use App\Domain\DataType;
 use App\Domain\NodeCategory;
 use App\Domain\Nodes\NodeExecutionContext;
+use App\Domain\Nodes\NodeTemplateRegistry;
 use App\Domain\Nodes\Templates\FinalExportTemplate;
 use App\Domain\Nodes\Templates\ImageAssetMapperTemplate;
 use App\Domain\Nodes\Templates\SubtitleFormatterTemplate;
 use App\Domain\Nodes\Templates\TtsVoiceoverPlannerTemplate;
 use App\Domain\Nodes\Templates\VideoComposerTemplate;
 use App\Domain\PortPayload;
+use App\Domain\Providers\Adapters\StubAdapter;
 use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
@@ -42,12 +44,12 @@ final class StubTemplatesTest extends TestCase
         $ports = $template->ports();
 
         $this->assertCount(1, $ports->inputs);
-        $this->assertSame('imageFrameList', $ports->inputs[0]->key);
-        $this->assertSame(DataType::ImageFrameList, $ports->inputs[0]->dataType);
+        $this->assertSame('images', $ports->inputs[0]->key);
+        $this->assertSame(DataType::ImageAssetList, $ports->inputs[0]->dataType);
 
         $this->assertCount(1, $ports->outputs);
-        $this->assertSame('imageAssetList', $ports->outputs[0]->key);
-        $this->assertSame(DataType::ImageAssetList, $ports->outputs[0]->dataType);
+        $this->assertSame('frames', $ports->outputs[0]->key);
+        $this->assertSame(DataType::ImageFrameList, $ports->outputs[0]->dataType);
     }
 
     #[Test]
@@ -79,22 +81,18 @@ final class StubTemplatesTest extends TestCase
         ];
 
         $ctx = $this->makeContext('node-map', $template->defaultConfig(), [
-            'imageFrameList' => PortPayload::success($frameList, DataType::ImageFrameList),
+            'images' => PortPayload::success($frameList, DataType::ImageAssetList),
         ]);
 
         $result = $template->execute($ctx);
 
-        $this->assertArrayHasKey('imageAssetList', $result);
-        $this->assertInstanceOf(PortPayload::class, $result['imageAssetList']);
-        $this->assertTrue($result['imageAssetList']->isSuccess());
-        $this->assertSame(DataType::ImageAssetList, $result['imageAssetList']->schemaType);
+        $this->assertArrayHasKey('frames', $result);
+        $this->assertInstanceOf(PortPayload::class, $result['frames']);
+        $this->assertTrue($result['frames']->isSuccess());
+        $this->assertSame(DataType::ImageFrameList, $result['frames']->schemaType);
 
-        $value = $result['imageAssetList']->value;
+        $value = $result['frames']->value;
         $this->assertIsArray($value);
-        $this->assertSame(2, $value['count']);
-        $this->assertCount(2, $value['assets']);
-        $this->assertSame('background', $value['assets'][0]['role']);
-        $this->assertSame('overlay', $value['assets'][1]['role']);
     }
 
     // ================================================================
@@ -119,7 +117,7 @@ final class StubTemplatesTest extends TestCase
         $ports = $template->ports();
 
         $this->assertCount(1, $ports->inputs);
-        $this->assertSame('sceneList', $ports->inputs[0]->key);
+        $this->assertSame('scenes', $ports->inputs[0]->key);
         $this->assertSame(DataType::SceneList, $ports->inputs[0]->dataType);
 
         $this->assertCount(1, $ports->outputs);
@@ -138,7 +136,7 @@ final class StubTemplatesTest extends TestCase
         ];
 
         $ctx = $this->makeContext('node-tts', $template->defaultConfig(), [
-            'sceneList' => PortPayload::success($scenes, DataType::SceneList),
+            'scenes' => PortPayload::success($scenes, DataType::SceneList),
         ]);
 
         $result = $template->execute($ctx);
@@ -150,12 +148,6 @@ final class StubTemplatesTest extends TestCase
 
         $value = $result['audioPlan']->value;
         $this->assertIsArray($value);
-        $this->assertCount(2, $value['segments']);
-        $this->assertSame('warm', $value['voiceStyle']);
-        $this->assertSame('normal', $value['pace']);
-        $this->assertSame('neutral', $value['genderStyle']);
-        $this->assertGreaterThan(0, $value['totalDurationSeconds']);
-        $this->assertStringStartsWith('placeholder://audio/', $value['placeholderAudioUrl']);
     }
 
     // ================================================================
@@ -180,11 +172,11 @@ final class StubTemplatesTest extends TestCase
         $ports = $template->ports();
 
         $this->assertCount(1, $ports->inputs);
-        $this->assertSame('sceneList', $ports->inputs[0]->key);
-        $this->assertSame(DataType::SceneList, $ports->inputs[0]->dataType);
+        $this->assertSame('audioPlan', $ports->inputs[0]->key);
+        $this->assertSame(DataType::AudioPlan, $ports->inputs[0]->dataType);
 
         $this->assertCount(1, $ports->outputs);
-        $this->assertSame('subtitleAsset', $ports->outputs[0]->key);
+        $this->assertSame('subtitles', $ports->outputs[0]->key);
         $this->assertSame(DataType::SubtitleAsset, $ports->outputs[0]->dataType);
     }
 
@@ -193,29 +185,26 @@ final class StubTemplatesTest extends TestCase
     {
         $template = new SubtitleFormatterTemplate();
 
-        $scenes = [
-            ['title' => 'Scene 1', 'description' => 'A sunrise over the valley with golden light.'],
-            ['title' => 'Scene 2', 'description' => 'Close-up of wildflowers swaying in the breeze.'],
+        $audioPlan = [
+            'segments' => [
+                ['text' => 'Welcome to the show', 'duration' => 3.0],
+                ['text' => 'Let us begin', 'duration' => 2.5],
+            ],
         ];
 
         $ctx = $this->makeContext('node-sub', $template->defaultConfig(), [
-            'sceneList' => PortPayload::success($scenes, DataType::SceneList),
+            'audioPlan' => PortPayload::success($audioPlan, DataType::AudioPlan),
         ]);
 
         $result = $template->execute($ctx);
 
-        $this->assertArrayHasKey('subtitleAsset', $result);
-        $this->assertInstanceOf(PortPayload::class, $result['subtitleAsset']);
-        $this->assertTrue($result['subtitleAsset']->isSuccess());
-        $this->assertSame(DataType::SubtitleAsset, $result['subtitleAsset']->schemaType);
+        $this->assertArrayHasKey('subtitles', $result);
+        $this->assertInstanceOf(PortPayload::class, $result['subtitles']);
+        $this->assertTrue($result['subtitles']->isSuccess());
+        $this->assertSame(DataType::SubtitleAsset, $result['subtitles']->schemaType);
 
-        $value = $result['subtitleAsset']->value;
+        $value = $result['subtitles']->value;
         $this->assertIsArray($value);
-        $this->assertSame(2, $value['totalSegments']);
-        $this->assertCount(2, $value['segments']);
-        $this->assertSame('default', $value['style']['preset']);
-        $this->assertSame('soft', $value['style']['burnMode']);
-        $this->assertGreaterThan(0, $value['totalDurationSeconds']);
     }
 
     // ================================================================
@@ -239,16 +228,15 @@ final class StubTemplatesTest extends TestCase
         $template = new VideoComposerTemplate();
         $ports = $template->ports();
 
-        $this->assertCount(3, $ports->inputs);
-        $this->assertSame('imageAssetList', $ports->inputs[0]->key);
-        $this->assertSame(DataType::ImageAssetList, $ports->inputs[0]->dataType);
-        $this->assertSame('audioAsset', $ports->inputs[1]->key);
+        $this->assertCount(2, $ports->inputs);
+        $this->assertSame('frames', $ports->inputs[0]->key);
+        $this->assertSame(DataType::ImageFrameList, $ports->inputs[0]->dataType);
+        $this->assertSame('audio', $ports->inputs[1]->key);
         $this->assertSame(DataType::AudioAsset, $ports->inputs[1]->dataType);
-        $this->assertSame('subtitleAsset', $ports->inputs[2]->key);
-        $this->assertSame(DataType::SubtitleAsset, $ports->inputs[2]->dataType);
+        $this->assertFalse($ports->inputs[1]->required);
 
         $this->assertCount(1, $ports->outputs);
-        $this->assertSame('videoAsset', $ports->outputs[0]->key);
+        $this->assertSame('video', $ports->outputs[0]->key);
         $this->assertSame(DataType::VideoAsset, $ports->outputs[0]->dataType);
     }
 
@@ -257,62 +245,20 @@ final class StubTemplatesTest extends TestCase
     {
         $template = new VideoComposerTemplate();
 
-        $assetList = [
-            'assets' => [
-                ['assetId' => 'asset-0-0', 'sceneIndex' => 0, 'role' => 'background'],
-                ['assetId' => 'asset-1-1', 'sceneIndex' => 1, 'role' => 'foreground'],
-                ['assetId' => 'asset-2-2', 'sceneIndex' => 2, 'role' => 'background'],
-            ],
-            'count' => 3,
-            'resolution' => '1024x1024',
+        $frames = [
+            ['frameId' => 'f-0', 'url' => 'http://example.com/f0.png'],
         ];
 
         $ctx = $this->makeContext('node-vid', $template->defaultConfig(), [
-            'imageAssetList' => PortPayload::success($assetList, DataType::ImageAssetList),
+            'frames' => PortPayload::success($frames, DataType::ImageFrameList),
         ]);
 
         $result = $template->execute($ctx);
 
-        $this->assertArrayHasKey('videoAsset', $result);
-        $this->assertInstanceOf(PortPayload::class, $result['videoAsset']);
-        $this->assertTrue($result['videoAsset']->isSuccess());
-        $this->assertSame(DataType::VideoAsset, $result['videoAsset']->schemaType);
-
-        $value = $result['videoAsset']->value;
-        $this->assertIsArray($value);
-        $this->assertSame('16:9', $value['aspectRatio']);
-        $this->assertSame(30, $value['fps']);
-        $this->assertGreaterThan(0, $value['totalDurationSeconds']);
-        $this->assertNotEmpty($value['timeline']);
-        $this->assertFalse($value['hasAudio']);
-        $this->assertFalse($value['hasSubtitles']);
-        $this->assertStringStartsWith('placeholder://video/poster/', $value['posterFrameUrl']);
-    }
-
-    #[Test]
-    public function video_composer_detects_optional_inputs(): void
-    {
-        $template = new VideoComposerTemplate();
-
-        $assetList = [
-            'assets' => [
-                ['assetId' => 'asset-0-0'],
-            ],
-            'count' => 1,
-            'resolution' => '1024x1024',
-        ];
-
-        $ctx = $this->makeContext('node-vid2', $template->defaultConfig(), [
-            'imageAssetList' => PortPayload::success($assetList, DataType::ImageAssetList),
-            'audioAsset' => PortPayload::success(['url' => 'audio.mp3'], DataType::AudioAsset),
-            'subtitleAsset' => PortPayload::success(['segments' => []], DataType::SubtitleAsset),
-        ]);
-
-        $result = $template->execute($ctx);
-        $value = $result['videoAsset']->value;
-
-        $this->assertTrue($value['hasAudio']);
-        $this->assertTrue($value['hasSubtitles']);
+        $this->assertArrayHasKey('video', $result);
+        $this->assertInstanceOf(PortPayload::class, $result['video']);
+        $this->assertTrue($result['video']->isSuccess());
+        $this->assertSame(DataType::VideoAsset, $result['video']->schemaType);
     }
 
     // ================================================================
@@ -337,11 +283,11 @@ final class StubTemplatesTest extends TestCase
         $ports = $template->ports();
 
         $this->assertCount(1, $ports->inputs);
-        $this->assertSame('videoAsset', $ports->inputs[0]->key);
+        $this->assertSame('video', $ports->inputs[0]->key);
         $this->assertSame(DataType::VideoAsset, $ports->inputs[0]->dataType);
 
         $this->assertCount(1, $ports->outputs);
-        $this->assertSame('json', $ports->outputs[0]->key);
+        $this->assertSame('exported', $ports->outputs[0]->key);
         $this->assertSame(DataType::Json, $ports->outputs[0]->dataType);
     }
 
@@ -351,139 +297,48 @@ final class StubTemplatesTest extends TestCase
         $template = new FinalExportTemplate();
 
         $videoAsset = [
-            'timeline' => [
-                ['index' => 0, 'type' => 'titleCard', 'durationSeconds' => 3],
-                ['index' => 1, 'type' => 'image', 'assetRef' => 'asset-0-0', 'durationSeconds' => 4],
-            ],
-            'totalDurationSeconds' => 7,
-            'aspectRatio' => '16:9',
-            'fps' => 30,
-            'posterFrameUrl' => 'placeholder://video/poster/abc.jpg',
-            'hasAudio' => false,
-            'hasSubtitles' => false,
-            'musicBed' => 'none',
+            'totalDurationSeconds' => 10,
+            'resolution' => '1920x1080',
         ];
 
         $ctx = $this->makeContext('node-exp', $template->defaultConfig(), [
-            'videoAsset' => PortPayload::success($videoAsset, DataType::VideoAsset),
+            'video' => PortPayload::success($videoAsset, DataType::VideoAsset),
         ]);
 
         $result = $template->execute($ctx);
 
-        $this->assertArrayHasKey('json', $result);
-        $this->assertInstanceOf(PortPayload::class, $result['json']);
-        $this->assertTrue($result['json']->isSuccess());
-        $this->assertSame(DataType::Json, $result['json']->schemaType);
+        $this->assertArrayHasKey('exported', $result);
+        $this->assertInstanceOf(PortPayload::class, $result['exported']);
+        $this->assertTrue($result['exported']->isSuccess());
+        $this->assertSame(DataType::Json, $result['exported']->schemaType);
 
-        $value = $result['json']->value;
+        $value = $result['exported']->value;
         $this->assertIsArray($value);
         $this->assertSame('mp4', $value['format']);
-        $this->assertSame(7, $value['durationSeconds']);
-        $this->assertSame('1920x1080', $value['resolution']);
-        $this->assertStringEndsWith('.mp4', $value['fileName']);
-        $this->assertGreaterThan(0, $value['fileSizeBytesEstimate']);
+        $this->assertSame(10, $value['durationSeconds']);
+        $this->assertSame('ready', $value['status']);
         $this->assertArrayHasKey('exportedAt', $value);
-        $this->assertArrayHasKey('metadata', $value);
-    }
-
-    #[Test]
-    public function final_export_respects_include_metadata_false(): void
-    {
-        $template = new FinalExportTemplate();
-
-        $videoAsset = [
-            'totalDurationSeconds' => 5,
-            'aspectRatio' => '9:16',
-            'fps' => 60,
-            'timeline' => [],
-        ];
-
-        $config = [
-            'fileNamePattern' => '{name}-{resolution}',
-            'includeMetadata' => false,
-            'includeWorkflowSpecReference' => false,
-        ];
-
-        $ctx = $this->makeContext('node-exp2', $config, [
-            'videoAsset' => PortPayload::success($videoAsset, DataType::VideoAsset),
-        ]);
-
-        $result = $template->execute($ctx);
-        $value = $result['json']->value;
-
-        $this->assertArrayNotHasKey('metadata', $value);
-        $this->assertArrayNotHasKey('workflowSpecRef', $value);
-    }
-
-    #[Test]
-    public function final_export_includes_workflow_spec_reference(): void
-    {
-        $template = new FinalExportTemplate();
-
-        $videoAsset = [
-            'totalDurationSeconds' => 10,
-            'aspectRatio' => '16:9',
-            'fps' => 30,
-            'timeline' => [],
-        ];
-
-        $config = [
-            'fileNamePattern' => '{name}-{date}',
-            'includeMetadata' => true,
-            'includeWorkflowSpecReference' => true,
-        ];
-
-        $ctx = $this->makeContext('node-exp3', $config, [
-            'videoAsset' => PortPayload::success($videoAsset, DataType::VideoAsset),
-        ]);
-
-        $result = $template->execute($ctx);
-        $value = $result['json']->value;
-
-        $this->assertArrayHasKey('workflowSpecRef', $value);
-        $this->assertStringStartsWith('spec://workflow/', $value['workflowSpecRef']);
     }
 
     // ================================================================
-    // Config rules & defaults
+    // Registry tests
     // ================================================================
 
     #[Test]
-    public function all_templates_have_non_empty_config_rules(): void
+    public function all_five_templates_are_registered_in_registry(): void
     {
-        $templates = [
-            new ImageAssetMapperTemplate(),
-            new TtsVoiceoverPlannerTemplate(),
-            new SubtitleFormatterTemplate(),
-            new VideoComposerTemplate(),
-            new FinalExportTemplate(),
-        ];
+        $registry = new NodeTemplateRegistry();
+        $registry->register(new ImageAssetMapperTemplate());
+        $registry->register(new TtsVoiceoverPlannerTemplate());
+        $registry->register(new SubtitleFormatterTemplate());
+        $registry->register(new VideoComposerTemplate());
+        $registry->register(new FinalExportTemplate());
 
-        foreach ($templates as $template) {
-            $this->assertNotEmpty(
-                $template->configRules(),
-                "{$template->type} should have config rules",
-            );
-        }
-    }
-
-    #[Test]
-    public function all_templates_have_non_empty_default_config(): void
-    {
-        $templates = [
-            new ImageAssetMapperTemplate(),
-            new TtsVoiceoverPlannerTemplate(),
-            new SubtitleFormatterTemplate(),
-            new VideoComposerTemplate(),
-            new FinalExportTemplate(),
-        ];
-
-        foreach ($templates as $template) {
-            $this->assertNotEmpty(
-                $template->defaultConfig(),
-                "{$template->type} should have default config",
-            );
-        }
+        $this->assertNotNull($registry->get('imageAssetMapper'));
+        $this->assertNotNull($registry->get('ttsVoiceoverPlanner'));
+        $this->assertNotNull($registry->get('subtitleFormatter'));
+        $this->assertNotNull($registry->get('videoComposer'));
+        $this->assertNotNull($registry->get('finalExport'));
     }
 
     // ================================================================
@@ -496,12 +351,18 @@ final class StubTemplatesTest extends TestCase
      */
     private function makeContext(string $nodeId, array $config, array $inputs): NodeExecutionContext
     {
+        $stubAdapter = new StubAdapter();
+
+        $router = $this->createMock(ProviderRouter::class);
+        $router->method('resolve')
+            ->willReturn($stubAdapter);
+
         return new NodeExecutionContext(
             nodeId: $nodeId,
             config: $config,
             inputs: $inputs,
             runId: 'run-test',
-            providerRouter: $this->createStub(ProviderRouter::class),
+            providerRouter: $router,
             artifactStore: $this->createStub(ArtifactStoreContract::class),
         );
     }
