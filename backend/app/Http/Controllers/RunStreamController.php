@@ -6,17 +6,21 @@ namespace App\Http\Controllers;
 
 use App\Models\ExecutionRun;
 use App\Models\NodeRunRecord;
-use Illuminate\Http\StreamedResponse;
 use Illuminate\Support\Facades\Redis;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RunStreamController extends Controller
 {
     public function stream(ExecutionRun $run): StreamedResponse
     {
         return new StreamedResponse(function () use ($run): void {
-            // Set up SSE headers are already set by StreamedResponse, but we need to flush headers
             // Send catchup event with current run state and all node records
             $this->sendSseEvent('run.catchup', $this->buildCatchupPayload($run));
+
+            // In testing environment, don't block on Redis subscription
+            if (app()->environment('testing')) {
+                return;
+            }
 
             // Subscribe to Redis pub/sub channel for this run
             $channel = "run.{$run->id}";
