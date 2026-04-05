@@ -1,23 +1,20 @@
-import { AppProviders } from './providers'
-import { AppRoutes } from './routes'
+import { RouterProvider } from '@tanstack/react-router'
+import { router } from './router'
 
 /**
- * App - Main application component
+ * App - Main application component with TanStack Router
  *
- * Implements the three-region app shell per plan section 6.1:
- * - Left: NodeLibraryPanel
- * - Center: CanvasSurface + RunToolbar
- * - Right: InspectorPanel with tabs
- * - Top bar: AppHeader with workflow controls
- * - Bottom: StatusBar with system status
+ * Per plan section 8.1:
+ * - Uses RouterProvider for routing
+ * - AppProviders (in router.tsx) provides QueryClient, Persistence, Boot, ReactFlow contexts
+ * - Routes:
+ *   / → redirect to /workflows
+ *   /workflows → WorkflowListPage
+ *   /workflows/$workflowId → EditorPage (wraps AppShell)
+ *   /workflows/$workflowId/runs → RunHistoryPage
  *
- * All layout components are defined in the features/ directory
- * and composed in routes.tsx and layout/app-shell.tsx
+ * TODO: Remove old single-route setup (routes.tsx, AppRoutes import)
  */
 export function App() {
-  return (
-    <AppProviders>
-      <AppRoutes />
-    </AppProviders>
-  )
+  return <RouterProvider router={router} />
 }

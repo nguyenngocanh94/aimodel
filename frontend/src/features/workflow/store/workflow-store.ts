@@ -105,6 +105,8 @@ export interface WorkflowStoreActions {
   readonly markSaved: () => void
   /** Load a document (e.g. from persistence). Resets undo stack and dirty state. */
   readonly loadDocument: (doc: WorkflowDocument) => void
+  /** Hydrate the store from an API response. Resets undo stack and dirty state. */
+  readonly hydrateFromApi: (apiDocument: WorkflowDocument) => void
 }
 
 export type WorkflowStore = WorkflowStoreState & WorkflowStoreActions
@@ -370,6 +372,36 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
       previewCaches: {},
       validationSummary: { issues: [] },
       validationIssues: [],
+    })
+  },
+
+  hydrateFromApi: (apiDocument) => {
+    const doc: WorkflowDocument = {
+      id: apiDocument.id,
+      schemaVersion: apiDocument.schemaVersion,
+      name: apiDocument.name,
+      description: apiDocument.description,
+      tags: apiDocument.tags ?? [],
+      nodes: apiDocument.nodes ?? [],
+      edges: apiDocument.edges ?? [],
+      viewport: apiDocument.viewport ?? { x: 0, y: 0, zoom: 1 },
+      createdAt: apiDocument.createdAt,
+      updatedAt: apiDocument.updatedAt,
+      ...(apiDocument.basedOnTemplateId && { basedOnTemplateId: apiDocument.basedOnTemplateId }),
+      ...(apiDocument.basedOnTemplateVersion && { basedOnTemplateVersion: apiDocument.basedOnTemplateVersion }),
+    }
+    set({
+      document: doc,
+      past: [],
+      future: [],
+      dirty: false,
+      lastSavedDocument: doc,
+      selectedNodeIds: [],
+      selectedEdgeId: null,
+      previewCaches: {},
+      validationSummary: { issues: [] },
+      validationIssues: [],
+      viewport: doc.viewport,
     })
   },
 }))
