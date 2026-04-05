@@ -51,6 +51,36 @@ class RunController extends Controller
             ->setStatusCode(202);
     }
 
+    public function index(Workflow $workflow): \Illuminate\Http\Resources\Json\AnonymousResourceCollection
+    {
+        $runs = ExecutionRun::where('workflow_id', $workflow->id)
+            ->orderByDesc('started_at')
+            ->paginate(20);
+
+        // Add summary stats to each run
+        $runs->getCollection()->transform(function (ExecutionRun $run) {
+            $counts = NodeRunRecord::where('run_id', $run->id)
+                ->selectRaw("
+                    COUNT(CASE WHEN status = 'success' THEN 1 END) as success_count,
+                    COUNT(CASE WHEN status = 'error' THEN 1 END) as error_count,
+                    COUNT(CASE WHEN status = 'skipped' THEN 1 END) as skipped_count,
+                    COUNT(*) as total_count
+                ")
+                ->first();
+
+            $run->setAttribute('summary', [
+                'successCount' => (int) $counts->success_count,
+                'errorCount' => (int) $counts->error_count,
+                'skippedCount' => (int) $counts->skipped_count,
+                'totalCount' => (int) $counts->total_count,
+            ]);
+
+            return $run;
+        });
+
+        return ExecutionRunResource::collection($runs);
+    }
+
     public function show(ExecutionRun $run): ExecutionRunResource
     {
         $run->load('nodeRunRecords');

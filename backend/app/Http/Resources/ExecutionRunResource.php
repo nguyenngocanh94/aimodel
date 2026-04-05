@@ -23,6 +23,7 @@ class ExecutionRunResource extends JsonResource
             'completedAt' => $this->completed_at?->toIso8601String(),
             'terminationReason' => $this->termination_reason,
             'nodeRunRecords' => NodeRunRecordResource::collection($this->whenLoaded('nodeRunRecords')),
+            'summary' => $this->when($this->getAttribute('summary') !== null, $this->getAttribute('summary')),
         ];
     }
 }

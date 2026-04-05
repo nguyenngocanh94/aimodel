@@ -11,6 +11,7 @@ Route::get('/health', [HealthController::class, 'check']);
 
 Route::apiResource('workflows', WorkflowController::class);
 
+Route::get('/workflows/{workflow}/runs', [RunController::class, 'index'])->name('runs.index');
 Route::post('/workflows/{workflow}/runs', [RunController::class, 'store'])->name('runs.store');
 Route::get('/runs/{run}', [RunController::class, 'show'])->name('runs.show');
 Route::get('/runs/{run}/stream', [RunStreamController::class, 'stream'])->name('runs.stream');
