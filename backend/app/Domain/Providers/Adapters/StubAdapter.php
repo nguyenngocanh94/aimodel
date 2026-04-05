@@ -6,32 +6,20 @@ namespace App\Domain\Providers\Adapters;
 
 use App\Domain\Capability;
 use App\Domain\Providers\ProviderContract;
-use Illuminate\Support\Facades\Log;
 
 class StubAdapter implements ProviderContract
 {
     public function execute(Capability $capability, array $input, array $config): mixed
     {
-        $startTime = hrtime(true);
         $seed = $this->deterministicSeed($input);
 
-        $result = match ($capability) {
+        return match ($capability) {
             Capability::TextGeneration => $this->textGeneration($input, $seed),
             Capability::TextToImage => $this->textToImage($seed),
             Capability::TextToSpeech => $this->textToSpeech($seed),
             Capability::StructuredTransform => $this->structuredTransform($input, $seed),
             Capability::MediaComposition => $this->mediaComposition($seed),
         };
-
-        $durationMs = (int) ((hrtime(true) - $startTime) / 1_000_000);
-
-        Log::channel('providers')->info('Provider call completed', [
-            'provider' => 'stub',
-            'capability' => $capability->value,
-            'duration_ms' => $durationMs,
-        ]);
-
-        return $result;
     }
 
     private function deterministicSeed(array $input): string

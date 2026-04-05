@@ -14,6 +14,15 @@ use App\Domain\Providers\Adapters\StubAdapter;
 
 class ProviderRouter
 {
+    public function __construct(
+        private readonly bool $debug = false,
+    ) {}
+
+    public static function fromConfig(): self
+    {
+        return new self((bool) config('app.debug'));
+    }
+
     public function resolve(Capability $capability, array $nodeConfig): ProviderContract
     {
         $driver = $nodeConfig['provider'] ?? 'stub';
@@ -29,7 +38,7 @@ class ProviderRouter
             default => throw new \InvalidArgumentException("Unknown provider driver: {$driver}"),
         };
 
-        if (config('app.debug')) {
+        if ($this->debug) {
             $adapter = new LoggingProviderDecorator($adapter);
         }
 

@@ -7,15 +7,37 @@ namespace Tests\Unit\Domain\Providers;
 use App\Domain\Capability;
 use App\Domain\Providers\Adapters\LoggingProviderDecorator;
 use App\Domain\Providers\ProviderContract;
+use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 final class LoggingProviderDecoratorTest extends TestCase
 {
+    /** @var list<array{level: string, message: string, context: array}> */
+    private array $logged = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->logged = [];
+
+        Log::listen(function (MessageLogged $event) {
+            $this->logged[] = [
+                'level' => $event->level,
+                'message' => $event->message,
+                'context' => $event->context,
+            ];
+        });
+
+        // Route the 'providers' channel to 'null' so no files are written during tests.
+        config(['logging.channels.providers.driver' => 'monolog']);
+        config(['logging.channels.providers.handler' => \Monolog\Handler\NullHandler::class]);
+    }
+
     public function test_logs_on_success(): void
     {
-        Log::fake();
-
         $inner = new class implements ProviderContract {
             public function execute(Capability $capability, array $input, array $config): mixed
             {
@@ -32,23 +54,19 @@ final class LoggingProviderDecoratorTest extends TestCase
 
         $this->assertSame(['text' => 'generated content'], $result);
 
-        Log::channel('providers')->assertLogged('info', function ($message, $context) {
-            return $message === 'Provider call started'
-                && $context['capability'] === 'text_generation'
-                && $context['input_keys'] === ['prompt'];
-        });
+        $started = $this->findLog('info', 'Provider call started');
+        $this->assertNotNull($started, 'Expected "Provider call started" info log');
+        $this->assertSame('text_generation', $started['context']['capability']);
+        $this->assertSame(['prompt'], $started['context']['input_keys']);
 
-        Log::channel('providers')->assertLogged('info', function ($message, $context) {
-            return $message === 'Provider call succeeded'
-                && $context['capability'] === 'text_generation'
-                && isset($context['duration_ms']);
-        });
+        $succeeded = $this->findLog('info', 'Provider call succeeded');
+        $this->assertNotNull($succeeded, 'Expected "Provider call succeeded" info log');
+        $this->assertSame('text_generation', $succeeded['context']['capability']);
+        $this->assertArrayHasKey('duration_ms', $succeeded['context']);
     }
 
     public function test_logs_on_failure(): void
     {
-        Log::fake();
-
         $inner = new class implements ProviderContract {
             public function execute(Capability $capability, array $input, array $config): mixed
             {
@@ -69,21 +87,21 @@ final class LoggingProviderDecoratorTest extends TestCase
             $this->assertSame('Provider timeout', $e->getMessage());
         }
 
-        Log::channel('providers')->assertLogged('info', function ($message) {
-            return $message === 'Provider call started';
-        });
+        $started = $this->findLog('info', 'Provider call started');
+        $this->assertNotNull($started, 'Expected "Provider call started" info log');
 
-        Log::channel('providers')->assertLogged('error', function ($message, $context) {
-            return $message === 'Provider call failed'
-                && $context['error'] === 'Provider timeout'
-                && isset($context['duration_ms']);
-        });
+        $failed = $this->findLog('error', 'Provider call failed');
+        $this->assertNotNull($failed, 'Expected "Provider call failed" error log');
+        $this->assertSame('Provider timeout', $failed['context']['error']);
+        $this->assertArrayHasKey('duration_ms', $failed['context']);
+
+        // Must NOT have a "succeeded" log
+        $succeeded = $this->findLog('info', 'Provider call succeeded');
+        $this->assertNull($succeeded, 'Should not log success on failure');
     }
 
     public function test_api_key_is_redacted_in_logs(): void
     {
-        Log::fake();
-
         $inner = new class implements ProviderContract {
             public function execute(Capability $capability, array $input, array $config): mixed
             {
@@ -98,24 +116,15 @@ final class LoggingProviderDecoratorTest extends TestCase
             ['apiKey' => 'sk-super-secret-key-12345', 'model' => 'tts-1'],
         );
 
-        Log::channel('providers')->assertLogged('info', function ($message, $context) {
-            if ($message !== 'Provider call started') {
-                return false;
-            }
+        $started = $this->findLog('info', 'Provider call started');
+        $this->assertNotNull($started);
 
-            // apiKey must be redacted
-            $this->assertSame('***REDACTED***', $context['config']['apiKey']);
-            // other config keys must be preserved
-            $this->assertSame('tts-1', $context['config']['model']);
-
-            return true;
-        });
+        $this->assertSame('***REDACTED***', $started['context']['config']['apiKey']);
+        $this->assertSame('tts-1', $started['context']['config']['model']);
     }
 
     public function test_inner_receives_unredacted_config(): void
     {
-        Log::fake();
-
         $captured = [];
         $inner = new class($captured) implements ProviderContract {
             public function __construct(private array &$captured) {}
@@ -136,5 +145,21 @@ final class LoggingProviderDecoratorTest extends TestCase
         );
 
         $this->assertSame('sk-real-key', $captured['apiKey']);
+    }
+
+    /**
+     * Find the first log entry matching the given level and message.
+     *
+     * @return array{level: string, message: string, context: array}|null
+     */
+    private function findLog(string $level, string $message): ?array
+    {
+        foreach ($this->logged as $entry) {
+            if ($entry['level'] === $level && $entry['message'] === $message) {
+                return $entry;
+            }
+        }
+
+        return null;
     }
 }
