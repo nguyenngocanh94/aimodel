@@ -9,6 +9,7 @@ use App\Models\ExecutionRun;
 use App\Models\NodeRunRecord;
 use App\Models\Workflow;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -150,6 +151,8 @@ final class ReviewCheckpointTest extends TestCase
     #[Test]
     public function cancel_during_awaiting_review(): void
     {
+        Event::fake();
+
         $workflow = $this->createWorkflowWithReview();
 
         $run = ExecutionRun::create([
