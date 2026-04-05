@@ -8,60 +8,59 @@ use App\Domain\Capability;
 use App\Domain\Providers\ProviderContract;
 use Illuminate\Support\Facades\Log;
 
-class LoggingProviderDecorator implements ProviderContract
+final class LoggingProviderDecorator implements ProviderContract
 {
     public function __construct(
-        private ProviderContract $inner,
-        private string $driverName,
+        private readonly ProviderContract $inner,
     ) {}
 
     public function execute(Capability $capability, array $input, array $config): mixed
     {
-        $startTime = hrtime(true);
-        $redactedConfig = $this->redactConfig($config);
+        $channel = Log::channel('providers');
 
-        Log::channel('providers')->info('Provider call started', [
-            'driver' => $this->driverName,
+        $channel->info('Provider call started', [
             'capability' => $capability->value,
-            'inputKeys' => array_keys($input),
-            'config' => $redactedConfig,
+            'input_keys' => array_keys($input),
+            'config' => $this->redactConfig($config),
+            'adapter' => $this->inner::class,
         ]);
+
+        $start = hrtime(true);
 
         try {
             $result = $this->inner->execute($capability, $input, $config);
-
-            $durationMs = (int) ((hrtime(true) - $startTime) / 1_000_000);
-
-            Log::channel('providers')->info('Provider call succeeded', [
-                'driver' => $this->driverName,
-                'capability' => $capability->value,
-                'durationMs' => $durationMs,
-            ]);
-
-            return $result;
         } catch (\Throwable $e) {
-            $durationMs = (int) ((hrtime(true) - $startTime) / 1_000_000);
+            $durationMs = (hrtime(true) - $start) / 1_000_000;
 
-            Log::channel('providers')->error('Provider call failed', [
-                'driver' => $this->driverName,
+            $channel->error('Provider call failed', [
                 'capability' => $capability->value,
-                'durationMs' => $durationMs,
+                'adapter' => $this->inner::class,
+                'duration_ms' => round($durationMs, 2),
                 'error' => $e->getMessage(),
-                'errorClass' => get_class($e),
             ]);
 
             throw $e;
         }
+
+        $durationMs = (hrtime(true) - $start) / 1_000_000;
+
+        $channel->info('Provider call succeeded', [
+            'capability' => $capability->value,
+            'adapter' => $this->inner::class,
+            'duration_ms' => round($durationMs, 2),
+        ]);
+
+        return $result;
     }
 
     private function redactConfig(array $config): array
     {
         $redacted = $config;
-        foreach (['apiKey', 'api_key', 'secret', 'token'] as $key) {
-            if (isset($redacted[$key])) {
-                $redacted[$key] = '***REDACTED***';
-            }
+
+        if (array_key_exists('apiKey', $redacted)) {
+            $redacted['apiKey'] = '***REDACTED***';
         }
+
         return $redacted;
     }
 }

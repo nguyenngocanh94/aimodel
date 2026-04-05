@@ -7,6 +7,7 @@ namespace App\Domain\Providers;
 use App\Domain\Capability;
 use App\Domain\Providers\Adapters\AnthropicAdapter;
 use App\Domain\Providers\Adapters\FalAdapter;
+use App\Domain\Providers\Adapters\LoggingProviderDecorator;
 use App\Domain\Providers\Adapters\OpenAiAdapter;
 use App\Domain\Providers\Adapters\ReplicateAdapter;
 use App\Domain\Providers\Adapters\StubAdapter;
@@ -19,7 +20,7 @@ class ProviderRouter
         $apiKey = $nodeConfig['apiKey'] ?? '';
         $model = $nodeConfig['model'] ?? null;
 
-        return match ($driver) {
+        $adapter = match ($driver) {
             'openai' => new OpenAiAdapter($apiKey, $model),
             'anthropic' => new AnthropicAdapter($apiKey, $model),
             'replicate' => new ReplicateAdapter($apiKey, $model),
@@ -27,5 +28,11 @@ class ProviderRouter
             'stub' => new StubAdapter(),
             default => throw new \InvalidArgumentException("Unknown provider driver: {$driver}"),
         };
+
+        if (config('app.debug')) {
+            $adapter = new LoggingProviderDecorator($adapter);
+        }
+
+        return $adapter;
     }
 }

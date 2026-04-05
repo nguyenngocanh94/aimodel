@@ -76,7 +76,7 @@ return [
         'providers' => [
             'driver' => 'daily',
             'path' => storage_path('logs/providers.log'),
-            'level' => 'info',
+            'level' => 'debug',
             'days' => 14,
             'replace_placeholders' => true,
         ],
@@ -133,14 +133,6 @@ return [
 
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
-        ],
-
-        'providers' => [
-            'driver' => 'daily',
-            'path' => storage_path('logs/providers.log'),
-            'level' => 'debug',
-            'days' => 14,
-            'replace_placeholders' => true,
         ],
 
     ],

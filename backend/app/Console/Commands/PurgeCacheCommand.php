@@ -10,6 +10,7 @@ use Illuminate\Console\Command;
 class PurgeCacheCommand extends Command
 {
     protected $signature = 'cache:purge
+        {--ttl-days= : Days after which entries are considered expired}
         {--max-entries= : Maximum total entries to keep}
         {--dry-run : Show what would be deleted without deleting}';
 
@@ -17,7 +18,9 @@ class PurgeCacheCommand extends Command
 
     public function handle(): int
     {
-        $ttlDays = config('aimodel.cache_ttl_days', 7);
+        $ttlDays = $this->option('ttl-days') !== null
+            ? (int) $this->option('ttl-days')
+            : (int) config('aimodel.cache_ttl_days', 7);
         $maxEntries = $this->option('max-entries') ?? config('aimodel.cache_max_entries');
         $dryRun = (bool) $this->option('dry-run');
 
