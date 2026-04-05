@@ -191,4 +191,4 @@ export const ApiErrorSchema = z.object({
   errors: z.record(z.array(z.string())).optional(),
 });
 
-export type ApiError = z.infer<typeof ApiErrorSchema>;
+export type ApiErrorData = z.infer<typeof ApiErrorSchema>;

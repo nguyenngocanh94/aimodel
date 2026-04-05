@@ -103,9 +103,10 @@ describe('API Client', () => {
         await apiRequest('/workflows/1');
         expect.fail('Should have thrown');
       } catch (error) {
-        expect(error).toBeInstanceOf(ApiError);
-        expect(error.message).toContain('Not Found');
-        expect(error.status).toBe(404);
+        const apiError = error as ApiError;
+        expect(apiError).toBeInstanceOf(ApiError);
+        expect(apiError.message).toContain('Not Found');
+        expect(apiError.status).toBe(404);
       }
     });
 
