@@ -6,6 +6,7 @@ import type {
   WorkflowEdge,
   WorkflowNode,
 } from '@/features/workflows/domain/workflow-types'
+import { getTemplate } from '@/features/node-registry/node-registry'
 
 /** Inspector tab selection; authoring-adjacent but not part of undo/redo. */
 export type InspectorTab = 'config' | 'preview' | 'data' | 'validation' | 'metadata'
@@ -376,17 +377,42 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   },
 
   hydrateFromApi: (apiDocument) => {
+    // Map API node format to frontend WorkflowNode format
+    // API: { id, type, config, position } — no label
+    // Frontend: { id, type, label, config, position }
+    const mappedNodes = (apiDocument.nodes ?? []).map((n: Record<string, unknown>) => ({
+      id: n.id as string,
+      type: n.type as string,
+      label: (n as { label?: string }).label ?? getTemplate(n.type as string)?.title ?? (n.type as string),
+      position: (n.position as { x: number; y: number }) ?? { x: 0, y: 0 },
+      config: (n.config as Record<string, unknown>) ?? {},
+      ...(n.disabled != null && { disabled: n.disabled as boolean }),
+      ...(n.notes != null && { notes: n.notes as string }),
+    }))
+
+    // Map API edge format to frontend WorkflowEdge format
+    // API: { id, source, target, sourceHandle, targetHandle }
+    // Frontend: { id, sourceNodeId, sourcePortKey, targetNodeId, targetPortKey }
+    const mappedEdges = (apiDocument.edges ?? []).map((e: Record<string, unknown>) => ({
+      id: e.id as string,
+      sourceNodeId: (e.sourceNodeId as string) ?? (e.source as string),
+      sourcePortKey: (e.sourcePortKey as string) ?? (e.sourceHandle as string) ?? 'output',
+      targetNodeId: (e.targetNodeId as string) ?? (e.target as string),
+      targetPortKey: (e.targetPortKey as string) ?? (e.targetHandle as string) ?? 'input',
+      ...(e.targetOrder != null && { targetOrder: e.targetOrder as number }),
+    }))
+
     const doc: WorkflowDocument = {
       id: apiDocument.id,
-      schemaVersion: apiDocument.schemaVersion,
-      name: apiDocument.name,
-      description: apiDocument.description,
+      schemaVersion: apiDocument.schemaVersion ?? 1,
+      name: apiDocument.name ?? 'Untitled',
+      description: apiDocument.description ?? '',
       tags: apiDocument.tags ?? [],
-      nodes: apiDocument.nodes ?? [],
-      edges: apiDocument.edges ?? [],
+      nodes: mappedNodes,
+      edges: mappedEdges,
       viewport: apiDocument.viewport ?? { x: 0, y: 0, zoom: 1 },
-      createdAt: apiDocument.createdAt,
-      updatedAt: apiDocument.updatedAt,
+      createdAt: apiDocument.createdAt ?? new Date().toISOString(),
+      updatedAt: apiDocument.updatedAt ?? new Date().toISOString(),
       ...(apiDocument.basedOnTemplateId && { basedOnTemplateId: apiDocument.basedOnTemplateId }),
       ...(apiDocument.basedOnTemplateVersion && { basedOnTemplateVersion: apiDocument.basedOnTemplateVersion }),
     }

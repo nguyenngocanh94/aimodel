@@ -36,8 +36,8 @@ export function ConnectDialog({ open, onClose, onConnect }: ConnectDialogProps) 
       .filter((n) => n.id !== sourceNodeId)
       .filter(
         (n) =>
-          n.label.toLowerCase().includes(query.toLowerCase()) ||
-          n.type.toLowerCase().includes(query.toLowerCase()),
+          (n.label ?? n.type ?? '').toLowerCase().includes(query.toLowerCase()) ||
+          (n.type ?? '').toLowerCase().includes(query.toLowerCase()),
       );
   }, [document.nodes, sourceNodeId, query]);
 

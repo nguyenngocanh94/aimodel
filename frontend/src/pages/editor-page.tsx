@@ -35,7 +35,18 @@ export function EditorPage() {
     if (hydratedIdRef.current === workflowId) return
     hydratedIdRef.current = workflowId
 
-    hydrateFromApi(workflow.document)
+    // Merge workflow-level fields into document for the store
+    // API document only has nodes/edges; store expects full WorkflowDocument
+    hydrateFromApi({
+      ...workflow.document,
+      id: workflow.id,
+      name: workflow.name,
+      description: workflow.description ?? '',
+      schemaVersion: workflow.schemaVersion ?? 1,
+      tags: workflow.tags ?? [],
+      createdAt: workflow.createdAt,
+      updatedAt: workflow.updatedAt,
+    } as Parameters<typeof hydrateFromApi>[0])
   }, [data, workflowId, hydrateFromApi])
 
   // Auto-save to backend
