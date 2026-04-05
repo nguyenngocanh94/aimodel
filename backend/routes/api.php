@@ -12,5 +12,7 @@ Route::apiResource('workflows', WorkflowController::class);
 
 Route::post('/workflows/{workflow}/runs', [RunController::class, 'store'])->name('runs.store');
 Route::get('/runs/{run}', [RunController::class, 'show'])->name('runs.show');
+Route::post('/runs/{run}/cancel', [RunController::class, 'cancel'])->name('runs.cancel');
+Route::post('/runs/{run}/review', [RunController::class, 'review'])->name('runs.review');
 
 Route::get('/artifacts/{artifact}', [ArtifactController::class, 'show'])->name('artifacts.show');
