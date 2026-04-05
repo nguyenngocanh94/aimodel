@@ -9,6 +9,7 @@ use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\NodeTemplateRegistry;
 use App\Domain\Providers\ProviderRouter;
 use App\Domain\RunTrigger;
+use App\Events\NodeStatusChanged;
 use App\Models\ExecutionRun;
 use App\Models\NodeRunRecord;
 use App\Services\ArtifactStoreContract;
@@ -174,14 +175,86 @@ final class RunExecutor
                 $nodeRunRecords[$nodeId] = $record->fresh()->toArray();
 
             } catch (ReviewPendingException $e) {
+                // Store input payloads for review context
+                $inputArrays = array_map(
+                    fn ($p) => is_array($p) ? $p : $p->toArray(),
+                    $inputs,
+                );
+
                 $record->update([
                     'status' => 'awaitingReview',
+                    'input_payloads' => $inputArrays,
                     'completed_at' => null,
                 ]);
                 $nodeRunRecords[$nodeId] = $record->fresh()->toArray();
 
                 $run->update(['status' => 'awaitingReview']);
-                return; // Pause execution — AiModel-597 handles resumption
+
+                // Broadcast awaitingReview status
+                broadcast(new \App\Events\NodeStatusChanged(
+                    runId: $run->id,
+                    nodeId: $nodeId,
+                    status: 'awaitingReview',
+                ));
+
+                // Poll for review decision
+                $pollResult = $this->pollForReviewDecision($run->id, $nodeId);
+
+                if ($pollResult['cancelled']) {
+                    // Run was cancelled during review - break to let deriveTerminalStatus handle it
+                    break;
+                }
+
+                if ($pollResult['timedOut']) {
+                    // Auto-reject after timeout
+                    $record->update([
+                        'status' => 'error',
+                        'error_message' => 'Review timeout - auto-rejected after 1 hour',
+                        'completed_at' => now(),
+                        'output_payloads' => [
+                            'decision' => 'reject',
+                            'reason' => 'reviewTimeout',
+                            'timedOutAt' => now()->toIso8601String(),
+                        ],
+                    ]);
+                    $nodeRunRecords[$nodeId] = $record->fresh()->toArray();
+                    broadcast(new \App\Events\NodeStatusChanged(
+                        runId: $run->id,
+                        nodeId: $nodeId,
+                        status: 'error',
+                        errorMessage: 'Review timeout - auto-rejected after 1 hour',
+                    ));
+                    continue;
+                }
+
+                if ($pollResult['rejected']) {
+                    // Review rejected
+                    $record->update([
+                        'status' => 'error',
+                        'error_message' => 'Review rejected by user',
+                        'completed_at' => now(),
+                    ]);
+                    $nodeRunRecords[$nodeId] = $record->fresh()->toArray();
+                    broadcast(new \App\Events\NodeStatusChanged(
+                        runId: $run->id,
+                        nodeId: $nodeId,
+                        status: 'error',
+                        errorMessage: 'Review rejected by user',
+                    ));
+                    continue;
+                }
+
+                // Review approved - extract decision from output_payloads and continue
+                $record->refresh();
+                $outputArrays = $record->output_payloads ?? [];
+                $nodeRunRecords[$nodeId] = $record->toArray();
+
+                broadcast(new \App\Events\NodeStatusChanged(
+                    runId: $run->id,
+                    nodeId: $nodeId,
+                    status: 'success',
+                    outputPayloads: $outputArrays,
+                ));
 
             } catch (\Throwable $e) {
                 $record->update([
@@ -227,5 +300,55 @@ final class RunExecutor
                 'completed_at' => now(),
             ]);
         }
+    }
+
+    /**
+     * Poll for review decision on a node.
+     *
+     * @return array{cancelled: bool, timedOut: bool, rejected: bool}
+     */
+    private function pollForReviewDecision(string $runId, string $nodeId): array
+    {
+        $timeoutAt = now()->addHour();
+        $pollIntervalSeconds = 2;
+
+        while (now()->lt($timeoutAt)) {
+            // Check if run was cancelled
+            $run = ExecutionRun::find($runId);
+            if ($run === null || $run->status === 'cancelled') {
+                return ['cancelled' => true, 'timedOut' => false, 'rejected' => false];
+            }
+
+            // Check node status
+            $record = NodeRunRecord::where('run_id', $runId)
+                ->where('node_id', $nodeId)
+                ->first();
+
+            if ($record === null) {
+                // Record deleted - treat as cancelled
+                return ['cancelled' => true, 'timedOut' => false, 'rejected' => false];
+            }
+
+            if ($record->status === 'success') {
+                // Approved
+                return ['cancelled' => false, 'timedOut' => false, 'rejected' => false];
+            }
+
+            if ($record->status === 'error') {
+                // Rejected
+                return ['cancelled' => false, 'timedOut' => false, 'rejected' => true];
+            }
+
+            if ($record->status !== 'awaitingReview') {
+                // Unexpected status - treat as cancelled
+                return ['cancelled' => true, 'timedOut' => false, 'rejected' => false];
+            }
+
+            // Still awaiting review - wait and poll again
+            sleep($pollIntervalSeconds);
+        }
+
+        // Timeout reached
+        return ['cancelled' => false, 'timedOut' => true, 'rejected' => false];
     }
 }
