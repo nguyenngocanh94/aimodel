@@ -33,9 +33,16 @@ class ConfigValidatorTest extends TestCase
         $this->registry->register(new ImageGeneratorTemplate());
     }
 
-    public function test_default_config_passes_validation_for_all_templates(): void
+    public function test_default_config_passes_validation_for_executable_templates(): void
     {
+        // UserPrompt's default has empty prompt (user fills in), so skip it
+        $skipTypes = ['userPrompt'];
+
         foreach ($this->registry->all() as $template) {
+            if (in_array($template->type, $skipTypes, true)) {
+                continue;
+            }
+
             $result = $this->validator->validate(
                 $template->type,
                 $template->defaultConfig(),
@@ -47,6 +54,19 @@ class ConfigValidatorTest extends TestCase
                 "defaultConfig() for {$template->type} failed validation: " . json_encode($result['errors']),
             );
         }
+    }
+
+    public function test_user_prompt_with_text_passes_validation(): void
+    {
+        $config = ['prompt' => 'Make a video about cats'];
+        $result = $this->validator->validate('userPrompt', $config, $this->registry);
+        $this->assertTrue($result['valid']);
+    }
+
+    public function test_user_prompt_empty_fails_validation(): void
+    {
+        $result = $this->validator->validate('userPrompt', ['prompt' => ''], $this->registry);
+        $this->assertFalse($result['valid']);
     }
 
     public function test_unknown_node_type_returns_error(): void
