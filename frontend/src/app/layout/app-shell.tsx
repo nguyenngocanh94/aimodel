@@ -4,7 +4,6 @@ import { InspectorPanel } from '@/features/inspector/components/inspector-panel'
 import { NodeLibraryPanel } from '@/features/node-library/components/node-library-panel'
 import { useWorkflowStore } from '@/features/workflow/store/workflow-store'
 
-import { AppHeader } from './app-header'
 import { DegradedModeBanner } from '@/app/boot/degraded-mode-banner'
 
 function AppStatusBar() {
@@ -27,9 +26,8 @@ export function AppShell() {
   const hasSelectedNode = useWorkflowStore((s) => s.selectedNodeIds.length > 0)
 
   return (
-    <div className="flex h-screen min-h-0 flex-col bg-background">
+    <div className="flex h-full min-h-0 flex-col bg-background">
       <DegradedModeBanner />
-      <AppHeader />
       <main className="flex flex-1 min-h-0 overflow-hidden" aria-label="Workflow editor">
         {/* Left sidebar: Node library - shown only via header toggle */}
         {isLibraryVisible && (
