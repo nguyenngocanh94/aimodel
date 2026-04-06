@@ -1,8 +1,6 @@
 import {
-  Download,
   Undo2,
   Redo2,
-  Settings,
   PanelLeft,
   ArrowLeft,
 } from 'lucide-react'
@@ -100,13 +98,6 @@ export function AppHeader({
         </Button>
         <Button type="button" variant="ghost" size="icon" disabled aria-label="Redo">
           <Redo2 className="h-4 w-4" />
-        </Button>
-        <div className="mx-1 h-4 w-px bg-border" />
-        <Button type="button" variant="ghost" size="icon" disabled aria-label="Export workflow" data-testid="workflow-export-btn">
-          <Download className="h-4 w-4" />
-        </Button>
-        <Button type="button" variant="ghost" size="icon" disabled aria-label="Settings">
-          <Settings className="h-4 w-4" />
         </Button>
       </div>
     </header>
