@@ -14,7 +14,7 @@ import { AppShell } from '@/app/layout/app-shell'
 
 export function AppSplashScreen() {
   return (
-    <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-background">
+    <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-background">
       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       <p className="text-sm text-muted-foreground">Loading workspace…</p>
     </div>
@@ -31,7 +31,7 @@ interface FatalBootErrorScreenProps {
 
 export function FatalBootErrorScreen({ message }: FatalBootErrorScreenProps) {
   return (
-    <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-background px-6">
+    <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-background px-6">
       <AlertTriangle className="h-10 w-10 text-destructive" />
       <h1 className="text-lg font-semibold text-foreground">Failed to start</h1>
       <p className="max-w-md text-center text-sm text-muted-foreground">{message}</p>
