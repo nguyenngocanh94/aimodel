@@ -240,9 +240,9 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
         // Focus-visible
         'focus-within:ring-[1.5px] focus-within:ring-ring',
         // Selected
-        selected && !active && 'border-[1.5px] border-primary/50 ring-[1.5px] ring-primary/70 shadow-[0_0_20px_rgba(56,189,248,0.2)]',
+        selected && !active && 'border-[1.5px] border-primary/60 shadow-[0_2px_12px_rgba(0,0,0,0.35)]',
         // Active (double-clicked / inspecting)
-        active && 'border-[1.5px] border-primary ring-2 ring-primary/40 shadow-[0_0_24px_rgba(56,189,248,0.3)] bg-[#151c28]',
+        active && 'border-[1.5px] border-primary ring-1 ring-primary/20 shadow-[0_2px_12px_rgba(0,0,0,0.35)]',
         // Dragging
         dragging && 'opacity-95 shadow-lg',
         // Disabled
