@@ -105,6 +105,32 @@ final class StubAdapterTest extends TestCase
     }
 
     #[Test]
+    public function reference_to_video_returns_stub_data(): void
+    {
+        $result = $this->adapter->execute(
+            Capability::ReferenceToVideo,
+            ['prompt' => 'A woman walks in a garden', 'reference_video_urls' => ['https://example.com/ref.mp4']],
+            [],
+        );
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('video', $result);
+        $this->assertArrayHasKey('url', $result['video']);
+        $this->assertArrayHasKey('content_type', $result['video']);
+        $this->assertArrayHasKey('file_name', $result['video']);
+        $this->assertArrayHasKey('file_size', $result['video']);
+        $this->assertArrayHasKey('width', $result['video']);
+        $this->assertArrayHasKey('height', $result['video']);
+        $this->assertArrayHasKey('fps', $result['video']);
+        $this->assertArrayHasKey('duration', $result['video']);
+        $this->assertArrayHasKey('num_frames', $result['video']);
+        $this->assertArrayHasKey('seed', $result);
+        $this->assertArrayHasKey('actual_prompt', $result);
+        $this->assertSame('video/mp4', $result['video']['content_type']);
+        $this->assertSame(5.0, $result['video']['duration']);
+    }
+
+    #[Test]
     public function same_input_produces_identical_output(): void
     {
         $input = ['system' => 'Write a script', 'user' => 'About nature'];

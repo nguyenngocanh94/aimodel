@@ -19,6 +19,7 @@ class StubAdapter implements ProviderContract
             Capability::TextToSpeech => $this->textToSpeech($seed),
             Capability::StructuredTransform => $this->structuredTransform($input, $seed),
             Capability::MediaComposition => $this->mediaComposition($seed),
+            Capability::ReferenceToVideo => $this->referenceToVideo($seed),
         };
     }
 
@@ -176,6 +177,25 @@ class StubAdapter implements ProviderContract
             'resolution' => '1920x1080',
             'format' => 'mp4',
             'codec' => 'h264',
+        ];
+    }
+
+    private function referenceToVideo(string $seed): array
+    {
+        return [
+            'video' => [
+                'url' => 'stub://r2v-video-' . substr($seed, 0, 8) . '.mp4',
+                'content_type' => 'video/mp4',
+                'file_name' => 'r2v-video-' . substr($seed, 0, 8) . '.mp4',
+                'file_size' => 2_500_000,
+                'width' => 1080,
+                'height' => 1920,
+                'fps' => 24.0,
+                'duration' => 5.0,
+                'num_frames' => 120,
+            ],
+            'seed' => hexdec(substr($seed, 0, 8)),
+            'actual_prompt' => 'Stub R2V prompt expansion',
         ];
     }
 }
