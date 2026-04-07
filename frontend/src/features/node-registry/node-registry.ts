@@ -19,6 +19,9 @@ import {
   humanGateTemplate,
   finalExportTemplate,
   wanR2VTemplate,
+  wanI2VTemplate,
+  wanImageEditTemplate,
+  wanVideoEditTemplate,
 } from './templates';
 
 /**
@@ -193,6 +196,9 @@ function registerAllNodeTemplates(registry: NodeTemplateRegistry): void {
   registry.register(humanGateTemplate);
   registry.register(finalExportTemplate);
   registry.register(wanR2VTemplate);
+  registry.register(wanI2VTemplate);
+  registry.register(wanImageEditTemplate);
+  registry.register(wanVideoEditTemplate);
 }
 
 registerAllNodeTemplates(nodeTemplateRegistry);

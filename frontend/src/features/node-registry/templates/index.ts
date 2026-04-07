@@ -11,3 +11,6 @@ export * from './review-checkpoint';
 export * from './human-gate';
 export * from './final-export';
 export { wanR2VTemplate } from './wan-r2v';
+export { wanI2VTemplate } from './wan-i2v';
+export { wanImageEditTemplate } from './wan-image-edit';
+export { wanVideoEditTemplate } from './wan-video-edit';

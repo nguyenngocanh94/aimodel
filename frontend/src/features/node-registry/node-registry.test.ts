@@ -14,8 +14,8 @@ import {
 
 describe('Node Registry Module - AiModel-9wx.15', () => {
   describe('Auto-registration', () => {
-    it('should have all 12 templates registered', () => {
-      expect(getTemplateCount()).toBe(13);
+    it('should have all 16 templates registered', () => {
+      expect(getTemplateCount()).toBe(16);
     });
 
     it('should have all expected template types', () => {
@@ -33,6 +33,9 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
         'humanGate',
         'finalExport',
         'wanR2V',
+        'wanI2V',
+        'wanImageEdit',
+        'wanVideoEdit',
       ];
 
       expectedTypes.forEach((type) => {
@@ -72,7 +75,7 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
   describe('getAllTemplates', () => {
     it('should return all templates', () => {
       const templates = getAllTemplates();
-      expect(templates).toHaveLength(13);
+      expect(templates).toHaveLength(16);
     });
 
     it('should return templates with correct structure', () => {
@@ -114,7 +117,7 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
   describe('getTemplateMetadata', () => {
     it('should return metadata for all templates', () => {
       const metadata = getTemplateMetadata();
-      expect(metadata).toHaveLength(13);
+      expect(metadata).toHaveLength(16);
     });
 
     it('should include required metadata fields', () => {
@@ -157,7 +160,7 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
 
   describe('getTemplateCount', () => {
     it('should return correct count', () => {
-      expect(getTemplateCount()).toBe(13);
+      expect(getTemplateCount()).toBe(16);
     });
   });
 
@@ -188,7 +191,7 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
       const executable = templates.filter((t) => isExecutableNode(t));
       const nonExecutable = templates.filter((t) => isNonExecutableNode(t));
 
-      expect(executable.length + nonExecutable.length).toBe(13);
+      expect(executable.length + nonExecutable.length).toBe(16);
     });
   });
 
