@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Domain\Nodes\NodeTemplateRegistry;
 use App\Domain\Nodes\Templates\FinalExportTemplate;
+use App\Domain\Nodes\Templates\HumanGateTemplate;
 use App\Domain\Nodes\Templates\ImageAssetMapperTemplate;
 use App\Domain\Nodes\Templates\ImageGeneratorTemplate;
 use App\Domain\Nodes\Templates\PromptRefinerTemplate;
@@ -37,6 +38,7 @@ class NodeTemplateServiceProvider extends ServiceProvider
         $registry->register(new PromptRefinerTemplate());
         $registry->register(new ImageGeneratorTemplate());
         $registry->register(new ReviewCheckpointTemplate());
+        $registry->register(new HumanGateTemplate());
         $registry->register(new ImageAssetMapperTemplate());
         $registry->register(new TtsVoiceoverPlannerTemplate());
         $registry->register(new SubtitleFormatterTemplate());

@@ -8,5 +8,6 @@ export * from './tts-voiceover-planner';
 export * from './subtitle-formatter';
 export * from './video-composer';
 export * from './review-checkpoint';
+export * from './human-gate';
 export * from './final-export';
 export { wanR2VTemplate } from './wan-r2v';
