@@ -6,6 +6,7 @@ namespace Tests\Unit\Domain\Providers;
 
 use App\Domain\Capability;
 use App\Domain\Providers\Adapters\AnthropicAdapter;
+use App\Domain\Providers\Adapters\DashScopeAdapter;
 use App\Domain\Providers\Adapters\FalAdapter;
 use App\Domain\Providers\Adapters\OpenAiAdapter;
 use App\Domain\Providers\Adapters\ReplicateAdapter;
@@ -69,6 +70,25 @@ class ProviderRouterTest extends TestCase
             'apiKey' => 'fal-test',
         ]);
         $this->assertInstanceOf(FalAdapter::class, $adapter);
+    }
+
+    public function test_resolves_dashscope_adapter(): void
+    {
+        $adapter = $this->router->resolve(Capability::ReferenceToVideo, [
+            'provider' => 'dashscope',
+            'apiKey' => 'dk-test',
+        ]);
+        $this->assertInstanceOf(DashScopeAdapter::class, $adapter);
+    }
+
+    public function test_resolves_dashscope_adapter_with_region(): void
+    {
+        $adapter = $this->router->resolve(Capability::ReferenceToVideo, [
+            'provider' => 'dashscope',
+            'apiKey' => 'dk-test',
+            'region' => 'cn',
+        ]);
+        $this->assertInstanceOf(DashScopeAdapter::class, $adapter);
     }
 
     public function test_throws_on_unknown_driver(): void

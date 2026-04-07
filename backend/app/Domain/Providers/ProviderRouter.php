@@ -6,6 +6,7 @@ namespace App\Domain\Providers;
 
 use App\Domain\Capability;
 use App\Domain\Providers\Adapters\AnthropicAdapter;
+use App\Domain\Providers\Adapters\DashScopeAdapter;
 use App\Domain\Providers\Adapters\FalAdapter;
 use App\Domain\Providers\Adapters\LoggingProviderDecorator;
 use App\Domain\Providers\Adapters\OpenAiAdapter;
@@ -34,6 +35,7 @@ class ProviderRouter
             'anthropic' => new AnthropicAdapter($apiKey, $model),
             'replicate' => new ReplicateAdapter($apiKey, $model),
             'fal' => new FalAdapter($apiKey, $model),
+            'dashscope' => new DashScopeAdapter($apiKey, $model, $nodeConfig['region'] ?? 'intl'),
             'stub' => new StubAdapter(),
             default => throw new \InvalidArgumentException("Unknown provider driver: {$driver}"),
         };
