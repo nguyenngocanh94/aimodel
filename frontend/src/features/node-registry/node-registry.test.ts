@@ -14,8 +14,8 @@ import {
 
 describe('Node Registry Module - AiModel-9wx.15', () => {
   describe('Auto-registration', () => {
-    it('should have all 16 templates registered', () => {
-      expect(getTemplateCount()).toBe(16);
+    it('should have all 18 templates registered', () => {
+      expect(getTemplateCount()).toBe(18);
     });
 
     it('should have all expected template types', () => {
@@ -36,6 +36,8 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
         'wanI2V',
         'wanImageEdit',
         'wanVideoEdit',
+        'productImageInput',
+        'diverge',
       ];
 
       expectedTypes.forEach((type) => {
@@ -75,7 +77,7 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
   describe('getAllTemplates', () => {
     it('should return all templates', () => {
       const templates = getAllTemplates();
-      expect(templates).toHaveLength(16);
+      expect(templates).toHaveLength(18);
     });
 
     it('should return templates with correct structure', () => {
@@ -95,8 +97,10 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
   describe('getTemplatesByCategory', () => {
     it('should filter by category', () => {
       const inputTemplates = getTemplatesByCategory('input');
-      expect(inputTemplates).toHaveLength(1);
-      expect(inputTemplates[0].type).toBe('userPrompt');
+      expect(inputTemplates).toHaveLength(2);
+      const types = inputTemplates.map((t) => t.type);
+      expect(types).toContain('userPrompt');
+      expect(types).toContain('productImageInput');
     });
 
     it('should return multiple templates for categories with many', () => {
@@ -117,7 +121,7 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
   describe('getTemplateMetadata', () => {
     it('should return metadata for all templates', () => {
       const metadata = getTemplateMetadata();
-      expect(metadata).toHaveLength(16);
+      expect(metadata).toHaveLength(18);
     });
 
     it('should include required metadata fields', () => {
@@ -160,7 +164,7 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
 
   describe('getTemplateCount', () => {
     it('should return correct count', () => {
-      expect(getTemplateCount()).toBe(16);
+      expect(getTemplateCount()).toBe(18);
     });
   });
 
@@ -191,7 +195,7 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
       const executable = templates.filter((t) => isExecutableNode(t));
       const nonExecutable = templates.filter((t) => isNonExecutableNode(t));
 
-      expect(executable.length + nonExecutable.length).toBe(16);
+      expect(executable.length + nonExecutable.length).toBe(18);
     });
   });
 

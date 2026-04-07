@@ -14,3 +14,5 @@ export { wanR2VTemplate } from './wan-r2v';
 export { wanI2VTemplate } from './wan-i2v';
 export { wanImageEditTemplate } from './wan-image-edit';
 export { wanVideoEditTemplate } from './wan-video-edit';
+export { productImageInputTemplate } from './product-image-input';
+export { divergeTemplate } from './diverge';

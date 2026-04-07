@@ -22,6 +22,8 @@ import {
   wanI2VTemplate,
   wanImageEditTemplate,
   wanVideoEditTemplate,
+  productImageInputTemplate,
+  divergeTemplate,
 } from './templates';
 
 /**
@@ -199,6 +201,8 @@ function registerAllNodeTemplates(registry: NodeTemplateRegistry): void {
   registry.register(wanI2VTemplate);
   registry.register(wanImageEditTemplate);
   registry.register(wanVideoEditTemplate);
+  registry.register(productImageInputTemplate);
+  registry.register(divergeTemplate);
 }
 
 registerAllNodeTemplates(nodeTemplateRegistry);
