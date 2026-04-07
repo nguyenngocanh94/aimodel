@@ -41,14 +41,16 @@ final class DomainEnumTest extends TestCase
         yield ['audioAsset', DataType::AudioAsset];
         yield ['subtitleAsset', DataType::SubtitleAsset];
         yield ['videoAsset', DataType::VideoAsset];
+        yield ['videoUrl', DataType::VideoUrl];
+        yield ['videoUrlList', DataType::VideoUrlList];
         yield ['reviewDecision', DataType::ReviewDecision];
         yield ['json', DataType::Json];
     }
 
     #[Test]
-    public function data_type_has_17_cases(): void
+    public function data_type_has_19_cases(): void
     {
-        $this->assertCount(17, DataType::cases());
+        $this->assertCount(19, DataType::cases());
     }
 
     #[Test]
@@ -193,12 +195,13 @@ final class DomainEnumTest extends TestCase
         yield ['text_to_speech', Capability::TextToSpeech];
         yield ['structured_transform', Capability::StructuredTransform];
         yield ['media_composition', Capability::MediaComposition];
+        yield ['reference_to_video', Capability::ReferenceToVideo];
     }
 
     #[Test]
-    public function capability_has_5_cases(): void
+    public function capability_has_6_cases(): void
     {
-        $this->assertCount(5, Capability::cases());
+        $this->assertCount(6, Capability::cases());
     }
 
     #[Test]

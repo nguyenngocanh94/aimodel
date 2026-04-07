@@ -22,5 +22,7 @@ enum DataType: string
     case SubtitleAsset = 'subtitleAsset';
     case VideoAsset = 'videoAsset';
     case ReviewDecision = 'reviewDecision';
+    case VideoUrl = 'videoUrl';
+    case VideoUrlList = 'videoUrlList';
     case Json = 'json';
 }

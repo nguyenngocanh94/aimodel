@@ -11,4 +11,5 @@ enum Capability: string
     case TextToSpeech = 'text_to_speech';
     case StructuredTransform = 'structured_transform';
     case MediaComposition = 'media_composition';
+    case ReferenceToVideo = 'reference_to_video';
 }
