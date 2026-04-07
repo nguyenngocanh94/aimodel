@@ -17,6 +17,7 @@ import {
   videoComposerTemplate,
   reviewCheckpointTemplate,
   finalExportTemplate,
+  wanR2VTemplate,
 } from './templates';
 
 /**
@@ -189,6 +190,7 @@ function registerAllNodeTemplates(registry: NodeTemplateRegistry): void {
   registry.register(videoComposerTemplate);
   registry.register(reviewCheckpointTemplate);
   registry.register(finalExportTemplate);
+  registry.register(wanR2VTemplate);
 }
 
 registerAllNodeTemplates(nodeTemplateRegistry);

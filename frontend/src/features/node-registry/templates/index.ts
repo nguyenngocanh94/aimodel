@@ -9,3 +9,4 @@ export * from './subtitle-formatter';
 export * from './video-composer';
 export * from './review-checkpoint';
 export * from './final-export';
+export { wanR2VTemplate } from './wan-r2v';

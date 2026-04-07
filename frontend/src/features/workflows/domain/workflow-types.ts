@@ -23,6 +23,8 @@ export type DataType =
   | 'audioPlan'
   | 'audioAsset'
   | 'subtitleAsset'
+  | 'videoUrl'
+  | 'videoUrlList'
   | 'videoAsset'
   | 'reviewDecision'
   | 'json';
