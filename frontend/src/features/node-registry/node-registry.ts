@@ -26,6 +26,9 @@ import {
   divergeTemplate,
   productAnalyzerTemplate,
   trendResearcherTemplate,
+  storyWriterTemplate,
+  telegramTriggerTemplate,
+  telegramDeliverTemplate,
 } from './templates';
 
 /**
@@ -207,6 +210,9 @@ function registerAllNodeTemplates(registry: NodeTemplateRegistry): void {
   registry.register(divergeTemplate);
   registry.register(productAnalyzerTemplate);
   registry.register(trendResearcherTemplate);
+  registry.register(storyWriterTemplate);
+  registry.register(telegramTriggerTemplate);
+  registry.register(telegramDeliverTemplate);
 }
 
 registerAllNodeTemplates(nodeTemplateRegistry);

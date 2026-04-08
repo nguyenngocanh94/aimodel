@@ -14,8 +14,8 @@ import {
 
 describe('Node Registry Module - AiModel-9wx.15', () => {
   describe('Auto-registration', () => {
-    it('should have all 18 templates registered', () => {
-      expect(getTemplateCount()).toBe(20);
+    it('should have all 23 templates registered', () => {
+      expect(getTemplateCount()).toBe(23);
     });
 
     it('should have all expected template types', () => {
@@ -40,6 +40,9 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
         'diverge',
         'productAnalyzer',
         'trendResearcher',
+        'storyWriter',
+        'telegramTrigger',
+        'telegramDeliver',
       ];
 
       expectedTypes.forEach((type) => {
@@ -79,7 +82,7 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
   describe('getAllTemplates', () => {
     it('should return all templates', () => {
       const templates = getAllTemplates();
-      expect(templates).toHaveLength(20);
+      expect(templates).toHaveLength(23);
     });
 
     it('should return templates with correct structure', () => {
@@ -99,11 +102,12 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
   describe('getTemplatesByCategory', () => {
     it('should filter by category', () => {
       const inputTemplates = getTemplatesByCategory('input');
-      expect(inputTemplates).toHaveLength(3);
+      expect(inputTemplates).toHaveLength(4);
       const types = inputTemplates.map((t) => t.type);
       expect(types).toContain('userPrompt');
       expect(types).toContain('productImageInput');
       expect(types).toContain('productAnalyzer');
+      expect(types).toContain('telegramTrigger');
     });
 
     it('should return multiple templates for categories with many', () => {
@@ -114,17 +118,16 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
       expect(types).toContain('imageGenerator');
     });
 
-    it('should return empty array for category with no templates', () => {
-      // There are no templates in some categories yet
+    it('should return templates for output category', () => {
       const templates = getTemplatesByCategory('output');
-      expect(templates).toHaveLength(1); // finalExport
+      expect(templates).toHaveLength(2); // finalExport, telegramDeliver
     });
   });
 
   describe('getTemplateMetadata', () => {
     it('should return metadata for all templates', () => {
       const metadata = getTemplateMetadata();
-      expect(metadata).toHaveLength(20);
+      expect(metadata).toHaveLength(23);
     });
 
     it('should include required metadata fields', () => {
@@ -167,7 +170,7 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
 
   describe('getTemplateCount', () => {
     it('should return correct count', () => {
-      expect(getTemplateCount()).toBe(20);
+      expect(getTemplateCount()).toBe(23);
     });
   });
 
@@ -198,7 +201,7 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
       const executable = templates.filter((t) => isExecutableNode(t));
       const nonExecutable = templates.filter((t) => isNonExecutableNode(t));
 
-      expect(executable.length + nonExecutable.length).toBe(20);
+      expect(executable.length + nonExecutable.length).toBe(23);
     });
   });
 

@@ -18,3 +18,6 @@ export { productImageInputTemplate } from './product-image-input';
 export { divergeTemplate } from './diverge';
 export { productAnalyzerTemplate } from './product-analyzer';
 export { trendResearcherTemplate } from './trend-researcher';
+export { storyWriterTemplate } from './story-writer';
+export { telegramTriggerTemplate } from './telegram-trigger';
+export { telegramDeliverTemplate } from './telegram-deliver';
