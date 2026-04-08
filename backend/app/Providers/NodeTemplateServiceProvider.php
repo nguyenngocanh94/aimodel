@@ -17,6 +17,8 @@ use App\Domain\Nodes\Templates\SubtitleFormatterTemplate;
 use App\Domain\Nodes\Templates\TtsVoiceoverPlannerTemplate;
 use App\Domain\Nodes\Templates\UserPromptTemplate;
 use App\Domain\Nodes\Templates\VideoComposerTemplate;
+use App\Domain\Nodes\Templates\TrendResearcherTemplate;
+use App\Domain\Nodes\Templates\ProductAnalyzerTemplate;
 use App\Domain\Nodes\Templates\WanR2VTemplate;
 use Illuminate\Support\ServiceProvider;
 
@@ -45,5 +47,7 @@ class NodeTemplateServiceProvider extends ServiceProvider
         $registry->register(new VideoComposerTemplate());
         $registry->register(new FinalExportTemplate());
         $registry->register(new WanR2VTemplate());
+        $registry->register(new TrendResearcherTemplate());
+        $registry->register(new ProductAnalyzerTemplate());
     }
 }

@@ -16,3 +16,5 @@ export { wanImageEditTemplate } from './wan-image-edit';
 export { wanVideoEditTemplate } from './wan-video-edit';
 export { productImageInputTemplate } from './product-image-input';
 export { divergeTemplate } from './diverge';
+export { productAnalyzerTemplate } from './product-analyzer';
+export { trendResearcherTemplate } from './trend-researcher';
