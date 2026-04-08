@@ -19,6 +19,9 @@ use App\Domain\Nodes\Templates\UserPromptTemplate;
 use App\Domain\Nodes\Templates\VideoComposerTemplate;
 use App\Domain\Nodes\Templates\TrendResearcherTemplate;
 use App\Domain\Nodes\Templates\ProductAnalyzerTemplate;
+use App\Domain\Nodes\Templates\StoryWriterTemplate;
+use App\Domain\Nodes\Templates\TelegramDeliverTemplate;
+use App\Domain\Nodes\Templates\TelegramTriggerTemplate;
 use App\Domain\Nodes\Templates\WanR2VTemplate;
 use Illuminate\Support\ServiceProvider;
 
@@ -49,5 +52,8 @@ class NodeTemplateServiceProvider extends ServiceProvider
         $registry->register(new WanR2VTemplate());
         $registry->register(new TrendResearcherTemplate());
         $registry->register(new ProductAnalyzerTemplate());
+        $registry->register(new StoryWriterTemplate());
+        $registry->register(new TelegramTriggerTemplate());
+        $registry->register(new TelegramDeliverTemplate());
     }
 }
