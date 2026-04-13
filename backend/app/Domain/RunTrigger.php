@@ -10,4 +10,6 @@ enum RunTrigger: string
     case RunNode = 'runNode';
     case RunFromHere = 'runFromHere';
     case RunUpToHere = 'runUpToHere';
+    case TelegramWebhook = 'telegramWebhook';
+    case WebhookTrigger = 'webhookTrigger';
 }

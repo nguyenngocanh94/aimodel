@@ -12,6 +12,8 @@ use App\Domain\PortSchema;
 use App\Domain\Nodes\Exceptions\ReviewPendingException;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\NodeTemplate;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class HumanGateTemplate extends NodeTemplate
 {
@@ -41,6 +43,8 @@ class HumanGateTemplate extends NodeTemplate
             'timeoutSeconds' => ['sometimes', 'integer', 'min:0', 'max:86400'],
             'autoFallbackResponse' => ['sometimes', 'nullable', 'string'],
             'options' => ['sometimes', 'nullable', 'array'],
+            'botToken' => ['sometimes', 'string'],
+            'chatId' => ['sometimes', 'string'],
         ];
     }
 
@@ -52,6 +56,8 @@ class HumanGateTemplate extends NodeTemplate
             'timeoutSeconds' => 0,
             'autoFallbackResponse' => null,
             'options' => null,
+            'botToken' => '',
+            'chatId' => '',
         ];
     }
 
@@ -83,6 +89,45 @@ class HumanGateTemplate extends NodeTemplate
             $ctx->config['messageTemplate'] ?? '',
             is_array($inputValue) ? $inputValue : [],
         );
+
+        // If no template, format the input data as readable text
+        if (empty($message) && $inputValue) {
+            $message = is_string($inputValue) ? $inputValue : json_encode($inputValue, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        }
+
+        // Send to Telegram if channel is 'telegram' and bot config is provided
+        $channel = $ctx->config['channel'] ?? 'ui';
+        $botToken = $ctx->config['botToken'] ?? '';
+        $chatId = $ctx->config['chatId'] ?? '';
+
+        if (in_array($channel, ['telegram', 'any']) && $botToken && $chatId) {
+            $telegramMessage = "🔔 Workflow paused — approval needed\n\n"
+                . $message;
+
+            // Build inline keyboard with callback_data encoding run+node IDs
+            $callbackPrefix = "g:{$ctx->runId}:{$ctx->nodeId}";
+            $replyMarkup = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => '✅ Approve', 'callback_data' => "{$callbackPrefix}:a"],
+                        ['text' => '❌ Reject', 'callback_data' => "{$callbackPrefix}:r"],
+                    ],
+                ],
+            ];
+
+            try {
+                Http::post("https://api.telegram.org/bot{$botToken}/sendMessage", [
+                    'chat_id' => $chatId,
+                    'text' => mb_substr($telegramMessage, 0, 4096),
+                    'reply_markup' => json_encode($replyMarkup),
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('HumanGate failed to send Telegram notification', [
+                    'error' => $e->getMessage(),
+                    'nodeId' => $ctx->nodeId,
+                ]);
+            }
+        }
 
         throw new ReviewPendingException(
             nodeId: $ctx->nodeId,

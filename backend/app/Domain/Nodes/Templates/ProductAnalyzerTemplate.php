@@ -66,12 +66,36 @@ class ProductAnalyzerTemplate extends NodeTemplate
         $config = $ctx->config;
         $analysisDepth = $config['analysisDepth'] ?? 'detailed';
 
+        // Extract image URLs for vision models
+        $imageUrls = [];
+        if (is_array($images)) {
+            foreach ($images as $img) {
+                if (is_string($img)) {
+                    $imageUrls[] = $img;
+                } elseif (is_array($img) && isset($img['url'])) {
+                    $imageUrls[] = $img['url'];
+                }
+            }
+        }
+
+        // Also extract URLs from description text (user might paste URLs)
+        $descText = (string) $description;
+        if (preg_match_all('/https?:\/\/[^\s<>"]+\.(?:jpg|jpeg|png|webp|gif)/i', $descText, $urlMatches)) {
+            $imageUrls = array_merge($imageUrls, $urlMatches[0]);
+        }
+
+        $input = [
+            'systemPrompt' => $this->buildSystemPrompt($analysisDepth),
+            'prompt' => $this->buildUserPrompt($images, $descText),
+        ];
+
+        if (!empty($imageUrls)) {
+            $input['imageUrls'] = array_values(array_unique($imageUrls));
+        }
+
         $result = $ctx->provider(Capability::TextGeneration)->execute(
             Capability::TextGeneration,
-            [
-                'systemPrompt' => $this->buildSystemPrompt($analysisDepth),
-                'prompt' => $this->buildUserPrompt($images, (string) $description),
-            ],
+            $input,
             $config,
         );
 
@@ -118,9 +142,21 @@ class ProductAnalyzerTemplate extends NodeTemplate
     private function parseAnalysis(mixed $result): array
     {
         if (is_string($result)) {
-            $decoded = json_decode($result, true);
+            // Strip markdown code fences
+            $cleaned = preg_replace('/^```(?:json)?\s*\n?/i', '', trim($result));
+            $cleaned = preg_replace('/\n?```\s*$/i', '', $cleaned);
+
+            $decoded = json_decode(trim($cleaned), true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                 return $decoded;
+            }
+
+            // Try to find JSON object in the response
+            if (preg_match('/\{[\s\S]*\}/u', $result, $matches)) {
+                $decoded = json_decode($matches[0], true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    return $decoded;
+                }
             }
 
             return $this->fallbackAnalysis();

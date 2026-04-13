@@ -59,10 +59,20 @@ final class RunExecutor
             $nodeMap[$node['id']] = $node;
         }
 
-        // 3. Iterate ordered nodes
+        // 3. Load existing node run records (for resumed runs)
         $nodeRunRecords = [];
+        $existingRecords = NodeRunRecord::where('run_id', $run->id)->get();
+        foreach ($existingRecords as $existing) {
+            $nodeRunRecords[$existing->node_id] = $existing->toArray();
+        }
 
         foreach ($plan->orderedNodeIds as $nodeId) {
+            // Skip nodes that already completed successfully (resume scenario)
+            $existingRecord = $nodeRunRecords[$nodeId] ?? null;
+            if ($existingRecord && in_array($existingRecord['status'], ['success', 'error', 'skipped'])) {
+                continue;
+            }
+
             // Cooperative cancellation check
             $run->refresh();
             if ($run->status === 'cancelled') {
@@ -86,8 +96,12 @@ final class RunExecutor
                 continue;
             }
 
-            // Create pending record
-            $record = NodeRunRecord::create([
+            // Create pending record or reuse existing one (resume scenario)
+            $existingModel = $existingRecord
+                ? NodeRunRecord::where('run_id', $run->id)->where('node_id', $nodeId)->first()
+                : null;
+
+            $record = $existingModel ?? NodeRunRecord::create([
                 'run_id' => $run->id,
                 'node_id' => $nodeId,
                 'status' => 'running',
@@ -121,7 +135,7 @@ final class RunExecutor
                     $template->type,
                     $template->version,
                     1, // schema version
-                    $node['config'] ?? [],
+                    $node['data']['config'] ?? $node['config'] ?? [],
                     array_map(fn ($p) => is_array($p) ? $p : $p->toArray(), $inputs),
                 );
 
@@ -143,7 +157,7 @@ final class RunExecutor
 
                 $ctx = new NodeExecutionContext(
                     nodeId: $nodeId,
-                    config: $node['config'] ?? [],
+                    config: $node['data']['config'] ?? $node['config'] ?? [],
                     inputs: $inputs,
                     runId: $run->id,
                     providerRouter: $this->providerRouter,
@@ -197,7 +211,13 @@ final class RunExecutor
                     status: 'awaitingReview',
                 ));
 
-                // Poll for review decision
+                // For HumanGate nodes: stop execution here, resume via webhook/API
+                $nodeType = $node['type'] ?? '';
+                if ($nodeType === 'humanGate') {
+                    return; // Exit execution — webhook will re-dispatch when response arrives
+                }
+
+                // For legacy ReviewCheckpoint: poll synchronously
                 $pollResult = $this->pollForReviewDecision($run->id, $nodeId);
 
                 if ($pollResult['cancelled']) {

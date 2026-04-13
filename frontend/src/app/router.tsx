@@ -5,6 +5,7 @@ import { ErrorBoundary } from '@/shared/ui/error-boundary'
 import { WorkflowListPage } from '@/pages/workflow-list-page'
 import { EditorPage } from '@/pages/editor-page'
 import { RunHistoryPage } from '@/pages/run-history-page'
+import { RunDetailsPage } from '@/pages/run-details-page'
 import { Toaster } from 'sonner'
 
 /**
@@ -62,6 +63,15 @@ export const workflowRunsRoute = createRoute({
 })
 
 /**
+ * Run details route
+ */
+export const workflowRunDetailsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/workflows/$workflowId/runs/$runId',
+  component: RunDetailsPage,
+})
+
+/**
  * Route tree
  */
 export const routeTree = rootRoute.addChildren([
@@ -69,6 +79,7 @@ export const routeTree = rootRoute.addChildren([
   workflowsRoute,
   workflowEditorRoute,
   workflowRunsRoute,
+  workflowRunDetailsRoute,
 ])
 
 /**

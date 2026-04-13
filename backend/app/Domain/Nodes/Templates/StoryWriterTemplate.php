@@ -171,9 +171,21 @@ class StoryWriterTemplate extends NodeTemplate
     private function parseStoryArc(mixed $result): array
     {
         if (is_string($result)) {
-            $decoded = json_decode($result, true);
+            // Strip markdown code fences (```json ... ``` or ``` ... ```)
+            $cleaned = preg_replace('/^```(?:json)?\s*\n?/i', '', trim($result));
+            $cleaned = preg_replace('/\n?```\s*$/i', '', $cleaned);
+
+            $decoded = json_decode(trim($cleaned), true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                 return $decoded;
+            }
+
+            // Try to find JSON object in the response
+            if (preg_match('/\{[\s\S]*\}/u', $result, $matches)) {
+                $decoded = json_decode($matches[0], true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    return $decoded;
+                }
             }
 
             return $this->emptyStoryArc();

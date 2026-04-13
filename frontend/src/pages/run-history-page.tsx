@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { useParams } from '@tanstack/react-router'
+import { useParams, useNavigate } from '@tanstack/react-router'
 import { Play, Loader2, History } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -117,7 +117,7 @@ export function RunHistoryPage() {
         {!isLoading && runs.length > 0 && (
           <div className="space-y-2 p-6" data-testid="run-list">
             {runs.map((run) => (
-              <CancelableRunItem key={run.id} run={run} />
+              <CancelableRunItem key={run.id} run={run} workflowId={workflowId} />
             ))}
           </div>
         )}
@@ -127,11 +127,18 @@ export function RunHistoryPage() {
 }
 
 /**
- * Wrapper that provides per-run cancel functionality via the useCancelRun hook.
+ * Wrapper that provides per-run cancel functionality and navigation via hooks.
  * Hooks must be called at the component level, so each run item gets its own instance.
  */
-function CancelableRunItem({ run }: { readonly run: ExecutionRun }) {
+function CancelableRunItem({
+  run,
+  workflowId,
+}: {
+  readonly run: ExecutionRun
+  readonly workflowId: string
+}) {
   const cancelRun = useCancelRun(run.id)
+  const navigate = useNavigate()
 
   const handleCancel = useCallback(async () => {
     try {
@@ -142,11 +149,22 @@ function CancelableRunItem({ run }: { readonly run: ExecutionRun }) {
     }
   }, [cancelRun])
 
+  const handleClick = useCallback(
+    (runId: string) => {
+      navigate({
+        to: '/workflows/$workflowId/runs/$runId',
+        params: { workflowId, runId },
+      })
+    },
+    [navigate, workflowId],
+  )
+
   return (
     <RunListItem
       run={run}
       isCancelling={cancelRun.isPending}
       onCancel={handleCancel}
+      onClick={handleClick}
     />
   )
 }

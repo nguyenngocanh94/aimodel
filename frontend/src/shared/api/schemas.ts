@@ -34,6 +34,8 @@ export const NodeRunRecordSchema = z.object({
   errorMessage: z.string().optional(),
   usedCache: z.boolean().optional(),
   durationMs: z.number().optional(),
+  startedAt: z.string().datetime().optional(),
+  completedAt: z.string().datetime().optional(),
 });
 
 export type NodeRunRecord = z.infer<typeof NodeRunRecordSchema>;

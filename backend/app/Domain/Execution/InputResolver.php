@@ -28,7 +28,7 @@ final class InputResolver
         array $document,
         array $nodeRunRecords,
     ): array {
-        $activePorts = $template->activePorts($node['config'] ?? []);
+        $activePorts = $template->activePorts($node['data']['config'] ?? $node['config'] ?? []);
         $edges = $document['edges'] ?? [];
         $nodeMap = [];
         foreach ($document['nodes'] ?? [] as $n) {
@@ -53,8 +53,8 @@ final class InputResolver
                 continue;
             }
 
-            $sourceNodeId = $edge['source'];
-            $sourcePortKey = $edge['sourceHandle'] ?? $edge['sourcePort'] ?? 'out';
+            $sourceNodeId = $edge['source'] ?? $edge['sourceNodeId'] ?? '';
+            $sourcePortKey = $edge['sourceHandle'] ?? $edge['sourcePortKey'] ?? $edge['sourcePort'] ?? 'out';
 
             // Priority 1: Successful upstream output from current run
             $sourceRecord = $nodeRunRecords[$sourceNodeId] ?? null;
@@ -114,8 +114,8 @@ final class InputResolver
     private function findEdgeForInput(array $edges, string $targetNodeId, string $targetPortKey): ?array
     {
         foreach ($edges as $edge) {
-            $edgeTarget = $edge['target'] ?? '';
-            $edgeTargetPort = $edge['targetHandle'] ?? $edge['targetPort'] ?? 'in';
+            $edgeTarget = $edge['target'] ?? $edge['targetNodeId'] ?? '';
+            $edgeTargetPort = $edge['targetHandle'] ?? $edge['targetPortKey'] ?? $edge['targetPort'] ?? 'in';
 
             if ($edgeTarget === $targetNodeId && $edgeTargetPort === $targetPortKey) {
                 return $edge;

@@ -290,10 +290,24 @@ class PromptRefinerTemplate extends NodeTemplate
     private function parsePrompts(mixed $result, array $scenes): array
     {
         if (is_string($result)) {
-            $decoded = json_decode($result, true);
+            // Strip markdown code fences
+            $cleaned = preg_replace('/^```(?:json)?\s*\n?/i', '', trim($result));
+            $cleaned = preg_replace('/\n?```\s*$/i', '', $cleaned);
+
+            $decoded = json_decode(trim($cleaned), true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                 return $decoded['prompts'] ?? [$decoded];
             }
+
+            // Try to find JSON in the response
+            if (preg_match('/\{[\s\S]*\}/u', $result, $matches)) {
+                $decoded = json_decode($matches[0], true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    return $decoded['prompts'] ?? [$decoded];
+                }
+            }
+
+            // Fallback: use the raw text as a single prompt
             return [['sceneIndex' => 0, 'prompt' => $result, 'negativePrompt' => '']];
         }
 

@@ -22,6 +22,8 @@ class NodeRunRecordResource extends JsonResource
             'errorMessage' => $this->error_message,
             'usedCache' => $this->used_cache,
             'durationMs' => $this->duration_ms,
+            'startedAt' => $this->started_at?->toIso8601String(),
+            'completedAt' => $this->completed_at?->toIso8601String(),
         ];
     }
 }

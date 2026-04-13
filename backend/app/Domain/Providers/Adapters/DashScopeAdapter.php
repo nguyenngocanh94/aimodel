@@ -24,6 +24,7 @@ class DashScopeAdapter implements ProviderContract
     ];
 
     private const VIDEO_SYNTHESIS_PATH = '/api/v1/services/aigc/video-generation/video-synthesis';
+    private const IMAGE_GENERATION_PATH = '/api/v1/services/aigc/image-generation/generation';
     private const TASK_PATH = '/api/v1/tasks';
 
     private const DEFAULT_POLL_INTERVAL = 5;
@@ -38,12 +39,56 @@ class DashScopeAdapter implements ProviderContract
     public function execute(Capability $capability, array $input, array $config): mixed
     {
         return match ($capability) {
+            Capability::TextGeneration => $this->textGeneration($input, $config),
             Capability::ReferenceToVideo => $this->referenceToVideo($input, $config),
             Capability::TextToImage => $this->textToImage($input, $config),
             Capability::TextToSpeech => $this->textToSpeech($input, $config),
             Capability::MediaComposition => $this->mediaComposition($input, $config),
             default => throw new \RuntimeException("DashScope adapter does not support: {$capability->value}"),
         };
+    }
+
+    /**
+     * Text generation via DashScope's OpenAI-compatible endpoint (Qwen models).
+     * Supports vision when image URLs are provided in input.
+     */
+    private function textGeneration(array $input, array $config): string
+    {
+        $model = $this->model ?? $config['model'] ?? 'qwen-plus';
+        $baseUrl = $this->getBaseUrl();
+
+        $messages = [];
+
+        // System prompt
+        if (!empty($input['systemPrompt'])) {
+            $messages[] = ['role' => 'system', 'content' => $input['systemPrompt']];
+        }
+
+        // User message — supports text + images for vision models
+        $userContent = [];
+        if (!empty($input['imageUrls']) && is_array($input['imageUrls'])) {
+            // Vision mode: use qwen-vl-max or similar
+            foreach ($input['imageUrls'] as $url) {
+                $userContent[] = ['type' => 'image_url', 'image_url' => ['url' => $url]];
+            }
+            $userContent[] = ['type' => 'text', 'text' => $input['prompt'] ?? ''];
+            $messages[] = ['role' => 'user', 'content' => $userContent];
+        } else {
+            $messages[] = ['role' => 'user', 'content' => $input['prompt'] ?? ''];
+        }
+
+        $response = Http::withHeaders([
+            'Authorization' => "Bearer {$this->apiKey}",
+        ])->timeout(120)->post("{$baseUrl}/compatible-mode/v1/chat/completions", [
+            'model' => $model,
+            'messages' => $messages,
+            'temperature' => $config['temperature'] ?? 0.7,
+            'max_tokens' => $config['maxTokens'] ?? 4096,
+        ]);
+
+        $response->throw();
+
+        return $response->json('choices.0.message.content', '');
     }
 
     public function getBaseUrl(): string
@@ -205,11 +250,78 @@ class DashScopeAdapter implements ProviderContract
     }
 
     /**
-     * Placeholder — TextToImage via DashScope (not yet implemented).
+     * Text-to-image via DashScope's Wan image generation (V2 async API).
+     *
+     * @return array{url: string, request_id: string, task_id: string}
      */
-    private function textToImage(array $input, array $config): mixed
+    private function textToImage(array $input, array $config): array
     {
-        throw new \RuntimeException('DashScope TextToImage is not yet implemented');
+        $model = $this->model ?? $config['model'] ?? 'wan2.6-t2i';
+        $prompt = $input['prompt'] ?? '';
+
+        $payload = [
+            'model' => $model,
+            'input' => [
+                'messages' => [
+                    [
+                        'role' => 'user',
+                        'content' => [['text' => $prompt]],
+                    ],
+                ],
+            ],
+            'parameters' => [
+                'size' => $config['size'] ?? '1024*1024',
+                'n' => (int) ($config['n'] ?? 1),
+                'prompt_extend' => $config['promptExtend'] ?? true,
+                'watermark' => $config['watermark'] ?? false,
+            ],
+        ];
+
+        if (!empty($input['negative_prompt'])) {
+            $payload['parameters']['negative_prompt'] = $input['negative_prompt'];
+        }
+
+        if (isset($config['seed'])) {
+            $payload['parameters']['seed'] = (int) $config['seed'];
+        }
+
+        // Submit async task
+        $response = Http::withHeaders([
+            'Authorization' => "Bearer {$this->apiKey}",
+            'Content-Type' => 'application/json',
+            'X-DashScope-Async' => 'enable',
+        ])->timeout(30)->post(
+            $this->getBaseUrl() . self::IMAGE_GENERATION_PATH,
+            $payload,
+        );
+
+        if ($response->failed()) {
+            throw new ProviderException(
+                "DashScope image submit failed: {$response->body()}",
+                provider: 'dashscope',
+                capability: Capability::TextToImage->value,
+                retryable: $response->status() >= 500,
+            );
+        }
+
+        $taskId = $response->json('output.task_id');
+        if (!$taskId) {
+            throw new ProviderException(
+                'DashScope image submit did not return a task_id: ' . $response->body(),
+                provider: 'dashscope',
+                capability: Capability::TextToImage->value,
+            );
+        }
+
+        $result = $this->pollTask($taskId, $config);
+
+        $imageUrl = $result['output']['choices'][0]['message']['content'][0]['image'] ?? '';
+
+        return [
+            'url' => $imageUrl,
+            'request_id' => $result['request_id'] ?? '',
+            'task_id' => $taskId,
+        ];
     }
 
     /**

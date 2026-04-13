@@ -25,7 +25,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    command: php artisan queue:work redis --queue=workflow-runs --timeout=900 --tries=1 --sleep=3
+    command: php artisan queue:work redis --queue=default,workflow-runs --timeout=900 --tries=1 --sleep=3
     volumes:
       - .:/var/www/html
       - artifact-storage:/var/www/html/storage/app/artifacts

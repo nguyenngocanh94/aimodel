@@ -75,22 +75,31 @@ class WanR2VTemplate extends NodeTemplate
 
         $input = ['prompt' => $prompt];
 
+        // Collect all reference URLs into a single array for the adapter
+        $referenceUrls = [];
+
         if (!empty($referenceVideos)) {
-            $input['reference_video_urls'] = is_array($referenceVideos) ? $referenceVideos : [$referenceVideos];
+            foreach ((array) $referenceVideos as $vid) {
+                if (is_string($vid)) {
+                    $referenceUrls[] = $vid;
+                } elseif (is_array($vid) && isset($vid['url'])) {
+                    $referenceUrls[] = $vid['url'];
+                }
+            }
         }
 
         if (!empty($referenceImages)) {
-            $urls = [];
             foreach ((array) $referenceImages as $img) {
                 if (is_string($img)) {
-                    $urls[] = $img;
+                    $referenceUrls[] = $img;
                 } elseif (is_array($img) && isset($img['url'])) {
-                    $urls[] = $img['url'];
+                    $referenceUrls[] = $img['url'];
                 }
             }
-            if ($urls) {
-                $input['reference_image_urls'] = $urls;
-            }
+        }
+
+        if ($referenceUrls) {
+            $input['reference_urls'] = $referenceUrls;
         }
 
         $result = $ctx->provider(Capability::ReferenceToVideo)->execute(

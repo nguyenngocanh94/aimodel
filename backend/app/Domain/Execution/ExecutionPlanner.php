@@ -34,9 +34,9 @@ final class ExecutionPlanner
             $reverse[$id] = [];
         }
         foreach ($edges as $edge) {
-            $src = $edge['source'];
-            $tgt = $edge['target'];
-            if (isset($nodeMap[$src], $nodeMap[$tgt])) {
+            $src = $edge['source'] ?? $edge['sourceNodeId'] ?? '';
+            $tgt = $edge['target'] ?? $edge['targetNodeId'] ?? '';
+            if ($src && $tgt && isset($nodeMap[$src], $nodeMap[$tgt])) {
                 $forward[$src][] = $tgt;
                 $reverse[$tgt][] = $src;
             }
@@ -44,7 +44,7 @@ final class ExecutionPlanner
 
         // Determine candidate node IDs based on the trigger.
         $candidateIds = match ($trigger) {
-            RunTrigger::RunWorkflow => array_keys($nodeMap),
+            RunTrigger::RunWorkflow, RunTrigger::TelegramWebhook, RunTrigger::WebhookTrigger => array_keys($nodeMap),
             RunTrigger::RunNode => $targetNodeId !== null ? [$targetNodeId] : [],
             RunTrigger::RunFromHere => $this->collectDownstream($targetNodeId, $forward),
             RunTrigger::RunUpToHere => $this->collectUpstream($targetNodeId, $reverse),
