@@ -1,0 +1,243 @@
+{
+    "format_shortlist": {
+      "selection_logic": {
+        "primary_intent_used": "education_soft_product_support",
+        "viewer_outcome_used": "learn",
+        "hard_constraints_used": [
+          "Không before/after transformation claim",
+          "Không cam kết timeline kết quả",
+          "Không so sánh sản phẩm khác",
+          "Không ngôn ngữ điều trị/chữa bệnh",
+          "Soft CTA only",
+          "Tone casual bạn bè, không chuyên gia",
+          "Chỉ dùng ngôn ngữ hỗ trợ/cải thiện"
+        ]
+      },
+      "formats": [
+        {
+          "format_id": "F01_INGREDIENT_BREAKDOWN",
+          "format_name_vi": "Giải mã thành phần – Serum này có gì bên trong?",
+          "core_pattern": "Hook bằng pain point (mụn ẩn/thâm) → lần lượt highlight 2–3 thành phần chính với nồng độ (text overlay) → mỗi thành phần giải thích 1 câu vai trò → close-up texture/dropper → soft CTA lưu lại",
+          "why_it_fits": "Đúng intent edu + soft product support. Audience solution_aware đã biết Niacinamide nên việc đi sâu vào nồng độ và combo thành phần tạo giá trị mới. Format phổ biến trên TikTok VN skincare, dễ save vì mang tính tham khảo lâu dài.",
+          "best_for_outcome": ["learn", "save", "comment"],
+          "hook_style_options": [
+            "Pain point trực tiếp: 'Da dầu mụn ẩn mà chưa biết dùng serum nào?'",
+            "Ingredient tease: '7% Niacinamide + 0.8% BHA trong cùng 1 lọ – combo này làm gì?'",
+            "Curiosity gap: 'Serum bí đao mà có cả BHA lẫn NAG – nghe lạ nhưng hợp lý lắm'"
+          ],
+          "product_visibility_mode": "natural_use_first",
+          "production_feasibility": {
+            "score_1_to_5": 5,
+            "why": "Chỉ cần 1 người nói + close-up sản phẩm + text overlay. Không cần diễn xuất phức tạp, không cần nhiều cảnh quay.",
+            "requirements": ["1 talent/creator", "Lọ sản phẩm", "Ring light hoặc ánh sáng tự nhiên", "App edit có text overlay (CapCut)"],
+            "risk_flags": ["Nếu giải thích quá dài hoặc quá kỹ thuật sẽ mất retention"]
+          },
+          "native_feel_score_1_to_5": 5,
+          "compliance_safety_score_1_to_5": 5,
+          "caption_overlay_pattern": "Text highlight nồng độ từng thành phần (ví dụ: '7% NIACINAMIDE' xuất hiện khi nhắc đến), bullet ngắn vai trò mỗi thành phần",
+          "audio_style_hint": "Voiceover tự nhiên giọng nữ trẻ, nói chuyện casual như đang kể cho bạn nghe. Nhạc nền lo-fi nhẹ hoặc trending sound nhỏ.",
+          "estimated_duration_range_sec": "30–45"
+        },
+        {
+          "format_id": "F02_POV_ROUTINE_MOMENT",
+          "format_name_vi": "POV: Bước serum trong routine tối của mình",
+          "core_pattern": "POV camera / first-person → rửa mặt xong → lấy serum ra → nhỏ giọt lên tay (close-up texture) → thoa lên mặt → voiceover giải thích ngắn tại sao chọn serum này → kết bằng soft CTA",
+          "why_it_fits": "Kết hợp entertainment_relatable (routine đời thường) với edu (giải thích lý do chọn). Tận dụng được visual provable: dropper, texture lỏng không màu, thấm nhanh. Dạng POV routine rất native trên TikTok VN.",
+          "best_for_outcome": ["save", "learn", "feel"],
+          "hook_style_options": [
+            "POV visual: Camera quay từ góc nhìn thứ nhất, tay cầm lọ serum – không cần nói gì 2 giây đầu",
+            "Text hook: 'POV: bạn tìm được serum hợp da dầu mà không bết rít'",
+            "Sound-driven: Dùng trending sound + text overlay pain point"
+          ],
+          "product_visibility_mode": "natural_use_first",
+          "production_feasibility": {
+            "score_1_to_5": 5,
+            "why": "Quay POV góc nhìn thứ nhất rất đơn giản, chỉ cần điện thoại + sản phẩm + gương. Không cần lộ mặt nếu không muốn.",
+            "requirements": ["Điện thoại có camera tốt", "Lọ sản phẩm", "Góc quay bàn skincare hoặc gương", "Ánh sáng ấm tự nhiên"],
+            "risk_flags": ["Nếu chỉ quay routine mà không có voiceover edu thì thành pure aesthetic, mất yếu tố learn"]
+          },
+          "native_feel_score_1_to_5": 5,
+          "compliance_safety_score_1_to_5": 5,
+          "caption_overlay_pattern": "Text nhỏ góc trên: tên sản phẩm. Text highlight khi nhắc thành phần. Không cần nhiều text – ưu tiên visual.",
+          "audio_style_hint": "Voiceover nhỏ nhẹ, intimate, kiểu nói thầm buổi tối. Hoặc dùng trending audio + text overlay thay voiceover.",
+          "estimated_duration_range_sec": "20–35"
+        },
+        {
+          "format_id": "F03_MYTH_VS_FACT",
+          "format_name_vi": "Đúng hay Sai: Những hiểu lầm về serum cho da dầu",
+          "core_pattern": "Đưa ra 2–3 câu hiểu lầm phổ biến (myth) về da dầu dùng serum → bẻ lại bằng fact ngắn gọn dựa trên thành phần → dẫn tự nhiên vào sản phẩm như ví dụ minh họa → soft CTA",
+          "why_it_fits": "Format myth-bust kích thích comment (đồng ý/không đồng ý) và save (thông tin hữu ích). Phù hợp audience solution_aware – họ đã có kiến thức cơ bản nên sẽ thích tranh luận. Sản phẩm xuất hiện tự nhiên như ví dụ minh họa, không phải hero.",
+          "best_for_outcome": ["comment", "learn", "save"],
+          "hook_style_options": [
+            "Provocative statement: 'Da dầu không cần dưỡng ẩm – ĐÚNG hay SAI?'",
+            "List tease: '3 điều sai bét về serum cho da dầu mà ai cũng tin'",
+            "Challenge: 'Bạn nghĩ BHA chỉ dùng để tẩy da chết? Sai rồi'"
+          ],
+          "product_visibility_mode": "subtle_background",
+          "production_feasibility": {
+            "score_1_to_5": 4,
+            "why": "Cần chuẩn bị nội dung myth/fact chặt chẽ hơn format khác. Quay đơn giản nhưng script phải chính xác để không drift claim.",
+            "requirements": ["1 talent/creator tự tin nói", "Script được review kỹ", "Text overlay rõ ràng ĐÚNG/SAI", "Lọ sản phẩm làm prop"],
+            "risk_flags": ["Dễ bị drift sang ngôn ngữ 'trị mụn' khi bẻ myth", "Myth nếu chọn không khéo có thể gây hiểu lầm ngược"]
+          },
+          "native_feel_score_1_to_5": 4,
+          "compliance_safety_score_1_to_5": 4,
+          "caption_overlay_pattern": "Text lớn ĐÚNG/SAI với màu xanh/đỏ. Highlight thành phần và nồng độ khi giải thích fact.",
+          "audio_style_hint": "Voiceover tự tin nhưng vẫn casual, kiểu bạn bè nói 'ê sai rồi nha'. Có thể dùng sound effect nhẹ khi chuyển đúng/sai.",
+          "estimated_duration_range_sec": "30–50"
+        },
+        {
+          "format_id": "F04_TEXTURE_ASMR_EDU",
+          "format_name_vi": "Close-up texture serum + giải thích nhanh",
+          "core_pattern": "Mở bằng close-up macro dropper nhỏ serum → texture chảy trên da → thoa thấm nhanh (ASMR visual) → voiceover hoặc text overlay giải thích ngắn 2–3 thành phần → soft CTA",
+          "why_it_fits": "Kết hợp aesthetic/satisfying visual (entertainment_relatable) với edu ngắn. Tận dụng tối đa visual provable: dropper hổ phách, texture lỏng không màu, thấm nhanh không nhờn. Dạng texture video rất viral trên TikTok skincare VN.",
+          "best_for_outcome": ["stop", "save", "learn"],
+          "hook_style_options": [
+            "Pure visual hook: Close-up macro dropper nhỏ giọt – không text, không voice 2 giây đầu",
+            "Text overlay hook: 'Serum texture đẹp nhất mình từng dùng cho da dầu'",
+            "ASMR sound: Âm thanh giọt serum rơi + nhạc nền minimal"
+          ],
+          "product_visibility_mode": "hero_moment",
+          "production_feasibility": {
+            "score_1_to_5": 4,
+            "why": "Cần macro lens hoặc điện thoại camera tốt để quay close-up texture đẹp. Ánh sáng cần chuẩn hơn các format khác.",
+            "requirements": ["Điện thoại camera tốt hoặc macro lens clip-on", "Ánh sáng tự nhiên mạnh hoặc ring light", "Lọ sản phẩm sạch", "Tay/da sạch cho close-up"],
+            "risk_flags": ["Nếu quá thiên aesthetic mà thiếu edu thì không đạt intent learn", "Texture không màu có thể kém ấn tượng visual nếu không quay khéo"]
+          },
+          "native_feel_score_1_to_5": 4,
+          "compliance_safety_score_1_to_5": 5,
+          "caption_overlay_pattern": "Minimal text – chỉ highlight tên thành phần + nồng độ khi voiceover nhắc. Ưu tiên visual sạch.",
+          "audio_style_hint": "ASMR-lite: âm thanh nhỏ giọt, thoa serum. Voiceover nhẹ nhàng hoặc chỉ dùng text. Nhạc nền ambient/minimal.",
+          "estimated_duration_range_sec": "15–30"
+        },
+        {
+          "format_id": "F05_DA_DAU_CHECKLIST",
+          "format_name_vi": "Checklist: Serum cho da dầu cần có gì?",
+          "core_pattern": "Đưa ra checklist 4–5 tiêu chí chọn serum cho da dầu mụn (ví dụ: có BHA, có Niacinamide, không cồn, texture nhẹ...) → tick từng mục → reveal sản phẩm đáp ứng tất cả ở cuối → soft CTA",
+          "why_it_fits": "Dạng checklist/listicle rất dễ save và có giá trị tham khảo. Audience solution_aware sẽ thấy hữu ích vì đang tìm sản phẩm phù hợp. Sản phẩm xuất hiện cuối cùng một cách tự nhiên sau khi đã xây dựng tiêu chí.",
+          "best_for_outcome": ["save", "learn", "click"],
+          "hook_style_options": [
+            "Question hook: 'Da dầu chọn serum – cần check những gì?'",
+            "List tease: 'Serum cho da dầu mụn phải có 4 thứ này'",
+            "Relatable hook: 'Chọn serum mà không biết check gì thì coi như đánh bạc với da'"
+          ],
+          "product_visibility_mode": "balanced",
+          "production_feasibility": {
+            "score_1_to_5": 5,
+            "why": "Có thể làm hoàn toàn bằng text overlay + voiceover + cầm sản phẩm cuối. Rất đơn giản, không cần diễn xuất.",
+            "requirements": ["1 talent hoặc chỉ cần tay + sản phẩm", "Text overlay rõ ràng (CapCut)", "Lọ sản phẩm cho cảnh reveal cuối"],
+            "risk_flags": ["Nếu checklist quá generic thì mất giá trị edu", "Cần đảm bảo tiêu chí checklist đều dựa trên grounding, không thêm claim mới"]
+          },
+          "native_feel_score_1_to_5": 4,
+          "compliance_safety_score_1_to_5": 4,
+          "caption_overlay_pattern": "Checklist với checkbox tick animation từng mục. Text lớn rõ ràng cho mỗi tiêu chí. Reveal sản phẩm cuối với tên + nồng độ thành phần.",
+          "audio_style_hint": "Voiceover casual đếm từng tiêu chí. Sound effect tick nhẹ. Nhạc nền upbeat nhẹ.",
+          "estimated_duration_range_sec": "25–40"
+        }
+      ],
+      "ranking": [
+        {
+          "format_id": "F01_INGREDIENT_BREAKDOWN",
+          "rank": 1,
+          "overall_score_100": 91,
+          "score_breakdown": {
+            "intent_fit_30": 29,
+            "viewer_outcome_fit_20": 18,
+            "native_feel_20": 19,
+            "production_feasibility_15": 14,
+            "compliance_safety_15": 11
+          },
+          "why_ranked_here": "Trùng khớp gần như hoàn hảo với primary intent (edu + soft product support) và creative angle đã chọn (giải mã thành phần). Nồng độ cụ thể (7% Niacinamide, 0.8% BHA, 4% NAG) tạo giá trị save rất cao. Dễ sản xuất, rủi ro claim thấp vì chỉ trình bày hard facts."
+        },
+        {
+          "format_id": "F02_POV_ROUTINE_MOMENT",
+          "rank": 2,
+          "overall_score_100": 85,
+          "score_breakdown": {
+            "intent_fit_30": 25,
+            "viewer_outcome_fit_20": 17,
+            "native_feel_20": 19,
+            "production_feasibility_15": 14,
+            "compliance_safety_15": 10
+          },
+          "why_ranked_here": "Cân bằng tốt giữa entertainment_relatable và edu. Native feel rất cao vì POV routine là format phổ biến nhất trên TikTok VN skincare. Tận dụng tốt visual provable (dropper, texture). Hơi thiên entertainment hơn edu nên intent fit thấp hơn F01."
+        },
+        {
+          "format_id": "F05_DA_DAU_CHECKLIST",
+          "rank": 3,
+          "overall_score_100": 80,
+          "score_breakdown": {
+            "intent_fit_30": 26,
+            "viewer_outcome_fit_20": 17,
+            "native_feel_20": 15,
+            "production_feasibility_15": 14,
+            "compliance_safety_15": 8
+          },
+          "why_ranked_here": "Rất mạnh về save outcome và edu intent. Dễ sản xuất. Tuy nhiên dạng checklist có thể hơi 'template' và kém native feel hơn F01/F02. Cần cẩn thận để tiêu chí checklist không drift thành claim mới ngoài grounding."
+        },
+        {
+          "format_id": "F03_MYTH_VS_FACT",
+          "rank": 4,
+          "overall_score_100": 76,
+          "score_breakdown": {
+            "intent_fit_30": 24,
+            "viewer_outcome_fit_20": 16,
+            "native_feel_20": 14,
+            "production_feasibility_15": 12,
+            "compliance_safety_15": 10
+          },
+          "why_ranked_here": "Tốt cho comment engagement và edu. Tuy nhiên rủi ro claim drift cao hơn khi phải bẻ myth – dễ vô tình dùng ngôn ngữ mạnh. Cần script review kỹ hơn. Native feel ổn nhưng không bằng ingredient breakdown hay POV routine trên TikTok VN."
+        },
+        {
+          "format_id": "F04_TEXTURE_ASMR_EDU",
+          "rank": 5,
+          "overall_score_100": 72,
+          "score_breakdown": {
+            "intent_fit_30": 20,
+            "viewer_outcome_fit_20": 14,
+            "native_feel_20": 16,
+            "production_feasibility_15": 12,
+            "compliance_safety_15": 10
+          },
+          "why_ranked_here": "Mạnh về stop (scroll-stopping visual) và native feel. Tuy nhiên thiên aesthetic hơn edu – yếu hơn về primary intent education_soft_product_support. Texture không màu của sản phẩm có thể hạn chế visual impact. Phù hợp hơn làm content bổ trợ hơn là video chính."
+        }
+      ],
+      "recommended_top_2_for_step5": [
+        {
+          "format_id": "F01_INGREDIENT_BREAKDOWN",
+          "reason": "Trùng khớp tốt nhất với creative angle đã chọn (giải mã thành phần), tận dụng hard facts về nồng độ (7% Niacinamide, 0.8% BHA, 4% NAG), dễ sản xuất, rủi ro compliance thấp, và tối ưu cho outcome learn + save."
+        },
+        {
+          "format_id": "F02_POV_ROUTINE_MOMENT",
+          "reason": "Bổ trợ tốt cho F01 – thêm yếu tố entertainment_relatable và tận dụng visual provable (texture, dropper). Nếu F01 thiên edu thì F02 cân bằng lại bằng cảm giác đời thường, gần gũi. Có thể dùng song song hoặc chọn 1 tùy creator style."
+        }
+      ],
+      "formats_to_avoid_now": [
+        {
+          "format_name_vi": "Before/After Transformation",
+          "why_not_now": "Không có ảnh before/after thật được cung cấp. Tuyên bố transformation vi phạm constraints_for_downstream và grounding. Rủi ro compliance rất cao."
+        },
+        {
+          "format_name_vi": "Bác sĩ / Chuyên gia review",
+          "why_not_now": "Tone yêu cầu là casual bạn bè, không phải chuyên gia. Dạng dermatologist authority performance bị penalize theo selection rules. Không phù hợp với audience_segment (trẻ, casual) và intent (edu soft, không phải medical authority)."
+        },
+        {
+          "format_name_vi": "So sánh sản phẩm / Battle format",
+          "why_not_now": "Không có dữ liệu so sánh với sản phẩm khác từ nguồn. Mọi comparative claim đều vi phạm forbidden_claim_directions. Non-goal rõ ràng: không định vị vs đối thủ."
+        },
+        {
+          "format_name_vi": "Challenge / Thử thách X ngày",
+          "why_not_now": "Không có dữ liệu timeline kết quả từ nhãn hàng. Cam kết hiệu quả sau X ngày vi phạm efficacy_timeline trong risky_or_regulated. Dễ tạo kỳ vọng sai."
+        }
+      ],
+      "assumptions": [
+        "Video organic/seeding, không phải paid ad – ưu tiên edu value hơn conversion",
+        "1 creator/talent duy nhất, không cần multi-actor",
+        "Quay bằng điện thoại, edit bằng CapCut hoặc tương đương",
+        "Audience đã quen Niacinamide và BHA ở mức cơ bản",
+        "Cocoon đã có độ nhận diện – không cần giới thiệu brand từ đầu",
+        "Không có before/after assets hoặc UGC có sẵn",
+        "Đăng trên TikTok là primary, có thể repurpose sang Reels/Shorts"
+      ]
+    }
+  }

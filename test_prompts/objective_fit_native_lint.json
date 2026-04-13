@@ -1,0 +1,167 @@
+{
+    "hook_pack": {
+      "selected_formats": ["F01_INGREDIENT_BREAKDOWN", "F02_POV_ROUTINE_MOMENT"],
+      "hooks": [
+        {
+          "hook_id": "F01_H01",
+          "format_id": "F01_INGREDIENT_BREAKDOWN",
+          "hook_text_vi": "Da dầu mụn ẩn – bạn đã biết combo 7% Niacinamide và 0.8% BHA chưa?",
+          "hook_type": "pain_point",
+          "first_3s_visual_direction": "Close-up mặt da dầu bóng nhẹ, tay chạm vùng cằm có mụn ẩn li ti, ánh sáng tự nhiên buổi sáng",
+          "angle_statement": "Mở bằng pain point quen thuộc của da dầu, dẫn thẳng vào nồng độ thành phần để tạo curiosity",
+          "product_visibility": "subtle_background",
+          "why_it_should_hold_attention": "Pain point cực kỳ relatable với target audience nữ 18-28 da dầu. Nồng độ cụ thể tạo cảm giác thông tin có giá trị, khác quảng cáo chung chung",
+          "compliance_check": {
+            "risk_level": "low",
+            "passes_grounding": true,
+            "notes": "Dùng 'mụn ẩn' là mô tả tình trạng, không phải claim điều trị. Nồng độ 7% Niacinamide và 0.8% BHA đều từ brief"
+          }
+        },
+        {
+          "hook_id": "F01_H02",
+          "format_id": "F01_INGREDIENT_BREAKDOWN",
+          "hook_text_vi": "7% Niacinamide, 0.8% BHA, 4% NAG – combo này trong một lọ serum bí đao?",
+          "hook_type": "ingredient_tease",
+          "first_3s_visual_direction": "Text overlay lớn hiện nồng độ từng thành phần lần lượt trên nền tối, lọ serum nâu hổ phách mờ phía sau",
+          "angle_statement": "Tease bằng con số nồng độ ngay đầu để thu hút người đã biết skincare cơ bản, tạo tò mò về combo lạ",
+          "product_visibility": "subtle_background",
+          "why_it_should_hold_attention": "Audience solution_aware nhận ra Niacinamide và BHA ngay – nồng độ cụ thể kích thích muốn biết thêm. NAG 4% là yếu tố mới lạ tạo curiosity gap",
+          "compliance_check": {
+            "risk_level": "low",
+            "passes_grounding": true,
+            "notes": "Chỉ liệt kê nồng độ từ brief, không claim hiệu quả. Dạng câu hỏi mở, không khẳng định"
+          }
+        },
+        {
+          "hook_id": "F01_H03",
+          "format_id": "F01_INGREDIENT_BREAKDOWN",
+          "hook_text_vi": "Thâm mụn mãi không mờ – thử kiểm tra serum bạn đang dùng có thiếu gì không",
+          "hook_type": "pain_point",
+          "first_3s_visual_direction": "Tay sờ vùng má có vết thâm nhẹ, biểu cảm hơi buồn rồi nhìn xuống lọ serum trên bàn",
+          "angle_statement": "Pain point thâm sau mụn dẫn vào góc nhìn kiểm tra thành phần – gợi mở không ép",
+          "product_visibility": "subtle_background",
+          "why_it_should_hold_attention": "Thâm mụn là nỗi đau dai dẳng, câu hook gợi ý vấn đề nằm ở thành phần serum – khiến viewer ở lại xem giải thích",
+          "compliance_check": {
+            "risk_level": "low",
+            "passes_grounding": true,
+            "notes": "Dùng 'mờ' thay vì 'hết'. Không cam kết timeline. Chỉ gợi ý kiểm tra, không khẳng định sản phẩm giải quyết"
+          }
+        },
+        {
+          "hook_id": "F01_H04",
+          "format_id": "F01_INGREDIENT_BREAKDOWN",
+          "hook_text_vi": "NAG 4% là gì mà kết hợp với Niacinamide lại hay vậy?",
+          "hook_type": "curiosity_gap",
+          "first_3s_visual_direction": "Text overlay '4% NAG = ?' hiện lớn giữa màn hình, nền trắng sạch, dropper nhỏ giọt serum chảy chậm bên cạnh",
+          "angle_statement": "Dùng thành phần ít người biết (NAG) để tạo curiosity gap, dẫn vào giải thích cơ chế kết hợp",
+          "product_visibility": "natural_use_first",
+          "why_it_should_hold_attention": "Hầu hết audience biết Niacinamide nhưng chưa biết NAG – câu hỏi này kích thích tò mò muốn học thêm, đúng intent edu",
+          "compliance_check": {
+            "risk_level": "low",
+            "passes_grounding": true,
+            "notes": "NAG 4% từ brief. 'Hay' là nhận xét chung, không claim hiệu quả cụ thể. Vai trò combo Niacinamide + NAG có trong brief ingredients"
+          }
+        },
+        {
+          "hook_id": "F01_H05",
+          "format_id": "F01_INGREDIENT_BREAKDOWN",
+          "hook_text_vi": "Lỗ chân lông to, dầu thừa – mình giải thích serum này hỗ trợ cải thiện kiểu gì",
+          "hook_type": "pain_point",
+          "first_3s_visual_direction": "Split screen: bên trái close-up da lỗ chân lông to, bên phải tay cầm lọ serum nâu hổ phách đang xoay nhẹ",
+          "angle_statement": "Double pain point quen thuộc + hứa hẹn giải thích cơ chế, giữ chân viewer bằng giá trị edu",
+          "product_visibility": "natural_use_first",
+          "why_it_should_hold_attention": "Hai concern phổ biến nhất của da dầu. Từ 'hỗ trợ cải thiện' giữ đúng mức claim cho phép mà vẫn đủ hấp dẫn",
+          "compliance_check": {
+            "risk_level": "low",
+            "passes_grounding": true,
+            "notes": "Dùng đúng cụm 'hỗ trợ cải thiện' từ brief. Lỗ chân lông to và dầu thừa đều trong benefits_structured"
+          }
+        },
+        {
+          "hook_id": "F02_H01",
+          "format_id": "F02_POV_ROUTINE_MOMENT",
+          "hook_text_vi": "POV: bước serum tối nay của đứa da dầu mụn ẩn",
+          "hook_type": "pov_visual",
+          "first_3s_visual_direction": "Góc quay first-person nhìn xuống bàn skincare, tay vừa đặt xuống khăn rửa mặt, với sang lọ serum nâu hổ phách",
+          "angle_statement": "POV routine tối quen thuộc, tạo cảm giác intimate và relatable cho target da dầu mụn ẩn",
+          "product_visibility": "natural_use_first",
+          "why_it_should_hold_attention": "POV format native TikTok VN, viewer da dầu tự nhận ra mình ngay. Im lặng 2 giây đầu + visual đẹp giữ scroll",
+          "compliance_check": {
+            "risk_level": "low",
+            "passes_grounding": true,
+            "notes": "Chỉ mô tả routine cá nhân, không claim. 'Đứa da dầu mụn ẩn' là tự mô tả, không phải tuyên bố sản phẩm"
+          }
+        },
+        {
+          "hook_id": "F02_H02",
+          "format_id": "F02_POV_ROUTINE_MOMENT",
+          "hook_text_vi": "Tối nào cũng dùng – serum bí đao mà da dầu thoa không bết rít",
+          "hook_type": "curiosity_gap",
+          "first_3s_visual_direction": "Close-up tay bóp dropper, giọt serum trong suốt rơi xuống lòng bàn tay, ánh đèn vàng ấm",
+          "angle_statement": "Curiosity từ claim cảm nhận cá nhân (không bết rít) kết hợp routine đều đặn – gợi muốn biết tại sao",
+          "product_visibility": "natural_use_first",
+          "why_it_should_hold_attention": "'Không bết rít' là điều da dầu luôn tìm kiếm ở serum – hook chạm đúng tiêu chí chọn sản phẩm của họ",
+          "compliance_check": {
+            "risk_level": "low",
+            "passes_grounding": true,
+            "notes": "Texture lỏng sánh nhẹ từ brief sensory. 'Không bết rít' là mô tả trải nghiệm cá nhân dựa trên texture thực tế, không phải claim y tế"
+          }
+        },
+        {
+          "hook_id": "F02_H03",
+          "format_id": "F02_POV_ROUTINE_MOMENT",
+          "hook_text_vi": "Không voiceover, chỉ quay tay nhỏ serum lên da – xem texture thật nhé",
+          "hook_type": "text_overlay",
+          "first_3s_visual_direction": "Text overlay trắng trên nền tối: câu hook. Ngay sau đó cut sang close-up dropper nhỏ giọt lên mu bàn tay, im lặng",
+          "angle_statement": "Text-first hook tạo kỳ vọng xem visual ASMR, kết hợp POV routine không lời – rất native TikTok",
+          "product_visibility": "natural_use_first",
+          "why_it_should_hold_attention": "Phá vỡ kỳ vọng (không voiceover) tạo curiosity. Viewer muốn ở lại xem texture thật trên da – scroll-stopping bằng visual",
+          "compliance_check": {
+            "risk_level": "low",
+            "passes_grounding": true,
+            "notes": "Không có claim nào. Chỉ mời xem texture thực tế – hoàn toàn visual provable"
+          }
+        },
+        {
+          "hook_id": "F02_H04",
+          "format_id": "F02_POV_ROUTINE_MOMENT",
+          "hook_text_vi": "Da dầu mà dùng serum – nghe ngược đời nhưng mình kể vì sao",
+          "hook_type": "curiosity_gap",
+          "first_3s_visual_direction": "Mặt quay thẳng camera, biểu cảm hơi bí ẩn, tay giơ lọ serum ngang mặt, ánh sáng tự nhiên",
+          "angle_statement": "Đánh vào hiểu lầm phổ biến (da dầu không cần serum) rồi dẫn vào routine moment giải thích",
+          "product_visibility": "balanced",
+          "why_it_should_hold_attention": "Tạo cognitive tension – viewer da dầu sẽ muốn biết lý do. Dạng 'nghe ngược đời nhưng...' rất hiệu quả trên TikTok VN",
+          "compliance_check": {
+            "risk_level": "low",
+            "passes_grounding": true,
+            "notes": "Chia sẻ quan điểm cá nhân, không claim sản phẩm. 'Kể vì sao' là giải thích trải nghiệm, không hứa hẹn kết quả"
+          }
+        },
+        {
+          "hook_id": "F02_H05",
+          "format_id": "F02_POV_ROUTINE_MOMENT",
+          "hook_text_vi": "Rửa mặt xong – bước tiếp theo của mình là lọ này",
+          "hook_type": "text_overlay",
+          "first_3s_visual_direction": "Text overlay xuất hiện trên nền video: tay vừa vỗ khô mặt bằng khăn, camera nhìn xuống bàn skincare có lọ serum nâu hổ phách nổi bật",
+          "angle_statement": "Text-first dẫn vào routine moment tự nhiên, tạo tò mò 'lọ này là gì' mà không cần nói tên sản phẩm ngay",
+          "product_visibility": "natural_use_first",
+          "why_it_should_hold_attention": "Routine moment quen thuộc + mystery nhẹ ('lọ này') giữ viewer ở lại. Text overlay giúp hook ngay cả khi xem không có tiếng",
+          "compliance_check": {
+            "risk_level": "low",
+            "passes_grounding": true,
+            "notes": "Không có claim. Chỉ giới thiệu bước routine cá nhân. Sản phẩm hiện visual nhưng chưa được gọi tên"
+          }
+        }
+      ],
+      "selection_recommendation": {
+        "best_primary_hook_id": "F01_H02",
+        "best_backup_hook_id": "F02_H01",
+        "why": "F01_H02 mở bằng 3 con số nồng độ cụ thể – tạo giá trị edu ngay giây đầu, rất khác biệt so với quảng cáo serum thông thường trên TikTok VN. Audience solution_aware sẽ nhận ra ngay đây là nội dung đáng xem. F02_H01 là backup vì POV routine tối có native feel cực cao, hoạt động tốt nếu audience phản hồi yếu với dạng số liệu – chuyển sang cảm xúc relatable thay thế."
+      },
+      "micro_ab_test_plan": {
+        "test_variants": ["F01_H02 – ingredient tease mở bằng nồng độ", "F02_H01 – POV routine tối im lặng visual-first"],
+        "success_signal": "So sánh retention rate giây 0-3 và tỷ lệ save/impression giữa 2 variant sau 48 giờ đăng",
+        "stop_rule": "Dừng variant có retention 0-3s thấp hơn 15% so với variant còn lại sau 10,000 impressions mỗi bên. Nếu chênh lệch dưới 15%, chạy thêm 24 giờ rồi chọn variant có save rate cao hơn."
+      }
+    }
+  }

@@ -1,0 +1,224 @@
+{
+    "grounding": {
+      "product_identity": {
+        "brand": "The Cocoon Original Vietnam",
+        "product_name_full": "Tinh chất bí đao N7 - Winter Melon Serum N7",
+        "category": "Serum dưỡng da mặt",
+        "size": null
+      },
+      "hard_facts": [
+        {
+          "fact": "Chứa 7% Niacinamide (Vitamin B3)",
+          "source_anchor": "brief.ingredients_highlights"
+        },
+        {
+          "fact": "Chứa 4% Acetyl Glucosamine (NAG)",
+          "source_anchor": "brief.ingredients_highlights"
+        },
+        {
+          "fact": "Chứa 0.8% Salicylic Acid (BHA)",
+          "source_anchor": "brief.ingredients_highlights"
+        },
+        {
+          "fact": "Có chứa chiết xuất bí đao (nồng độ không công bố)",
+          "source_anchor": "brief.ingredients_highlights"
+        },
+        {
+          "fact": "Có chứa Centella CAST (TECA từ rau má, nồng độ không công bố)",
+          "source_anchor": "brief.ingredients_highlights"
+        },
+        {
+          "fact": "Có chứa tinh dầu tràm trà (nồng độ không công bố)",
+          "source_anchor": "brief.ingredients_highlights"
+        },
+        {
+          "fact": "Có chứa Ferulic Acid (nồng độ không công bố)",
+          "source_anchor": "brief.ingredients_highlights"
+        },
+        {
+          "fact": "Không chứa cồn, không sulfate, không dầu khoáng, không paraben",
+          "source_anchor": "brief.free_from"
+        },
+        {
+          "fact": "Dạng dung dịch lỏng, sánh nhẹ, không màu, mùi tinh dầu tràm trà thoang thoảng",
+          "source_anchor": "brief.sensory"
+        },
+        {
+          "fact": "Đóng gói lọ thủy tinh màu nâu hổ phách, dạng dropper",
+          "source_anchor": "brief.visual_facts"
+        },
+        {
+          "fact": "Dùng sáng và tối, 4–6 giọt cho toàn mặt, tránh vùng mắt",
+          "source_anchor": "brief.usage"
+        },
+        {
+          "fact": "Phù hợp cho da dầu, da có mụn ẩn, mụn trứng cá",
+          "source_anchor": "brief.claims_verbatim"
+        }
+      ],
+      "allowed_phrasing_vi": [
+        {
+          "intent": "benefit",
+          "phrase": "Hỗ trợ cải thiện mụn ẩn và mụn đầu đen"
+        },
+        {
+          "intent": "benefit",
+          "phrase": "Giúp kiểm soát dầu thừa"
+        },
+        {
+          "intent": "benefit",
+          "phrase": "Làm mờ vết thâm sau mụn"
+        },
+        {
+          "intent": "benefit",
+          "phrase": "Cung cấp độ ẩm cho da"
+        },
+        {
+          "intent": "benefit",
+          "phrase": "Giúp thông thoáng lỗ chân lông"
+        },
+        {
+          "intent": "benefit",
+          "phrase": "Làm dịu da, giảm các vết đỏ"
+        },
+        {
+          "intent": "benefit",
+          "phrase": "Giúp làm giảm sự xuất hiện của lỗ chân lông to"
+        },
+        {
+          "intent": "ingredient_role",
+          "phrase": "7% Niacinamide hỗ trợ cải thiện mụn và giảm sự xuất hiện của lỗ chân lông to"
+        },
+        {
+          "intent": "ingredient_role",
+          "phrase": "0.8% BHA (Salicylic Acid) thấm vào lỗ chân lông, giúp thông thoáng và cải thiện mụn"
+        },
+        {
+          "intent": "ingredient_role",
+          "phrase": "4% NAG giúp cải thiện độ ẩm và hỗ trợ làm sáng da, đặc biệt khi kết hợp với Niacinamide"
+        },
+        {
+          "intent": "ingredient_role",
+          "phrase": "Chiết xuất bí đao có đặc tính làm mát da"
+        },
+        {
+          "intent": "ingredient_role",
+          "phrase": "Tinh dầu tràm trà có mùi thơm ấm áp, hỗ trợ ngừa mụn trứng cá"
+        },
+        {
+          "intent": "ingredient_role",
+          "phrase": "Ferulic Acid giúp trung hòa gốc tự do và hỗ trợ làm đều màu vết thâm"
+        },
+        {
+          "intent": "ingredient_role",
+          "phrase": "Centella CAST (rau má) liên quan đến việc hỗ trợ tái tạo da"
+        },
+        {
+          "intent": "usage",
+          "phrase": "Dùng sáng và tối, lấy 4–6 giọt xoa nhẹ lên da mặt đã rửa sạch, tránh vùng mắt"
+        },
+        {
+          "intent": "sensory",
+          "phrase": "Kết cấu lỏng nhẹ, thấm nhanh, không nhờn rít"
+        },
+        {
+          "intent": "sensory",
+          "phrase": "Mùi tinh dầu tràm trà thoang thoảng, dễ chịu"
+        },
+        {
+          "intent": "suitability",
+          "phrase": "Phù hợp với da dầu, da có mụn ẩn và vết thâm"
+        },
+        {
+          "intent": "suitability",
+          "phrase": "BHA 0.8% ở nồng độ dịu nhẹ, phù hợp cho da nhạy cảm theo thông tin từ nhãn hàng"
+        }
+      ],
+      "risky_or_regulated": [
+        {
+          "topic": "anti_acne_claim",
+          "why_risky": "Các cụm từ 'giảm mụn', 'trị mụn', 'chữa mụn' hoặc 'ngừa mụn hoàn toàn' mang hàm ý điều trị bệnh lý da liễu, không được phép trong nội dung quảng cáo mỹ phẩm tại Việt Nam.",
+          "safe_reframe_vi": "Dùng: 'hỗ trợ cải thiện tình trạng mụn', 'giúp mụn ẩn xuất hiện ít hơn', 'hỗ trợ ngừa mụn trứng cá'"
+        },
+        {
+          "topic": "collagen_claim",
+          "why_risky": "Nguồn ghi Centella CAST 'giúp tăng sinh collagen cho làn da' nhưng không có bằng chứng lâm sàng được xác nhận trong brief. Không thể tuyên bố tăng sinh collagen có kiểm chứng.",
+          "safe_reframe_vi": "Dùng: 'Rau má chứa các hợp chất liên quan đến quá trình tái tạo da' hoặc 'Centella hỗ trợ phục hồi da'"
+        },
+        {
+          "topic": "uv_protection",
+          "why_risky": "Ferulic Acid được mô tả là 'ngăn ngừa tác hại của tia cực tím' – nếu diễn đạt không cẩn thận có thể bị hiểu là tác dụng chống nắng (sunscreen), vốn yêu cầu chứng nhận SPF riêng.",
+          "safe_reframe_vi": "Dùng: 'Ferulic Acid giúp trung hòa gốc tự do, hỗ trợ bảo vệ da khỏi tác động môi trường' – KHÔNG dùng 'chống nắng' hoặc 'bảo vệ tia UV'"
+        },
+        {
+          "topic": "sensitive_skin_safety",
+          "why_risky": "BHA 0.8% được mô tả là 'dịu nhẹ và an toàn cho da nhạy cảm' theo nguồn nhãn hàng, nhưng không có bằng chứng lâm sàng độc lập xác nhận trong brief. Không thể khẳng định tuyệt đối an toàn cho mọi da nhạy cảm.",
+          "safe_reframe_vi": "Dùng: 'BHA 0.8% ở nồng độ dịu nhẹ, theo nhãn hàng phù hợp cho cả da nhạy cảm – khuyến khích patch test trước'"
+        },
+        {
+          "topic": "efficacy_timeline",
+          "why_risky": "Không có dữ liệu timeline kết quả từ nhãn hàng. Cam kết kết quả trong thời gian cụ thể (ví dụ: '2 tuần mờ thâm') là không có cơ sở và vi phạm quy định.",
+          "safe_reframe_vi": "Không đề cập timeline. Nếu cần: 'Kết quả có thể khác nhau tùy cơ địa mỗi người'"
+        },
+        {
+          "topic": "comparative_claim",
+          "why_risky": "Không có dữ liệu so sánh với sản phẩm khác từ nguồn. Mọi tuyên bố vượt trội so với đối thủ đều không có cơ sở.",
+          "safe_reframe_vi": "Không so sánh. Tập trung vào đặc điểm công thức của sản phẩm này."
+        }
+      ],
+      "forbidden_phrasing_vi": [
+        "Trị mụn dứt điểm",
+        "Chữa mụn",
+        "Điều trị mụn trứng cá",
+        "Trị thâm hoàn toàn",
+        "Chữa lành da",
+        "Tăng sinh collagen (không có dẫn chứng lâm sàng)",
+        "Chống nắng",
+        "Bảo vệ tia UV / SPF",
+        "Kháng khuẩn tuyệt đối",
+        "100% an toàn cho da nhạy cảm",
+        "Cam kết hiệu quả sau X ngày / X tuần",
+        "Tốt hơn [tên sản phẩm khác]",
+        "Số 1 cho da dầu mụn",
+        "Điều trị bệnh da liễu",
+        "Hỗ trợ cải thiện → nâng thành → điều trị / chữa lành"
+      ],
+      "visually_provable_details": [
+        "Lọ thủy tinh màu nâu hổ phách với ống nhỏ giọt (dropper)",
+        "Nhãn sản phẩm song ngữ Tiếng Việt – Tiếng Anh",
+        "Logo và tên thương hiệu: The Cocoon Original Vietnam",
+        "Kết cấu serum lỏng, không màu khi nhỏ giọt ra tay",
+        "Texture thấm nhanh khi thoa lên da (demonstrable on camera)",
+        "Số giọt sử dụng: 4–6 giọt mỗi lần"
+      ],
+      "mandatory_disclaimers_soft_vi": [
+        "Kết quả có thể khác nhau tùy cơ địa và tình trạng da mỗi người.",
+        "Nên patch test trước khi dùng, đặc biệt với da nhạy cảm.",
+        "Sản phẩm hỗ trợ chăm sóc da, không thay thế chỉ định y tế.",
+        "Tránh tiếp xúc trực tiếp với vùng mắt."
+      ],
+      "uncertain_or_needs_evidence": [
+        "Dung tích/size sản phẩm chưa được công bố rõ trong brief.",
+        "Nồng độ chính xác của Centella CAST, Ferulic Acid và chiết xuất bí đao chưa được công bố.",
+        "Hiệu quả tăng sinh collagen từ Centella CAST chưa có xác nhận lâm sàng trong nguồn cung cấp.",
+        "Thứ tự ưu tiên thành phần trong công thức đầy đủ chưa rõ.",
+        "Mức độ 'an toàn cho da nhạy cảm' của BHA 0.8% chưa có bằng chứng lâm sàng độc lập.",
+        "Hiệu quả kháng khuẩn thực tế của tinh dầu tràm trà ở nồng độ trong công thức chưa được xác nhận."
+      ],
+      "downstream_guardrails": {
+        "must_keep_tone": "Thân thiện, gần gũi như bạn bè chia sẻ – casual skincare edu, không giọng chuyên gia, không giọng quảng cáo catalogue. Ngôn ngữ tự nhiên, có thể dùng từ lóng quen thuộc với người dùng trẻ Việt Nam.",
+        "must_avoid": [
+          "Bất kỳ từ nào mang nghĩa điều trị/chữa bệnh da liễu",
+          "Cam kết timeline kết quả cụ thể không có nguồn từ nhãn hàng",
+          "So sánh với sản phẩm hoặc thương hiệu khác",
+          "Tuyên bố collagen có kiểm chứng lâm sàng",
+          "Tuyên bố chống nắng hoặc bảo vệ UV",
+          "Hard CTA ép mua ngay",
+          "Before/after transformation claim không có ảnh thật được cung cấp",
+          "Nâng cấp 'hỗ trợ cải thiện' thành 'điều trị' hoặc 'chữa lành'"
+        ],
+        "claim_strength_rule": "Chỉ dùng ngôn ngữ hỗ trợ/cải thiện (support/improve). Không dùng ngôn ngữ điều trị/chữa khỏi/đảm bảo kết quả. Với thành phần không công bố nồng độ, chỉ mô tả vai trò chức năng chung, không phóng đại.",
+        "cta_rule": "CTA cuối video phải là soft CTA: gợi ý lưu video, thử sản phẩm, hoặc hỏi thêm trong comment. Không dùng CTA ép mua ngay, không dùng ngôn ngữ khan hiếm/urgency giả tạo."
+      }
+    }
+  }

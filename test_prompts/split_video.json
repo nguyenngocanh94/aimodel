@@ -1,0 +1,197 @@
+{
+    "render_pack": {
+      "render_settings": {
+        "aspect_ratio": "9:16",
+        "resolution": "1080x1920",
+        "fps": 24,
+        "duration_rule_sec": "<6",
+        "target_duration_range_sec": "3-5",
+        "num_variants_per_clip": 2
+      },
+      "global_consistency": {
+        "subject_lock": "Young Vietnamese woman age 20-26, natural clear skin, hair clipped up or tied back neatly, minimal makeup, consistent facial features across all clips",
+        "wardrobe_lock": "Plain light-colored or white crew-neck t-shirt, no logos, no patterns, no jewelry except small studs",
+        "environment_lock": "Minimalist skincare desk corner, soft cream or white background, small round mirror and a simple cosmetic tray with 2-3 items, clean and aesthetic but lived-in",
+        "lighting_lock": "Warm white ring light or natural window light from front-left, soft even illumination on face and hands, no harsh shadows, no colored gels, no heavy filtering",
+        "product_lock": "Amber glass dropper bottle with gold or silver cap, clear colorless liquid serum inside, bilingual label visible but never relied upon for readability, consistent bottle shape and size throughout",
+        "camera_lock": "Primarily close-up and medium close-up framing, 9:16 vertical, shallow depth of field, no wide shots, no complex transitions, no camera flips or sudden angle changes, cuts only"
+      },
+      "negative_prompt_en": "no text overlays, no captions, no subtitles, no logos rendered in video, no watermarks, no split screen, no filters, no heavy color grading, no lens flare, no multiple people, no crowds, no children, no pets, no medical imagery, no before-after comparison, no exaggerated expressions, no wide shots, no dutch angle, no shaky cam, no distorted hands, no extra fingers, no facial deformation, no morphing, no surreal elements, no fantasy lighting",
+      "clips": [
+        {
+          "clip_id": "C01",
+          "source_shot_id": "S1",
+          "duration_sec": 4,
+          "prompt_en": "Close-up of a young woman's hand entering frame from below, holding an amber glass dropper bottle, lifting it smoothly to chest height against a soft cream background. Warm ring light reflects on the glass surface. Shallow depth of field with sharp focus on the bottle. 9:16 vertical, cinematic lighting, single hand only.",
+          "camera_move": "slow_push",
+          "action_focus": "Hand lifts amber dropper bottle into frame, slight rotation to show bottle shape",
+          "continuity_tags": ["amber_bottle", "hand_holding", "cream_background", "ring_light_reflection", "hero_product_intro"],
+          "safety_notes": ["Keep finger count correct on holding hand", "Bottle shape must remain consistent amber glass with dropper cap", "No text or label should be generated readable", "Single hand only in frame"]
+        },
+        {
+          "clip_id": "C02",
+          "source_shot_id": "S2",
+          "duration_sec": 5,
+          "prompt_en": "Medium close-up of a young Vietnamese woman with hair clipped back, wearing a plain light-colored t-shirt, talking naturally to camera with a relatable friendly expression. Amber glass dropper bottle sits on the desk in soft-focus foreground. Warm natural window light illuminates her face evenly. Minimal skincare desk setup in background. 9:16 vertical.",
+          "camera_move": "static",
+          "action_focus": "Creator speaks to camera with natural gestures, relatable expression, bottle visible on desk",
+          "continuity_tags": ["creator_face", "talking_to_camera", "bottle_on_desk", "warm_light", "plain_top", "hair_clipped"],
+          "safety_notes": ["Consistent facial features with other clips", "No exaggerated expressions", "Bottle in foreground must stay amber glass shape", "Single person only"]
+        },
+        {
+          "clip_id": "C03",
+          "source_shot_id": "S3",
+          "duration_sec": 4,
+          "prompt_en": "Extreme close-up of a glass dropper hovering above the back of a young woman's hand, releasing 2-3 drops of clear colorless liquid serum. Soft bokeh cream background. Warm lighting highlights the transparent droplets as they land on skin. 9:16 vertical, shallow depth of field, ASMR-style detail shot.",
+          "camera_move": "static",
+          "action_focus": "Dropper releases clear serum drops onto back of hand, visible liquid texture",
+          "continuity_tags": ["dropper_action", "clear_serum", "hand_skin", "bokeh_background", "warm_light", "texture_reveal"],
+          "safety_notes": ["Fingers must be anatomically correct", "Serum must appear as clear colorless liquid", "No colored or opaque liquid", "Dropper shape consistent with amber bottle cap"]
+        },
+        {
+          "clip_id": "C04",
+          "source_shot_id": "S3",
+          "duration_sec": 4,
+          "prompt_en": "Medium close-up of a young Vietnamese woman with hair clipped back, holding an amber glass dropper bottle near face level with one hand, speaking naturally and gesturing lightly with the other hand. Plain light t-shirt, warm ring light, minimalist skincare desk background. 9:16 vertical.",
+          "camera_move": "handheld_light",
+          "action_focus": "Creator holds bottle near face level while explaining, natural hand gestures",
+          "continuity_tags": ["creator_face", "bottle_near_face", "explaining_gesture", "warm_light", "plain_top", "hair_clipped"],
+          "safety_notes": ["Same person as C02", "Bottle shape consistent amber glass", "No readable text generated on bottle", "Natural hand poses only"]
+        },
+        {
+          "clip_id": "C05",
+          "source_shot_id": "S4",
+          "duration_sec": 4,
+          "prompt_en": "Close-up of an amber glass dropper bottle on a clean cream-colored surface, slowly rotating in place. Warm lighting creates soft reflections on the glass. Shallow depth of field, minimalist cosmetic tray partially visible. 9:16 vertical, smooth gentle rotation.",
+          "camera_move": "static",
+          "action_focus": "Amber bottle slowly rotates on clean surface showing its form from different angles",
+          "continuity_tags": ["bottle_rotation", "cream_surface", "warm_reflections", "minimalist_desk", "product_showcase"],
+          "safety_notes": ["Bottle must maintain consistent shape throughout rotation", "No label text should be legibly generated", "No morphing or shape distortion", "Smooth rotation without jitter"]
+        },
+        {
+          "clip_id": "C06",
+          "source_shot_id": "S4",
+          "duration_sec": 3,
+          "prompt_en": "Slight zoom out from the amber dropper bottle on desk revealing the young Vietnamese woman sitting beside it, hair clipped back, plain light t-shirt, gesturing casually toward the bottle as she speaks. Warm ambient light, cream background, minimalist skincare setup. 9:16 vertical.",
+          "camera_move": "slow_push",
+          "action_focus": "Zoom out reveals creator beside bottle, casual gesture toward product",
+          "continuity_tags": ["creator_face", "bottle_on_desk", "casual_gesture", "warm_light", "reveal_transition", "plain_top"],
+          "safety_notes": ["Same person as previous clips", "Bottle stays consistent amber glass shape", "Single person only", "No sudden movements"]
+        },
+        {
+          "clip_id": "C07",
+          "source_shot_id": "S5",
+          "duration_sec": 4,
+          "prompt_en": "First-person POV close-up: a hand holds an amber glass dropper over the opposite open palm, dispensing 4-5 drops of clear colorless serum into the palm. Warm ambient light, vanity mirror edge visible in background. 9:16 vertical, ASMR-style intimate detail shot.",
+          "camera_move": "static",
+          "action_focus": "POV dropper dispensing clear serum drops into open palm",
+          "continuity_tags": ["POV_hands", "dropper_dispensing", "clear_serum_palm", "vanity_mirror", "warm_light", "texture_demo"],
+          "safety_notes": ["Correct finger count on both hands", "Serum must be clear and colorless", "Dropper consistent with amber bottle", "No extra objects appearing"]
+        },
+        {
+          "clip_id": "C08",
+          "source_shot_id": "S5",
+          "duration_sec": 4,
+          "prompt_en": "Close-up of a young woman gently patting clear serum onto her cheek and forehead with fingertips, in front of a small vanity mirror. Serum absorbs quickly into skin showing lightweight texture. Warm ambient light, plain light t-shirt visible at neckline. 9:16 vertical.",
+          "camera_move": "handheld_light",
+          "action_focus": "Fingertips patting serum onto face, visible absorption into skin",
+          "continuity_tags": ["serum_application_face", "patting_motion", "vanity_mirror", "warm_light", "skin_texture", "absorption"],
+          "safety_notes": ["Same person as other clips", "Correct finger anatomy", "No heavy makeup change between clips", "Natural skin appearance, no filter effect"]
+        },
+        {
+          "clip_id": "C09",
+          "source_shot_id": "S6",
+          "duration_sec": 3,
+          "prompt_en": "Medium close-up of the young Vietnamese woman with hair clipped back, plain light t-shirt, looking at camera with a sincere warm expression, slight gentle nod. Same warm lighting and minimalist skincare desk background. 9:16 vertical, calm and reassuring mood.",
+          "camera_move": "static",
+          "action_focus": "Creator looks at camera with sincere expression, gentle nod",
+          "continuity_tags": ["creator_face", "sincere_expression", "gentle_nod", "warm_light", "plain_top", "same_background"],
+          "safety_notes": ["Same person throughout", "No expression exaggeration", "Consistent lighting with previous clips", "No sudden mood shift in visuals"]
+        },
+        {
+          "clip_id": "C10",
+          "source_shot_id": "S7",
+          "duration_sec": 3,
+          "prompt_en": "Medium shot of the young Vietnamese woman smiling warmly, making a casual small wave or pointing-down gesture. Amber glass dropper bottle visible on the desk beside her. Hair clipped back, plain light t-shirt, same warm lighting and minimalist skincare background. 9:16 vertical, friendly closing mood.",
+          "camera_move": "static",
+          "action_focus": "Creator smiles and makes friendly closing gesture, bottle visible on desk",
+          "continuity_tags": ["creator_face", "smile", "wave_gesture", "bottle_on_desk", "warm_light", "closing_shot", "plain_top"],
+          "safety_notes": ["Same person as all clips", "Bottle consistent amber glass", "No extra people entering frame", "Natural hand gesture only"]
+        }
+      ],
+      "assembly_map": [
+        {
+          "clip_id": "C01",
+          "target_beat_id": "B1",
+          "order_index": 1
+        },
+        {
+          "clip_id": "C02",
+          "target_beat_id": "B2",
+          "order_index": 2
+        },
+        {
+          "clip_id": "C03",
+          "target_beat_id": "B3",
+          "order_index": 3
+        },
+        {
+          "clip_id": "C04",
+          "target_beat_id": "B3",
+          "order_index": 4
+        },
+        {
+          "clip_id": "C05",
+          "target_beat_id": "B4",
+          "order_index": 5
+        },
+        {
+          "clip_id": "C06",
+          "target_beat_id": "B4",
+          "order_index": 6
+        },
+        {
+          "clip_id": "C07",
+          "target_beat_id": "B5",
+          "order_index": 7
+        },
+        {
+          "clip_id": "C08",
+          "target_beat_id": "B5",
+          "order_index": 8
+        },
+        {
+          "clip_id": "C09",
+          "target_beat_id": "B6",
+          "order_index": 9
+        },
+        {
+          "clip_id": "C10",
+          "target_beat_id": "B7",
+          "order_index": 10
+        }
+      ],
+      "qc_gate": {
+        "must_pass": [
+          "no distorted hands/fingers",
+          "no facial deformation",
+          "product shape stays amber dropper bottle consistently",
+          "no random text artifacts or gibberish rendered in video",
+          "stable lighting continuity across all clips",
+          "same person identity maintained across all clips",
+          "serum liquid appears clear and colorless in all dropper/application shots",
+          "wardrobe stays plain light-colored t-shirt throughout"
+        ],
+        "reject_if": [
+          "clip duration >= 6s",
+          "extra people appear in any clip",
+          "logo or text becomes readable generated content in video frames",
+          "heavy flicker or frame jitter detected",
+          "bottle shape morphs or changes between clips",
+          "skin tone or lighting shifts dramatically between consecutive clips",
+          "complex choreography or unnatural body movements appear",
+          "any medical device or clinical setting appears"
+        ]
+      }
+    }
+  }

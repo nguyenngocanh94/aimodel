@@ -1,0 +1,53 @@
+{
+    "intent_pack": {
+      "primary_intent": "education_soft_product_support",
+      "secondary_intent": "entertainment_relatable",
+      "viewer_outcome_primary": "learn",
+      "viewer_outcome_secondary": ["save", "comment"],
+      "platform_hypothesis": {
+        "primary_platform": "tiktok",
+        "secondary_platforms": ["instagram_reels", "youtube_shorts"],
+        "reasoning": "Đối tượng mục tiêu là người dùng trẻ, da dầu, quan tâm mụn – phân khúc rất active trên TikTok Vietnam. Nội dung giải thích thành phần (Niacinamide, BHA, NAG) phù hợp format skincare edu ngắn đang viral. Instagram Reels phù hợp aesthetic dropper bottle. YouTube Shorts phù hợp nếu muốn đẩy nội dung dài hơn giải thích ingredient."
+      },
+      "audience_segment_focus": {
+        "core_segment": "Nữ 18–28 tuổi, da dầu, đang bị mụn ẩn hoặc vết thâm sau mụn, đã biết khái niệm serum và skincare cơ bản nhưng chưa rõ vai trò từng thành phần",
+        "awareness_level": "solution_aware",
+        "purchase_temperature": "warm"
+      },
+      "message_strategy": {
+        "creative_angle": "Giải mã thành phần – 'Tại sao serum bí đao này lại hợp với da dầu mụn hơn bạn nghĩ': dẫn dắt bằng pain point quen thuộc (mụn ẩn, thâm lì), rồi giải thích ngắn gọn cơ chế từng thành phần chủ đạo (7% Niacinamide, 0.8% BHA, NAG 4%) theo ngôn ngữ casual – không lên lớp, không quảng cáo.",
+        "product_visibility": "natural_use_first",
+        "hard_sell_level": "low"
+      },
+      "tone_and_style_constraints": {
+        "tone": "Thân thiện, gần gũi như bạn bè chia sẻ – không phải chuyên gia, không phải quảng cáo. Nói chuyện tự nhiên, thỉnh thoảng dùng từ lóng quen thuộc (ví dụ: 'da dầu bết', 'mụn ẩn li ti', 'thâm mãi không bay').",
+        "style": "Skincare edu casual – dạng 'ingredient breakdown' ngắn, có thể kết hợp text overlay để highlight nồng độ thành phần. Hình ảnh ưu tiên dropper và texture serum trên da thật.",
+        "avoid": [
+          "Giọng điệu quảng cáo cứng, đọc tính năng như catalogue",
+          "Từ ngữ y tế hoặc hứa hẹn điều trị",
+          "So sánh với sản phẩm khác",
+          "Cam kết timeline kết quả cụ thể",
+          "Phong cách review dạng 'chấm điểm' cứng nhắc"
+        ]
+      },
+      "non_goals": [
+        "Không nhằm tạo chuyển đổi mua ngay (hard CTA) trong video này",
+        "Không nhằm định vị thương hiệu Cocoon so với đối thủ",
+        "Không nhằm giáo dục toàn bộ skincare routine – chỉ tập trung sản phẩm này",
+        "Không tạo cảm giác sản phẩm chữa được mụn hoàn toàn"
+      ],
+      "success_criteria_for_next_steps": [
+        "Hook trong 3 giây đầu phải chạm đúng pain point: mụn ẩn hoặc thâm – đo bằng retention rate giây 0–3",
+        "Ít nhất một thành phần chính (Niacinamide hoặc BHA) được giải thích đủ để viewer hiểu lý do dùng – đo bằng comment hỏi thêm về thành phần",
+        "Video không chứa bất kỳ claim nào vi phạm constraints_for_downstream của brief",
+        "Tỷ lệ save cao hơn share – chỉ số phù hợp với nội dung edu có giá trị tham khảo lâu dài",
+        "CTA cuối video là soft: gợi ý lưu/thử, không ép mua"
+      ],
+      "assumptions": [
+        "Giả định đây là video organic hoặc seeding, không phải paid ad – nên ưu tiên edu thay vì hard-sell",
+        "Giả định không có before/after ảnh thật của người dùng được cung cấp – tránh dùng dạng transformation claim",
+        "Giả định audience đã quen với khái niệm Niacinamide (phổ biến trên TikTok VN) nên có thể đề cập trực tiếp không cần giải thích từ đầu",
+        "Giả định Cocoon là thương hiệu nội địa có độ nhận diện tốt tại thị trường Việt – không cần giới thiệu brand từ đầu"
+      ]
+    }
+  }
