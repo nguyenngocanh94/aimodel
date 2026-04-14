@@ -82,7 +82,7 @@ Core idea in plan:
 1. Re-run Step 4/5 prompts with anti-ad + twist-heavy constraints.
 2. Add explicit novelty/tension gates in Step 6.
 3. Regenerate Step 7 with forced beat structure:
-   - Hook -> Friction -> Reframe/Twist -> Payoff -> Soft CTA.
+  - Hook -> Friction -> Reframe/Twist -> Payoff -> Soft CTA.
 4. Convert Step 7 to Step 7.5 micro-clips (`< 6s`) for video API.
 5. Run Step 8 packaging after render candidates are selected.
 
@@ -92,3 +92,4 @@ Core idea in plan:
 - Keep soft CTA policy.
 - Avoid relying on readable label text in generated clips.
 - Prioritize creator-native messiness and conflict-driven hooks for TikTok/Reels.
+
