@@ -151,10 +151,31 @@ edit-audio-caption-finalizer
 }
 ```
 
-### Dual output
+### Provider-neutral output
 
-- **Human view:** The scenes read as a shot list — you can visualize the video scene by scene. "Scene 1: close-up of her holding the bottle, skeptical face. Scene 2: dropper releasing serum onto palm, macro shot."
-- **Agent view:** Each scene has a concrete `visual_prompt_en` that video generation API can convert directly to API calls, plus `cast_reference` for continuity.
+Shot-compiler outputs **provider-neutral clip specs**. The `prompt_en` field describes the scene in plain English — what to show, how to frame it, what the cast looks like. This does NOT change when you switch video API providers.
+
+A separate **prompt-enhancer** node downstream translates these neutral specs into API-specific optimized prompts for the target provider (Runway, Kling, Hailuo, Sora, etc.).
+
+```
+shot-compiler → neutral clip spec (stable across providers)
+    ↓
+prompt-enhancer → API-specific optimized prompt
+    ↓
+VIDEO GENERATION API (Runway / Kling / Hailuo / Sora)
+```
+
+This means:
+- Shot-compiler handles creative decisions (what to show, how to frame). Doesn't change per provider.
+- Prompt-enhancer handles technical optimization (how to ask this specific API). Changes per provider.
+- When a new provider comes out, you write one new prompt-enhancer adapter. All upstream nodes stay untouched.
+
+See `docs/plans/2026-04-15-prompt-enhancer-framework.md` for the prompt-enhancer node design.
+
+### Dual view
+
+- **Human view:** The clips read as a shot list — you can visualize the video clip by clip. "Clip 1: close-up of her holding the bottle, skeptical face. Clip 2: dropper releasing serum onto palm, macro shot."
+- **Agent view:** Each clip has a concrete `prompt_en`, `continuity_tags`, `safety_notes`, and `cast` references in `global_consistency`. Prompt-enhancer reads these to generate the final API prompt.
 
 ## 4. Config Knobs
 
