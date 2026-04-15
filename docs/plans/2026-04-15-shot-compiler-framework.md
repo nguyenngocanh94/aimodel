@@ -5,23 +5,27 @@
 
 ## 1. Purpose & Pipeline Position
 
-Shot-compiler sits after casting and before native-edit-grammar. It receives the human-approved story/beats/mood moments AND the cast identity (virtual model, wardrobe, environment) and writes scene-by-scene production scripts.
+Shot-compiler sits after casting and directly before the video generation API call. It is the **last node before video generation**. It receives the human-approved story/beats/mood moments AND the cast identity (virtual model, wardrobe, environment) and produces API-ready micro-clips.
 
 ```
 story-writer / beat-planner / mood-sequencer
     ↓
-ad-likeness-lint
+[HUMAN GATE]
     ↓
 casting  ← selects virtual model, wardrobe, environment
     ↓
-shot-compiler  ← THIS NODE: writes scene scripts referencing the cast
+shot-compiler  ← THIS NODE: produces API-ready clips
     ↓
-native-edit-grammar
+VIDEO GENERATION API
     ↓
-render-spec-compiler
+assembly
+    ↓
+edit-audio-caption-finalizer
 ```
 
-**Purpose:** Translate each moment into one or more concrete scenes with visual direction, camera behavior, voiceover text, on-screen text, and SFX hints — all referencing the specific cast identity. The output is the production script that render-spec-compiler converts into API-ready micro-clips.
+**Purpose:** Translate each moment into one or more API-ready micro-clips (<6s each) with English visual prompts, negative prompts, camera behavior, voiceover text, on-screen text, SFX hints, continuity rules, and QC gate criteria — all referencing the specific cast identity. This node merges the former shot-compiler and video generation API into one step.
+
+**Why merged:** The original pipeline had shot-compiler writing scene scripts and video generation API converting them to API format. In practice, video generation API was mostly mechanical (split >6s scenes, add negative prompts, set resolution). Merging reduces complexity — one node goes from moment to API-ready clip directly.
 
 **Key distinction from story/beat/mood nodes:** Those nodes decide WHAT happens (narrative). This node decides HOW it looks (production). The story says "character tries serum reluctantly." The shot-compiler says "medium close-up, she holds the bottle skeptically, dropper hovers over palm, ring light warm, cut to close-up of serum drops landing on skin."
 
@@ -96,31 +100,52 @@ render-spec-compiler
 
 ```json
 {
-  "scene_pack": {
-    "scenes": [
+  "clip_pack": {
+    "render_settings": {
+      "aspect_ratio": "9:16",
+      "resolution": "1080x1920",
+      "fps": 24,
+      "duration_rule_sec": "<6",
+      "num_variants_per_clip": 2
+    },
+    "global_consistency": {
+      "subject_lock": "string — from cast.subject_profile",
+      "wardrobe_lock": "string — from cast.wardrobe",
+      "environment_lock": "string — from cast.environment",
+      "lighting_lock": "string — from cast.lighting",
+      "product_lock": "string — from cast.product_identity_lock"
+    },
+    "negative_prompt_en": "string — things to exclude from all clips",
+    "clips": [
       {
-        "scene_id": "string",
-        "moment_id": "string — which moment this scene serves",
+        "clip_id": "string",
+        "moment_id": "string — which moment this clip serves",
         "duration_sec": 0,
         "camera": "string — framing, angle, movement",
+        "camera_move": "static | slow_push | handheld_light | tilt_light",
         "action": "string — what happens visually",
-        "visual_prompt_en": "string — English prompt for video generation API",
+        "prompt_en": "string — English prompt for video generation API",
         "voiceover_vi": "string|null — Vietnamese voiceover text if any",
         "on_screen_text_vi": "string|null — text overlays if any",
         "sfx_music_hint": "string — audio direction",
         "product_visibility": "absent | subtle_background | natural_use | hero_moment",
-        "cast_reference": {
-          "subject": "string — reference to cast.subject_profile",
-          "wardrobe": "string — reference to cast.wardrobe",
-          "environment": "string — reference to cast.environment"
-        },
+        "continuity_tags": ["string — tags for cross-clip consistency checking"],
+        "safety_notes": ["string — what to watch for in generated output"],
         "compliance_note": "string|null",
         "fallback_if_generation_fails": "string — simpler alternative"
       }
     ],
-    "continuity_rules": [
-      "string — rules that must hold across all scenes"
+    "assembly_map": [
+      {
+        "clip_id": "string",
+        "moment_id": "string",
+        "order_index": 0
+      }
     ],
+    "qc_gate": {
+      "must_pass": ["string — e.g. no distorted hands, product shape consistent"],
+      "reject_if": ["string — e.g. clip >= 6s, extra people appear"]
+    },
     "total_duration_sec": 0
   }
 }
@@ -129,7 +154,7 @@ render-spec-compiler
 ### Dual output
 
 - **Human view:** The scenes read as a shot list — you can visualize the video scene by scene. "Scene 1: close-up of her holding the bottle, skeptical face. Scene 2: dropper releasing serum onto palm, macro shot."
-- **Agent view:** Each scene has a concrete `visual_prompt_en` that render-spec-compiler can convert directly to API calls, plus `cast_reference` for continuity.
+- **Agent view:** Each scene has a concrete `visual_prompt_en` that video generation API can convert directly to API calls, plus `cast_reference` for continuity.
 
 ## 4. Config Knobs
 
@@ -195,14 +220,14 @@ The node does not read the raw brief. It reads:
 | Downstream node | What scenes control |
 |---|---|
 | native-edit-grammar | Reads scene durations, energy levels, transition hints to set edit rhythm |
-| render-spec-compiler | Reads `visual_prompt_en`, duration, camera, cast_reference to create API-ready micro-clips |
+| video generation API | Reads `visual_prompt_en`, duration, camera, cast_reference to create API-ready micro-clips |
 | edit-audio-caption-finalizer | Reads `voiceover_vi`, `on_screen_text_vi`, `sfx_music_hint` for audio/caption packaging |
 
 ## 7. Anti-patterns from Cocoon experiment
 
 ### AP1: Shots over-specified, leaving no room for downstream creativity
 
-The Cocoon shots included exact camera angles, exact text overlay content, exact SFX timing. This made render-spec-compiler a pure mechanical translator with no creative room. If the video model couldn't render the exact shot, the fallback was a static card.
+The Cocoon shots included exact camera angles, exact text overlay content, exact SFX timing. This made video generation API a pure mechanical translator with no creative room. If the video model couldn't render the exact shot, the fallback was a static card.
 
 **Fix:** `creative_space` field in moments gives shot-compiler room. And shot-compiler's `visual_prompt_en` is a direction, not a pixel-perfect specification.
 
@@ -228,11 +253,11 @@ The Cocoon experiment described "a young Vietnamese woman" in every shot indepen
 
 | Vibe dimension | What it sets | Who reads it downstream |
 |---|---|---|
-| `scene_sequence` | Ordered scenes with visual specs | render-spec-compiler (API calls), native-edit-grammar (pacing) |
+| `scene_sequence` | Ordered scenes with visual specs | video generation API (API calls), native-edit-grammar (pacing) |
 | `voiceover_text_sequence` | VO text per scene | edit-audio-caption-finalizer |
 | `text_overlay_sequence` | On-screen text per scene | edit-audio-caption-finalizer |
 | `audio_hints` | SFX and music direction per scene | edit-audio-caption-finalizer |
-| `continuity_rules` | What must stay consistent across all scenes | render-spec-compiler (consistency enforcement) |
+| `continuity_rules` | What must stay consistent across all scenes | video generation API (consistency enforcement) |
 
 ---
 
