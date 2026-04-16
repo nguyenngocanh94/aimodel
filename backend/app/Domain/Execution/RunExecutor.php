@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace App\Domain\Execution;
 
 use App\Domain\Nodes\Exceptions\ReviewPendingException;
+use App\Domain\Nodes\HumanProposal;
+use App\Domain\Nodes\HumanResponse;
 use App\Domain\Nodes\NodeExecutionContext;
+use App\Domain\Nodes\NodeTemplate;
 use App\Domain\Nodes\NodeTemplateRegistry;
 use App\Domain\Providers\ProviderRouter;
 use App\Domain\RunTrigger;
 use App\Events\NodeStatusChanged;
 use App\Models\ExecutionRun;
 use App\Models\NodeRunRecord;
+use App\Models\PendingInteraction;
 use App\Services\ArtifactStoreContract;
 
 final class RunExecutor
@@ -108,6 +112,13 @@ final class RunExecutor
                 'started_at' => now(),
             ]);
 
+            if ($template->needsHumanLoop()) {
+                $this->executeHumanLoop($run, $node, $template, $document, $nodeMap, $nodeRunRecords, $record);
+                // Node returned awaitingHuman — stop the pipeline
+                // resume() will continue it later
+                return;
+            }
+
             try {
                 // Resolve inputs
                 $inputResult = $this->inputResolver->resolve(
@@ -189,6 +200,7 @@ final class RunExecutor
                 $nodeRunRecords[$nodeId] = $record->fresh()->toArray();
 
             } catch (ReviewPendingException $e) {
+                // Legacy: HumanGateTemplate still throws this
                 // Store input payloads for review context
                 $inputArrays = array_map(
                     fn ($p) => is_array($p) ? $p : $p->toArray(),
@@ -204,77 +216,13 @@ final class RunExecutor
 
                 $run->update(['status' => 'awaitingReview']);
 
-                // Broadcast awaitingReview status
                 broadcast(new \App\Events\NodeStatusChanged(
                     runId: $run->id,
                     nodeId: $nodeId,
                     status: 'awaitingReview',
                 ));
 
-                // For HumanGate nodes: stop execution here, resume via webhook/API
-                $nodeType = $node['type'] ?? '';
-                if ($nodeType === 'humanGate') {
-                    return; // Exit execution — webhook will re-dispatch when response arrives
-                }
-
-                // For legacy ReviewCheckpoint: poll synchronously
-                $pollResult = $this->pollForReviewDecision($run->id, $nodeId);
-
-                if ($pollResult['cancelled']) {
-                    // Run was cancelled during review - break to let deriveTerminalStatus handle it
-                    break;
-                }
-
-                if ($pollResult['timedOut']) {
-                    // Auto-reject after timeout
-                    $record->update([
-                        'status' => 'error',
-                        'error_message' => 'Review timeout - auto-rejected after 1 hour',
-                        'completed_at' => now(),
-                        'output_payloads' => [
-                            'decision' => 'reject',
-                            'reason' => 'reviewTimeout',
-                            'timedOutAt' => now()->toIso8601String(),
-                        ],
-                    ]);
-                    $nodeRunRecords[$nodeId] = $record->fresh()->toArray();
-                    broadcast(new \App\Events\NodeStatusChanged(
-                        runId: $run->id,
-                        nodeId: $nodeId,
-                        status: 'error',
-                        errorMessage: 'Review timeout - auto-rejected after 1 hour',
-                    ));
-                    continue;
-                }
-
-                if ($pollResult['rejected']) {
-                    // Review rejected
-                    $record->update([
-                        'status' => 'error',
-                        'error_message' => 'Review rejected by user',
-                        'completed_at' => now(),
-                    ]);
-                    $nodeRunRecords[$nodeId] = $record->fresh()->toArray();
-                    broadcast(new \App\Events\NodeStatusChanged(
-                        runId: $run->id,
-                        nodeId: $nodeId,
-                        status: 'error',
-                        errorMessage: 'Review rejected by user',
-                    ));
-                    continue;
-                }
-
-                // Review approved - extract decision from output_payloads and continue
-                $record->refresh();
-                $outputArrays = $record->output_payloads ?? [];
-                $nodeRunRecords[$nodeId] = $record->toArray();
-
-                broadcast(new \App\Events\NodeStatusChanged(
-                    runId: $run->id,
-                    nodeId: $nodeId,
-                    status: 'success',
-                    outputPayloads: $outputArrays,
-                ));
+                return; // Exit execution — webhook will re-dispatch when response arrives
 
             } catch (\Throwable $e) {
                 $record->update([
@@ -323,52 +271,191 @@ final class RunExecutor
     }
 
     /**
-     * Poll for review decision on a node.
-     *
-     * @return array{cancelled: bool, timedOut: bool, rejected: bool}
+     * Resume execution after a human responds to a proposal.
+     * Called by the webhook handler when a human response arrives.
      */
-    private function pollForReviewDecision(string $runId, string $nodeId): array
+    public function resume(string $runId, string $nodeId, HumanResponse $response): void
     {
-        $timeoutAt = now()->addHour();
-        $pollIntervalSeconds = 2;
+        $run = ExecutionRun::findOrFail($runId);
+        $document = $run->document_snapshot ?? $run->workflow->document;
 
-        while (now()->lt($timeoutAt)) {
-            // Check if run was cancelled
-            $run = ExecutionRun::find($runId);
-            if ($run === null || $run->status === 'cancelled') {
-                return ['cancelled' => true, 'timedOut' => false, 'rejected' => false];
-            }
+        // Find the pending interaction
+        $pending = PendingInteraction::where('run_id', $runId)
+            ->where('node_id', $nodeId)
+            ->waiting()
+            ->latest()
+            ->firstOrFail();
 
-            // Check node status
-            $record = NodeRunRecord::where('run_id', $runId)
-                ->where('node_id', $nodeId)
-                ->first();
+        // Find the node run record
+        $record = NodeRunRecord::where('run_id', $runId)
+            ->where('node_id', $nodeId)
+            ->firstOrFail();
 
-            if ($record === null) {
-                // Record deleted - treat as cancelled
-                return ['cancelled' => true, 'timedOut' => false, 'rejected' => false];
-            }
-
-            if ($record->status === 'success') {
-                // Approved
-                return ['cancelled' => false, 'timedOut' => false, 'rejected' => false];
-            }
-
-            if ($record->status === 'error') {
-                // Rejected
-                return ['cancelled' => false, 'timedOut' => false, 'rejected' => true];
-            }
-
-            if ($record->status !== 'awaitingReview') {
-                // Unexpected status - treat as cancelled
-                return ['cancelled' => true, 'timedOut' => false, 'rejected' => false];
-            }
-
-            // Still awaiting review - wait and poll again
-            sleep($pollIntervalSeconds);
+        // Build node map
+        $nodeMap = [];
+        foreach ($document['nodes'] ?? [] as $node) {
+            $nodeMap[$node['id']] = $node;
         }
 
-        // Timeout reached
-        return ['cancelled' => false, 'timedOut' => true, 'rejected' => false];
+        $node = $nodeMap[$nodeId] ?? null;
+        if ($node === null) {
+            throw new \RuntimeException("Node {$nodeId} not found in workflow document");
+        }
+
+        $template = $this->registry->get($node['type'] ?? '');
+        if ($template === null) {
+            throw new \RuntimeException("Unknown node type: {$node['type']}");
+        }
+
+        // Rebuild inputs from the saved input_payloads on the record
+        $savedInputs = $record->input_payloads ?? [];
+        $inputs = [];
+        foreach ($savedInputs as $key => $payloadArr) {
+            $inputs[$key] = \App\Domain\PortPayload::fromArray($payloadArr);
+        }
+
+        $ctx = new NodeExecutionContext(
+            nodeId: $nodeId,
+            config: $node['data']['config'] ?? $node['config'] ?? [],
+            inputs: $inputs,
+            runId: $runId,
+            providerRouter: $this->providerRouter,
+            artifactStore: $this->artifactStore,
+        );
+
+        // Mark the old pending interaction as responded
+        $pending->markResponded($response->toArray());
+
+        try {
+            $result = $template->handleResponse($ctx, $response);
+        } catch (\Throwable $e) {
+            $record->update([
+                'status' => 'error',
+                'error_message' => $e->getMessage(),
+                'completed_at' => now(),
+            ]);
+            $run->update(['status' => 'error', 'completed_at' => now()]);
+            return;
+        }
+
+        if ($result instanceof HumanProposal) {
+            // Loop: save new pending interaction, stay in awaitingHuman
+            $this->savePendingInteraction($run, $nodeId, $result, $savedInputs);
+
+            broadcast(new \App\Events\NodeStatusChanged(
+                runId: $runId,
+                nodeId: $nodeId,
+                status: 'awaitingHuman',
+            ));
+            return;
+        }
+
+        // Complete: save outputs and continue pipeline
+        $outputArrays = [];
+        foreach ($result as $key => $payload) {
+            $outputArrays[$key] = is_array($payload) ? $payload : $payload->toArray();
+        }
+
+        $record->update([
+            'status' => 'success',
+            'output_payloads' => $outputArrays,
+            'completed_at' => now(),
+        ]);
+
+        broadcast(new \App\Events\NodeStatusChanged(
+            runId: $runId,
+            nodeId: $nodeId,
+            status: 'success',
+            outputPayloads: $outputArrays,
+        ));
+
+        // Continue executing remaining pipeline nodes
+        $this->continueAfterResume($run);
+    }
+
+    private function executeHumanLoop(
+        ExecutionRun $run,
+        array $node,
+        NodeTemplate $template,
+        array $document,
+        array $nodeMap,
+        array &$nodeRunRecords,
+        NodeRunRecord $record,
+    ): void {
+        // Resolve inputs (same as normal execution)
+        $inputResult = $this->inputResolver->resolve($node, $template, $document, $nodeRunRecords);
+
+        if (!$inputResult['ok']) {
+            $record->update([
+                'status' => 'error',
+                'error_message' => $inputResult['reason'] ?? 'Input resolution failed',
+                'blocked_by_node_ids' => $inputResult['blockedBy'] ?? [],
+                'completed_at' => now(),
+            ]);
+            $nodeRunRecords[$node['id']] = $record->fresh()->toArray();
+            return;
+        }
+
+        $inputs = $inputResult['inputs'] ?? [];
+
+        $ctx = new NodeExecutionContext(
+            nodeId: $node['id'],
+            config: $node['data']['config'] ?? $node['config'] ?? [],
+            inputs: $inputs,
+            runId: $run->id,
+            providerRouter: $this->providerRouter,
+            artifactStore: $this->artifactStore,
+        );
+
+        try {
+            $proposal = $template->propose($ctx);
+        } catch (\Throwable $e) {
+            $record->update([
+                'status' => 'error',
+                'error_message' => $e->getMessage(),
+                'completed_at' => now(),
+            ]);
+            $nodeRunRecords[$node['id']] = $record->fresh()->toArray();
+            return;
+        }
+
+        $this->savePendingInteraction($run, $node['id'], $proposal, $inputs);
+
+        $record->update([
+            'status' => 'awaitingHuman',
+            'input_payloads' => array_map(fn ($p) => is_array($p) ? $p : $p->toArray(), $inputs),
+            'completed_at' => null,
+        ]);
+        $nodeRunRecords[$node['id']] = $record->fresh()->toArray();
+
+        $run->update(['status' => 'awaitingHuman']);
+
+        broadcast(new \App\Events\NodeStatusChanged(
+            runId: $run->id,
+            nodeId: $node['id'],
+            status: 'awaitingHuman',
+        ));
+    }
+
+    private function savePendingInteraction(
+        ExecutionRun $run,
+        string $nodeId,
+        HumanProposal $proposal,
+        array $inputs,
+    ): PendingInteraction {
+        return PendingInteraction::create([
+            'run_id' => $run->id,
+            'node_id' => $nodeId,
+            'channel' => $proposal->channel,
+            'status' => 'waiting',
+            'proposal_payload' => $proposal->toArray(),
+            'node_state' => $proposal->state,
+        ]);
+    }
+
+    private function continueAfterResume(ExecutionRun $run): void
+    {
+        $run->update(['status' => 'running']);
+        $this->execute($run); // Re-enters execute() — already-completed nodes are skipped
     }
 }
