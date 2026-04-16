@@ -46,4 +46,30 @@ class NodeTemplateRegistry
             ];
         }, $this->templates));
     }
+
+    /**
+     * Collect planner guides from all registered templates.
+     *
+     * @return array<string, NodeGuide>
+     */
+    public function guides(): array
+    {
+        return array_map(
+            fn (NodeTemplate $t) => $t->plannerGuide(),
+            $this->templates,
+        );
+    }
+
+    /**
+     * All guides as concatenated YAML — ready for planner context injection.
+     */
+    public function guidesYaml(): string
+    {
+        $sections = array_map(
+            fn (NodeGuide $g) => $g->toYaml(),
+            $this->guides(),
+        );
+
+        return implode("\n---\n\n", $sections);
+    }
 }

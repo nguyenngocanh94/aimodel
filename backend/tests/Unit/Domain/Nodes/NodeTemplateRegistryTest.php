@@ -7,6 +7,7 @@ namespace Tests\Unit\Domain\Nodes;
 use App\Domain\DataType;
 use App\Domain\NodeCategory;
 use App\Domain\Nodes\NodeExecutionContext;
+use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplate;
 use App\Domain\Nodes\NodeTemplateRegistry;
 use App\Domain\PortDefinition;
@@ -122,5 +123,37 @@ final class NodeTemplateRegistryTest extends TestCase
 
         $this->assertCount(1, $this->registry->all());
         $this->assertSame($t2, $this->registry->get('node-a'));
+    }
+
+    #[Test]
+    public function guides_returns_all_node_guides_keyed_by_type(): void
+    {
+        $this->registry->register($this->createMockTemplate('node-a'));
+        $this->registry->register($this->createMockTemplate('node-b'));
+
+        $guides = $this->registry->guides();
+
+        $this->assertIsArray($guides);
+        $this->assertCount(2, $guides);
+        foreach ($guides as $type => $guide) {
+            $this->assertInstanceOf(NodeGuide::class, $guide);
+            $this->assertSame($type, $guide->nodeId);
+        }
+    }
+
+    #[Test]
+    public function guides_yaml_returns_concatenated_yaml(): void
+    {
+        $this->registry->register($this->createMockTemplate('node-a'));
+        $this->registry->register($this->createMockTemplate('node-b'));
+
+        $yaml = $this->registry->guidesYaml();
+
+        $this->assertIsString($yaml);
+        // Should contain the separator between node cards
+        $this->assertStringContainsString('---', $yaml);
+        // Should contain both node IDs
+        $this->assertStringContainsString('node-a', $yaml);
+        $this->assertStringContainsString('node-b', $yaml);
     }
 }
