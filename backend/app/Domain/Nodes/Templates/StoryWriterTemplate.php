@@ -10,8 +10,12 @@ use App\Domain\NodeCategory;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
+use App\Domain\Nodes\GuideKnob;
+use App\Domain\Nodes\GuidePort;
 use App\Domain\Nodes\NodeExecutionContext;
+use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplate;
+use App\Domain\Nodes\VibeImpact;
 
 class StoryWriterTemplate extends NodeTemplate
 {
@@ -64,6 +68,103 @@ class StoryWriterTemplate extends NodeTemplate
             'genZAuthenticity' => 'high',
             'vietnameseDialect' => 'neutral',
         ];
+    }
+
+    public function plannerGuide(): NodeGuide
+    {
+        return new NodeGuide(
+            nodeId: $this->type,
+            purpose: 'Write a short story that pays off the hook promise, stays within vibe, and contains the product naturally. Outputs human-readable script + structured moments.',
+            position: 'after hook selection gate, before casting',
+            vibeImpact: VibeImpact::Critical,
+            humanGate: true,
+            knobs: [
+                new GuideKnob(
+                    name: 'story_tension_curve',
+                    type: 'enum',
+                    options: ['slow_build', 'fast_hit', 'rollercoaster'],
+                    default: 'fast_hit',
+                    effect: 'Controls how tension builds — gradual ramp, early peak, or multiple peaks.',
+                    vibeMapping: [
+                        'funny_storytelling' => 'fast_hit',
+                        'clean_education' => 'slow_build',
+                        'aesthetic_mood' => 'slow_build',
+                        'raw_authentic' => 'slow_build',
+                    ],
+                ),
+                new GuideKnob(
+                    name: 'product_appearance_moment',
+                    type: 'enum',
+                    options: ['early', 'middle', 'twist', 'end'],
+                    default: 'twist',
+                    effect: 'When product enters the story. Later = less ad-like.',
+                    vibeMapping: [
+                        'funny_storytelling' => 'twist',
+                        'clean_education' => 'early',
+                        'aesthetic_mood' => 'middle',
+                        'raw_authentic' => 'middle',
+                    ],
+                ),
+                new GuideKnob(
+                    name: 'humor_density',
+                    type: 'enum',
+                    options: ['none', 'punchline_only', 'throughout'],
+                    default: 'throughout',
+                    effect: 'How much humor is woven into the story.',
+                    vibeMapping: [
+                        'funny_storytelling' => 'throughout',
+                        'clean_education' => 'none',
+                        'aesthetic_mood' => 'none',
+                        'raw_authentic' => 'none',
+                    ],
+                ),
+                new GuideKnob(
+                    name: 'story_versions_for_human',
+                    type: 'int',
+                    options: null,
+                    default: 2,
+                    effect: 'Number of story versions generated for human selection.',
+                ),
+                new GuideKnob(
+                    name: 'max_moments',
+                    type: 'int',
+                    options: null,
+                    default: 6,
+                    effect: 'Maximum story moments. TikTok under 30s: use 4-5.',
+                ),
+                new GuideKnob(
+                    name: 'target_duration_sec',
+                    type: 'int',
+                    options: null,
+                    default: 35,
+                    effect: 'Total video target duration distributed across moments.',
+                ),
+                new GuideKnob(
+                    name: 'ending_type_preference',
+                    type: 'enum',
+                    options: ['twist_reveal', 'emotional_beat', 'soft_loop', 'call_to_action'],
+                    default: 'twist_reveal',
+                    effect: 'How the story ends — surprise, emotion, loop, or CTA.',
+                    vibeMapping: [
+                        'funny_storytelling' => 'twist_reveal',
+                        'clean_education' => 'call_to_action',
+                        'aesthetic_mood' => 'soft_loop',
+                        'raw_authentic' => 'emotional_beat',
+                    ],
+                ),
+            ],
+            readsFrom: ['humanGate', 'intentOutcomeSelector', 'truthConstraintGate', 'formatLibraryMatcher'],
+            writesTo: ['casting', 'shotCompiler'],
+            ports: [
+                GuidePort::input('selected_hook', 'json', true),
+                GuidePort::input('intent_pack', 'json', true),
+                GuidePort::input('grounding', 'json', true),
+                GuidePort::input('vibe_state', 'json', false),
+                GuidePort::output('story_pack', 'json'),
+            ],
+            whenToInclude: 'when vibe_mode is funny_storytelling or raw_authentic',
+            whenToSkip: 'when vibe_mode is clean_education or aesthetic_mood — use beat-planner or mood-sequencer instead',
+        );
     }
 
     public function execute(NodeExecutionContext $ctx): array

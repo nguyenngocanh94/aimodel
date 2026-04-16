@@ -8,7 +8,9 @@ use App\Domain\Capability;
 use App\Domain\DataType;
 use App\Domain\NodeCategory;
 use App\Domain\Nodes\NodeExecutionContext;
+use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\Templates\StoryWriterTemplate;
+use App\Domain\Nodes\VibeImpact;
 use App\Domain\PortPayload;
 use App\Domain\Providers\Adapters\StubAdapter;
 use App\Domain\Providers\ProviderRouter;
@@ -128,5 +130,74 @@ final class StoryWriterTemplateTest extends TestCase
         $this->assertStringContainsString('shots', $systemPrompt);
         $this->assertStringContainsString('cast', $systemPrompt);
         $this->assertStringContainsString('productMoment', $systemPrompt);
+    }
+
+    #[Test]
+    public function planner_guide_has_correct_identity(): void
+    {
+        $guide = $this->template->plannerGuide();
+
+        $this->assertInstanceOf(NodeGuide::class, $guide);
+        $this->assertSame('storyWriter', $guide->nodeId);
+        $this->assertSame(VibeImpact::Critical, $guide->vibeImpact);
+        $this->assertTrue($guide->humanGate);
+    }
+
+    #[Test]
+    public function planner_guide_has_all_seven_knobs(): void
+    {
+        $guide = $this->template->plannerGuide();
+        $knobNames = array_map(fn ($k) => $k->name, $guide->knobs);
+
+        $this->assertContains('story_tension_curve', $knobNames);
+        $this->assertContains('product_appearance_moment', $knobNames);
+        $this->assertContains('humor_density', $knobNames);
+        $this->assertContains('story_versions_for_human', $knobNames);
+        $this->assertContains('max_moments', $knobNames);
+        $this->assertContains('target_duration_sec', $knobNames);
+        $this->assertContains('ending_type_preference', $knobNames);
+    }
+
+    #[Test]
+    public function planner_guide_knobs_have_vibe_mappings(): void
+    {
+        $guide = $this->template->plannerGuide();
+
+        $tensionKnob = null;
+        foreach ($guide->knobs as $k) {
+            if ($k->name === 'story_tension_curve') {
+                $tensionKnob = $k;
+                break;
+            }
+        }
+
+        $this->assertNotNull($tensionKnob);
+        $this->assertSame('enum', $tensionKnob->type);
+        $this->assertContains('slow_build', $tensionKnob->options);
+        $this->assertContains('fast_hit', $tensionKnob->options);
+        $this->assertArrayHasKey('funny_storytelling', $tensionKnob->vibeMapping);
+        $this->assertSame('fast_hit', $tensionKnob->vibeMapping['funny_storytelling']);
+    }
+
+    #[Test]
+    public function planner_guide_has_correct_connections(): void
+    {
+        $guide = $this->template->plannerGuide();
+
+        $this->assertContains('humanGate', $guide->readsFrom);
+        $this->assertContains('intentOutcomeSelector', $guide->readsFrom);
+        $this->assertContains('truthConstraintGate', $guide->readsFrom);
+        $this->assertContains('formatLibraryMatcher', $guide->readsFrom);
+        $this->assertContains('casting', $guide->writesTo);
+        $this->assertContains('shotCompiler', $guide->writesTo);
+    }
+
+    #[Test]
+    public function planner_guide_when_to_include_specifies_vibe_modes(): void
+    {
+        $guide = $this->template->plannerGuide();
+
+        $this->assertStringContainsString('funny_storytelling', $guide->whenToInclude);
+        $this->assertStringContainsString('raw_authentic', $guide->whenToInclude);
     }
 }
