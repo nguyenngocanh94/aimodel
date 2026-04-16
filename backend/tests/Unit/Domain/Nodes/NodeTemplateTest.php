@@ -6,6 +6,8 @@ namespace Tests\Unit\Domain\Nodes;
 
 use App\Domain\DataType;
 use App\Domain\NodeCategory;
+use App\Domain\Nodes\HumanProposal;
+use App\Domain\Nodes\HumanResponse;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplate;
@@ -77,6 +79,44 @@ class ConfigDependentStubTemplate extends StubTemplate
         }
 
         return $this->ports();
+    }
+}
+
+class HumanLoopStubTemplate extends StubTemplate
+{
+    public string $type { get => 'humanLoopStub'; }
+
+    public function needsHumanLoop(): bool
+    {
+        return true;
+    }
+
+    public function propose(NodeExecutionContext $ctx): HumanProposal
+    {
+        return new HumanProposal(
+            message: 'Pick an option',
+            channel: 'telegram',
+            payload: ['options' => ['A', 'B']],
+            state: ['attempt' => 1],
+        );
+    }
+
+    public function handleResponse(NodeExecutionContext $ctx, HumanResponse $response): array|HumanProposal
+    {
+        if ($response->isPromptBack()) {
+            return new HumanProposal(
+                message: 'Updated options',
+                payload: ['options' => ['C', 'D']],
+                state: ['attempt' => 2],
+            );
+        }
+
+        return [
+            'textOut' => PortPayload::success(
+                'Selected: ' . ($response->selectedIndex ?? 0),
+                DataType::Text,
+            ),
+        ];
     }
 }
 
@@ -168,5 +208,68 @@ class NodeTemplateTest extends TestCase
         $this->assertSame('input', $guide->ports[0]->direction);
         $this->assertSame('textOut', $guide->ports[1]->key);
         $this->assertSame('output', $guide->ports[1]->direction);
+    }
+
+    public function test_needs_human_loop_defaults_to_false(): void
+    {
+        $this->assertFalse($this->template->needsHumanLoop());
+    }
+
+    public function test_propose_throws_if_not_overridden(): void
+    {
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessageMatches('/does not implement propose/');
+
+        $ctx = $this->createMock(NodeExecutionContext::class);
+        $this->template->propose($ctx);
+    }
+
+    public function test_handle_response_throws_if_not_overridden(): void
+    {
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessageMatches('/does not implement handleResponse/');
+
+        $ctx = $this->createMock(NodeExecutionContext::class);
+        $response = HumanResponse::pick(0);
+        $this->template->handleResponse($ctx, $response);
+    }
+
+    public function test_human_loop_stub_needs_human_loop(): void
+    {
+        $template = new HumanLoopStubTemplate();
+        $this->assertTrue($template->needsHumanLoop());
+    }
+
+    public function test_human_loop_stub_propose_returns_proposal(): void
+    {
+        $template = new HumanLoopStubTemplate();
+        $ctx = $this->createMock(NodeExecutionContext::class);
+        $proposal = $template->propose($ctx);
+
+        $this->assertInstanceOf(HumanProposal::class, $proposal);
+        $this->assertSame('Pick an option', $proposal->message);
+        $this->assertSame(['options' => ['A', 'B']], $proposal->payload);
+    }
+
+    public function test_human_loop_stub_handle_pick_returns_outputs(): void
+    {
+        $template = new HumanLoopStubTemplate();
+        $ctx = $this->createMock(NodeExecutionContext::class);
+        $response = HumanResponse::pick(1);
+        $result = $template->handleResponse($ctx, $response);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('textOut', $result);
+    }
+
+    public function test_human_loop_stub_handle_prompt_back_returns_new_proposal(): void
+    {
+        $template = new HumanLoopStubTemplate();
+        $ctx = $this->createMock(NodeExecutionContext::class);
+        $response = HumanResponse::promptBack('try again');
+        $result = $template->handleResponse($ctx, $response);
+
+        $this->assertInstanceOf(HumanProposal::class, $result);
+        $this->assertSame('Updated options', $result->message);
     }
 }

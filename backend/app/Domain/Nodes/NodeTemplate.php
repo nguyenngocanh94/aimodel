@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Domain\Nodes;
 
 use App\Domain\NodeCategory;
+use App\Domain\Nodes\HumanProposal;
+use App\Domain\Nodes\HumanResponse;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
@@ -76,6 +78,42 @@ abstract class NodeTemplate
             ),
             whenToInclude: 'unassigned',
             whenToSkip: 'unassigned',
+        );
+    }
+
+    /**
+     * Does this node require human interaction during execution?
+     * Override and return true for nodes that need propose/handleResponse cycle.
+     */
+    public function needsHumanLoop(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Generate initial output to present to a human for review/selection.
+     * Only called if needsHumanLoop() returns true.
+     *
+     * @throws \LogicException if not overridden when needsHumanLoop is true
+     */
+    public function propose(NodeExecutionContext $ctx): HumanProposal
+    {
+        throw new \LogicException(
+            static::class . ' declares needsHumanLoop() but does not implement propose()'
+        );
+    }
+
+    /**
+     * Process a human's response to a proposal.
+     * Returns output array (execution complete) or new HumanProposal (loop for more input).
+     *
+     * @return array<string, \App\Domain\PortPayload>|HumanProposal
+     * @throws \LogicException if not overridden when needsHumanLoop is true
+     */
+    public function handleResponse(NodeExecutionContext $ctx, HumanResponse $response): array|HumanProposal
+    {
+        throw new \LogicException(
+            static::class . ' declares needsHumanLoop() but does not implement handleResponse()'
         );
     }
 }
