@@ -7,6 +7,7 @@ namespace Tests\Unit\Domain\Nodes;
 use App\Domain\DataType;
 use App\Domain\NodeCategory;
 use App\Domain\Nodes\NodeExecutionContext;
+use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplate;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
@@ -144,5 +145,28 @@ class NodeTemplateTest extends TestCase
 
         $defaultPorts = $template->activePorts(['mode' => 'full']);
         $this->assertEquals($template->ports(), $defaultPorts);
+    }
+
+    public function test_planner_guide_returns_node_guide(): void
+    {
+        $guide = $this->template->plannerGuide();
+
+        $this->assertInstanceOf(NodeGuide::class, $guide);
+        $this->assertSame('stubNode', $guide->nodeId);
+        $this->assertSame($this->template->type, $guide->nodeId);
+        $this->assertSame($this->template->description, $guide->purpose);
+    }
+
+    public function test_default_planner_guide_derives_ports_from_template(): void
+    {
+        $guide = $this->template->plannerGuide();
+        $ports = $this->template->ports();
+
+        // Should have 1 input + 1 output = 2 guide ports
+        $this->assertCount(count($ports->inputs) + count($ports->outputs), $guide->ports);
+        $this->assertSame('textIn', $guide->ports[0]->key);
+        $this->assertSame('input', $guide->ports[0]->direction);
+        $this->assertSame('textOut', $guide->ports[1]->key);
+        $this->assertSame('output', $guide->ports[1]->direction);
     }
 }

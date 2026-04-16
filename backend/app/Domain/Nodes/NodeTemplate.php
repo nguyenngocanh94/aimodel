@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Nodes;
 
 use App\Domain\NodeCategory;
+use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
 
@@ -45,5 +46,36 @@ abstract class NodeTemplate
     public function activePorts(array $config): PortSchema
     {
         return $this->ports();
+    }
+
+    /**
+     * The planner-readable guide card for this node.
+     * Override in each template to provide real planner data.
+     * Default returns a skeleton derived from ports + metadata.
+     */
+    public function plannerGuide(): NodeGuide
+    {
+        return new NodeGuide(
+            nodeId: $this->type,
+            purpose: $this->description,
+            position: 'unassigned',
+            vibeImpact: VibeImpact::Neutral,
+            humanGate: false,
+            knobs: [],
+            readsFrom: [],
+            writesTo: [],
+            ports: array_merge(
+                array_map(
+                    fn (PortDefinition $p) => GuidePort::input($p->key, $p->dataType->value, $p->required),
+                    $this->ports()->inputs,
+                ),
+                array_map(
+                    fn (PortDefinition $p) => GuidePort::output($p->key, $p->dataType->value),
+                    $this->ports()->outputs,
+                ),
+            ),
+            whenToInclude: 'unassigned',
+            whenToSkip: 'unassigned',
+        );
     }
 }
