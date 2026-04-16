@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\Nodes;
 
+use Symfony\Component\Yaml\Yaml;
+
 readonly class NodeGuide
 {
     /**
@@ -59,11 +61,11 @@ readonly class NodeGuide
 
     public function toYaml(): string
     {
-        return \Symfony\Component\Yaml\Yaml::dump(
+        return Yaml::dump(
             $this->toArray(),
             inline: 4,
             indent: 2,
-            flags: \Symfony\Component\Yaml\Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK,
+            flags: Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK,
         );
     }
 }

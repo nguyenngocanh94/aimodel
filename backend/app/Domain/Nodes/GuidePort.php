@@ -11,7 +11,11 @@ readonly class GuidePort
         public string $direction,
         public string $type,
         public bool $required,
-    ) {}
+    ) {
+        if (!in_array($direction, ['input', 'output'], true)) {
+            throw new \InvalidArgumentException("Direction must be 'input' or 'output', got: {$direction}");
+        }
+    }
 
     public static function input(string $key, string $type, bool $required = true): self
     {
