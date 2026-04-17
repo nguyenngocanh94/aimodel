@@ -7,6 +7,8 @@ namespace Tests\Unit\Domain\Nodes\Templates;
 use App\Domain\DataType;
 use App\Domain\NodeCategory;
 use App\Domain\Nodes\Exceptions\ReviewPendingException;
+use App\Domain\Nodes\HumanProposal;
+use App\Domain\Nodes\HumanResponse;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\Templates\HumanGateTemplate;
 use App\Domain\PortPayload;
@@ -62,6 +64,12 @@ final class HumanGateTemplateTest extends TestCase
     }
 
     #[Test]
+    public function needs_human_loop_returns_true(): void
+    {
+        $this->assertTrue($this->template->needsHumanLoop());
+    }
+
+    #[Test]
     public function execute_throws_review_pending_when_no_response(): void
     {
         $ctx = new NodeExecutionContext(
@@ -80,6 +88,7 @@ final class HumanGateTemplateTest extends TestCase
             $this->fail('Expected ReviewPendingException');
         } catch (ReviewPendingException $e) {
             $this->assertSame('node-gate-1', $e->nodeId);
+            $this->assertSame('HumanGate: use propose/handleResponse flow', $e->getMessage());
         }
     }
 
@@ -142,10 +151,11 @@ final class HumanGateTemplateTest extends TestCase
     }
 
     #[Test]
-    public function execute_throws_with_custom_message_from_template(): void
+    public function propose_returns_proposal_with_rendered_message(): void
     {
         $config = array_merge($this->template->defaultConfig(), [
             'messageTemplate' => 'Please review {{item}}',
+            'channel' => 'telegram',
         ]);
 
         $ctx = new NodeExecutionContext(
@@ -159,12 +169,116 @@ final class HumanGateTemplateTest extends TestCase
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
-        try {
-            $this->template->execute($ctx);
-            $this->fail('Expected ReviewPendingException');
-        } catch (ReviewPendingException $e) {
-            $this->assertSame('node-gate-3', $e->nodeId);
-            $this->assertSame('Please review the script', $e->getMessage());
-        }
+        $proposal = $this->template->propose($ctx);
+
+        $this->assertInstanceOf(HumanProposal::class, $proposal);
+        $this->assertSame('Please review the script', $proposal->message);
+        $this->assertSame('telegram', $proposal->channel);
+        $this->assertSame(['item' => 'the script'], $proposal->payload['data']);
+        $this->assertSame([], $proposal->state);
+    }
+
+    #[Test]
+    public function propose_falls_back_to_input_value_when_no_template(): void
+    {
+        $ctx = new NodeExecutionContext(
+            nodeId: 'node-gate-4',
+            config: $this->template->defaultConfig(),
+            inputs: [
+                'data' => PortPayload::success(['question' => 'Pick one'], DataType::Json),
+            ],
+            runId: 'run-1',
+            providerRouter: $this->createMock(ProviderRouter::class),
+            artifactStore: $this->createMock(ArtifactStoreContract::class),
+        );
+
+        $proposal = $this->template->propose($ctx);
+
+        $this->assertStringContainsString('Pick one', $proposal->message);
+        $this->assertSame('ui', $proposal->channel);
+    }
+
+    #[Test]
+    public function propose_uses_default_message_when_no_input(): void
+    {
+        $ctx = new NodeExecutionContext(
+            nodeId: 'node-gate-5',
+            config: $this->template->defaultConfig(),
+            inputs: [],
+            runId: 'run-1',
+            providerRouter: $this->createMock(ProviderRouter::class),
+            artifactStore: $this->createMock(ArtifactStoreContract::class),
+        );
+
+        $proposal = $this->template->propose($ctx);
+
+        $this->assertSame('Execution paused: awaiting human gate response', $proposal->message);
+    }
+
+    #[Test]
+    public function handle_response_with_pick(): void
+    {
+        $ctx = new NodeExecutionContext(
+            nodeId: 'node-gate-6',
+            config: $this->template->defaultConfig(),
+            inputs: [
+                'data' => PortPayload::success(['question' => 'Pick one'], DataType::Json),
+            ],
+            runId: 'run-1',
+            providerRouter: $this->createMock(ProviderRouter::class),
+            artifactStore: $this->createMock(ArtifactStoreContract::class),
+        );
+
+        $response = HumanResponse::pick(2);
+        $result = $this->template->handleResponse($ctx, $response);
+
+        $this->assertArrayHasKey('response', $result);
+        $this->assertTrue($result['response']->isSuccess());
+        $this->assertSame(DataType::Json, $result['response']->schemaType);
+        $this->assertSame(['approved' => true, 'selectedIndex' => 2], $result['response']->value);
+    }
+
+    #[Test]
+    public function handle_response_with_edit(): void
+    {
+        $ctx = new NodeExecutionContext(
+            nodeId: 'node-gate-7',
+            config: $this->template->defaultConfig(),
+            inputs: [
+                'data' => PortPayload::success(['draft' => 'text'], DataType::Json),
+            ],
+            runId: 'run-1',
+            providerRouter: $this->createMock(ProviderRouter::class),
+            artifactStore: $this->createMock(ArtifactStoreContract::class),
+        );
+
+        $response = HumanResponse::edit('revised text');
+        $result = $this->template->handleResponse($ctx, $response);
+
+        $this->assertArrayHasKey('response', $result);
+        $this->assertTrue($result['response']->isSuccess());
+        $this->assertSame('revised text', $result['response']->value);
+    }
+
+    #[Test]
+    public function handle_response_with_prompt_back(): void
+    {
+        $ctx = new NodeExecutionContext(
+            nodeId: 'node-gate-8',
+            config: $this->template->defaultConfig(),
+            inputs: [
+                'data' => PortPayload::success(['draft' => 'text'], DataType::Json),
+            ],
+            runId: 'run-1',
+            providerRouter: $this->createMock(ProviderRouter::class),
+            artifactStore: $this->createMock(ArtifactStoreContract::class),
+        );
+
+        $response = HumanResponse::promptBack('needs more detail');
+        $result = $this->template->handleResponse($ctx, $response);
+
+        $this->assertArrayHasKey('response', $result);
+        $this->assertTrue($result['response']->isSuccess());
+        $this->assertSame('needs more detail', $result['response']->value);
     }
 }

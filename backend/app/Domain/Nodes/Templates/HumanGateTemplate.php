@@ -10,10 +10,10 @@ use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
 use App\Domain\Nodes\Exceptions\ReviewPendingException;
+use App\Domain\Nodes\HumanProposal;
+use App\Domain\Nodes\HumanResponse;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\NodeTemplate;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 
 class HumanGateTemplate extends NodeTemplate
 {
@@ -61,9 +61,63 @@ class HumanGateTemplate extends NodeTemplate
         ];
     }
 
+    public function needsHumanLoop(): bool
+    {
+        return true;
+    }
+
+    public function propose(NodeExecutionContext $ctx): HumanProposal
+    {
+        $inputPayload = $ctx->input('data');
+        $inputValue = $inputPayload?->value;
+
+        $message = $this->renderMessageTemplate(
+            $ctx->config['messageTemplate'] ?? '',
+            is_array($inputValue) ? $inputValue : [],
+        );
+
+        if (empty($message) && $inputValue) {
+            $message = is_string($inputValue) ? $inputValue : json_encode($inputValue, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        }
+
+        if (empty($message)) {
+            $message = 'Execution paused: awaiting human gate response';
+        }
+
+        return new HumanProposal(
+            message: $message,
+            channel: $ctx->config['channel'] ?? 'ui',
+            payload: [
+                'data' => $inputValue,
+                'options' => $ctx->config['options'] ?? null,
+            ],
+            state: [], // Simple gate — no state to carry across rounds
+        );
+    }
+
+    public function handleResponse(NodeExecutionContext $ctx, HumanResponse $response): array
+    {
+        // HumanGate is a simple pass-through — the response becomes the output
+        $responseValue = $response->editedContent
+            ?? $response->feedback
+            ?? ['approved' => true, 'selectedIndex' => $response->selectedIndex];
+
+        return [
+            'response' => PortPayload::success(
+                value: $responseValue,
+                schemaType: DataType::Json,
+                sourceNodeId: $ctx->nodeId,
+                sourcePortKey: 'response',
+                previewText: is_string($responseValue)
+                    ? mb_substr($responseValue, 0, 120)
+                    : mb_substr(json_encode($responseValue), 0, 120),
+            ),
+        ];
+    }
+
     public function execute(NodeExecutionContext $ctx): array
     {
-        // Check if a response has already been provided via review data
+        // Legacy: pre-provided response via config (for programmatic triggers)
         $response = $ctx->config['_gateResponse'] ?? null;
 
         if ($response !== null) {
@@ -80,58 +134,11 @@ class HumanGateTemplate extends NodeTemplate
             ];
         }
 
-        // Build gate data from input and config for the pending exception
-        $inputPayload = $ctx->input('data');
-        $inputValue = $inputPayload?->value;
-
-        // Render the message template with input data placeholders
-        $message = $this->renderMessageTemplate(
-            $ctx->config['messageTemplate'] ?? '',
-            is_array($inputValue) ? $inputValue : [],
-        );
-
-        // If no template, format the input data as readable text
-        if (empty($message) && $inputValue) {
-            $message = is_string($inputValue) ? $inputValue : json_encode($inputValue, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        }
-
-        // Send to Telegram if channel is 'telegram' and bot config is provided
-        $channel = $ctx->config['channel'] ?? 'ui';
-        $botToken = $ctx->config['botToken'] ?? '';
-        $chatId = $ctx->config['chatId'] ?? '';
-
-        if (in_array($channel, ['telegram', 'any']) && $botToken && $chatId) {
-            $telegramMessage = "🔔 Workflow paused — approval needed\n\n"
-                . $message;
-
-            // Build inline keyboard with callback_data encoding run+node IDs
-            $callbackPrefix = "g:{$ctx->runId}:{$ctx->nodeId}";
-            $replyMarkup = [
-                'inline_keyboard' => [
-                    [
-                        ['text' => '✅ Approve', 'callback_data' => "{$callbackPrefix}:a"],
-                        ['text' => '❌ Reject', 'callback_data' => "{$callbackPrefix}:r"],
-                    ],
-                ],
-            ];
-
-            try {
-                Http::post("https://api.telegram.org/bot{$botToken}/sendMessage", [
-                    'chat_id' => $chatId,
-                    'text' => mb_substr($telegramMessage, 0, 4096),
-                    'reply_markup' => json_encode($replyMarkup),
-                ]);
-            } catch (\Throwable $e) {
-                Log::warning('HumanGate failed to send Telegram notification', [
-                    'error' => $e->getMessage(),
-                    'nodeId' => $ctx->nodeId,
-                ]);
-            }
-        }
-
+        // If needsHumanLoop() is true, RunExecutor calls propose() instead.
+        // This path should not be reached in normal operation.
         throw new ReviewPendingException(
             nodeId: $ctx->nodeId,
-            message: $message ?: 'Execution paused: awaiting human gate response',
+            message: 'HumanGate: use propose/handleResponse flow',
         );
     }
 
