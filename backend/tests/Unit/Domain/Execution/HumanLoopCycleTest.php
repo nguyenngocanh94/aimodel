@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domain\Execution;
 
-use App\Domain\DataType;
 use App\Domain\Nodes\HumanProposal;
 use App\Domain\Nodes\HumanResponse;
 use App\Domain\Nodes\NodeExecutionContext;
