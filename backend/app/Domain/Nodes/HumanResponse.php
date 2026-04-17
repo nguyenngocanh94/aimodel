@@ -57,4 +57,15 @@ readonly class HumanResponse
     {
         return new self(type: 'prompt_back', feedback: $feedback);
     }
+
+    public static function fromArray(array $data): self
+    {
+        return new self(
+            type: $data['type'],
+            selectedIndex: $data['selectedIndex'] ?? null,
+            editedContent: $data['editedContent'] ?? null,
+            feedback: $data['feedback'] ?? null,
+            raw: $data['raw'] ?? [],
+        );
+    }
 }

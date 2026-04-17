@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Domain\Nodes\HumanResponse;
 use App\Jobs\ProcessTelegramBatchJob;
+use App\Jobs\ResumeWorkflowJob;
 use App\Jobs\RunWorkflowJob;
 use App\Models\ExecutionRun;
 use App\Models\NodeRunRecord;
+use App\Models\PendingInteraction;
 use App\Models\Workflow;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,7 +43,18 @@ class TelegramWebhookController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        // Priority 1: Check if this is a text response to a suspended HumanGate
+        // Priority 1: Check for reply-to a pending interaction message
+        $replyToMessageId = (string) ($update['message']['reply_to_message']['message_id'] ?? '');
+        if ($replyToMessageId !== '' && $this->tryResumePendingByMessage($botToken, $chatId, $replyToMessageId, $text)) {
+            return response()->json(['ok' => true]);
+        }
+
+        // Priority 1b: Check for bare text matching a single pending interaction in this chat
+        if ($text !== '' && $this->tryResumePendingByChat($botToken, $chatId, $text)) {
+            return response()->json(['ok' => true]);
+        }
+
+        // Priority 1c: Legacy — check if this is a text response to a suspended HumanGate
         if ($this->tryResumeGate($botToken, $chatId, $text, $update)) {
             return response()->json(['ok' => true]);
         }
@@ -473,30 +487,80 @@ class TelegramWebhookController extends Controller
     }
 
     /**
-     * Handle Telegram inline keyboard callback (approve/reject buttons).
-     * callback_data format: g:{runId}:{nodeId}:a|r
+     * Handle Telegram inline keyboard callback.
+     * Supports both new PendingInteraction-based routing and legacy approve/reject.
+     * callback_data formats:
+     *   - g:{runId}:{nodeId}:a|r          (legacy approve/reject)
+     *   - g:{runId}:{nodeId}:pick:{index}  (new pick-by-index)
      */
     private function handleCallbackQuery(string $botToken, array $callbackQuery): void
     {
         $data = $callbackQuery['data'] ?? '';
         $callbackId = $callbackQuery['id'] ?? '';
         $chatId = (string) ($callbackQuery['message']['chat']['id'] ?? '');
-        $messageId = $callbackQuery['message']['message_id'] ?? null;
+        $messageId = (string) ($callbackQuery['message']['message_id'] ?? '');
         $originalText = $callbackQuery['message']['text'] ?? '';
 
-        // Parse callback_data: g:{runId}:{nodeId}:a|r
-        if (!preg_match('/^g:([^:]+):([^:]+):(a|r)$/', $data, $matches)) {
-            $this->answerCallback($botToken, $callbackId, '❓ Invalid callback');
+        // Try new PendingInteraction-based routing first
+        if (preg_match('/^g:([^:]+):([^:]+):(?:pick:(\d+)|(a|r))$/', $data, $matches)) {
+            $runId = $matches[1];
+            $nodeId = $matches[2];
+
+            // New format: pick by index
+            if (!empty($matches[3])) {
+                $response = HumanResponse::pick((int) $matches[3]);
+                $this->dispatchResume($runId, $nodeId, $response);
+                $this->answerCallback($botToken, $callbackId, "\xE2\x9C\x85 Selection received");
+                $this->editMessageDecision($botToken, $chatId, $messageId, $originalText, 'Selected option ' . $matches[3]);
+                return;
+            }
+
+            // Legacy format: approve/reject
+            $action = $matches[4];
+            $isApprove = $action === 'a';
+
+            // Check if there's a PendingInteraction for this (new flow)
+            $pending = PendingInteraction::where('run_id', $runId)
+                ->where('node_id', $nodeId)
+                ->waiting()
+                ->first();
+
+            if ($pending) {
+                $response = $isApprove
+                    ? HumanResponse::pick(0)
+                    : HumanResponse::promptBack('rejected');
+                $this->dispatchResume($runId, $nodeId, $response);
+                $emoji = $isApprove ? "\xE2\x9C\x85" : "\xE2\x9D\x8C";
+                $label = $isApprove ? 'Approved' : 'Rejected';
+                $this->answerCallback($botToken, $callbackId, "{$emoji} {$label}");
+                $this->editMessageDecision($botToken, $chatId, $messageId, $originalText, "{$emoji} **{$label}**");
+                return;
+            }
+
+            // Fallback: legacy flow (old runs with awaitingReview status)
+            $this->handleLegacyCallbackQuery($botToken, $callbackId, $chatId, $messageId, $originalText, $runId, $nodeId, $isApprove);
             return;
         }
 
-        $runId = $matches[1];
-        $nodeId = $matches[2];
-        $action = $matches[3]; // 'a' = approve, 'r' = reject
+        $this->answerCallback($botToken, $callbackId, "\xE2\x9D\x93 Invalid callback");
+    }
 
+    /**
+     * Legacy callback handler for runs still using awaitingReview status.
+     */
+    private function handleLegacyCallbackQuery(
+        string $botToken,
+        string $callbackId,
+        string $chatId,
+        string $messageId,
+        string $originalText,
+        string $runId,
+        string $nodeId,
+        bool $isApprove,
+    ): void {
         $run = ExecutionRun::find($runId);
         if ($run === null || $run->status !== 'awaitingReview') {
-            $this->answerCallback($botToken, $callbackId, '⏳ This run is no longer awaiting review');
+            $this->answerCallback($botToken, $callbackId, "\xE2\x8F\xB3 This run is no longer awaiting review");
             return;
         }
 
@@ -506,11 +570,10 @@ class TelegramWebhookController extends Controller
             ->first();
 
         if ($record === null) {
-            $this->answerCallback($botToken, $callbackId, '⏳ This gate has already been resolved');
+            $this->answerCallback($botToken, $callbackId, "\xE2\x8F\xB3 This gate has already been resolved");
             return;
         }
 
-        $isApprove = $action === 'a';
         $responseText = $isApprove ? 'approved' : 'rejected';
 
         if ($isApprove) {
@@ -545,13 +608,12 @@ class TelegramWebhookController extends Controller
 
             RunWorkflowJob::dispatch($run->id);
 
-            Log::info('HumanGate approved via inline button', [
+            Log::info('HumanGate approved via inline button (legacy)', [
                 'runId' => $runId,
                 'nodeId' => $nodeId,
                 'chatId' => $chatId,
             ]);
         } else {
-            // Reject — mark node as error, let deriveTerminalStatus handle run status
             $record->update([
                 'status' => 'error',
                 'error_message' => 'Rejected by user via Telegram',
@@ -564,34 +626,25 @@ class TelegramWebhookController extends Controller
                 'termination_reason' => 'gate_rejected',
             ]);
 
-            Log::info('HumanGate rejected via inline button', [
+            Log::info('HumanGate rejected via inline button (legacy)', [
                 'runId' => $runId,
                 'nodeId' => $nodeId,
                 'chatId' => $chatId,
             ]);
         }
 
-        // Answer the callback to dismiss the loading spinner
-        $emoji = $isApprove ? '✅' : '❌';
+        $emoji = $isApprove ? "\xE2\x9C\x85" : "\xE2\x9D\x8C";
         $this->answerCallback($botToken, $callbackId, "{$emoji} " . ucfirst($responseText));
 
-        // Edit the original message to show the decision (remove buttons)
-        if ($messageId) {
-            $updatedText = $originalText . "\n\n" . ($isApprove
-                ? "✅ **Approved** — workflow resuming..."
-                : "❌ **Rejected** — workflow stopped.");
-
-            try {
-                \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$botToken}/editMessageText", [
-                    'chat_id' => $chatId,
-                    'message_id' => $messageId,
-                    'text' => mb_substr($updatedText, 0, 4096),
-                    'parse_mode' => 'Markdown',
-                ]);
-            } catch (\Throwable $e) {
-                Log::warning('Failed to edit gate message', ['error' => $e->getMessage()]);
-            }
-        }
+        $this->editMessageDecision(
+            $botToken,
+            $chatId,
+            $messageId,
+            $originalText,
+            $isApprove
+                ? "\xE2\x9C\x85 **Approved** \xE2\x80\x94 workflow resuming..."
+                : "\xE2\x9D\x8C **Rejected** \xE2\x80\x94 workflow stopped.",
+        );
     }
 
     /**
@@ -606,6 +659,99 @@ class TelegramWebhookController extends Controller
             ]);
         } catch (\Throwable $e) {
             Log::warning('Failed to answer callback query', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Route a reply-to message to its PendingInteraction.
+     */
+    private function tryResumePendingByMessage(string $botToken, string $chatId, string $messageId, string $text): bool
+    {
+        $pending = PendingInteraction::forMessage($messageId)->waiting()->first();
+
+        if ($pending === null) {
+            return false;
+        }
+
+        $response = $this->parseTextResponse($text);
+        $this->dispatchResume($pending->run_id, $pending->node_id, $response);
+
+        $this->sendTelegram($botToken, $chatId, "\xE2\x9C\x85 Response received \xE2\x80\x94 processing...");
+        return true;
+    }
+
+    /**
+     * Route a bare text message to the single pending interaction in this chat.
+     * If multiple pending, ask user to reply-to the specific message.
+     */
+    private function tryResumePendingByChat(string $botToken, string $chatId, string $text): bool
+    {
+        $pendingCount = PendingInteraction::forChat($chatId)->waiting()->count();
+
+        if ($pendingCount === 0) {
+            return false;
+        }
+
+        if ($pendingCount > 1) {
+            $this->sendTelegram($botToken, $chatId,
+                "\xE2\x9A\xA0 Bạn có {$pendingCount} tasks đang chờ. Reply trực tiếp vào message cần trả lời.");
+            return true; // consumed the message (don't fall through to intake)
+        }
+
+        // Exactly 1 pending — route to it
+        $pending = PendingInteraction::forChat($chatId)->waiting()->first();
+        $response = $this->parseTextResponse($text);
+        $this->dispatchResume($pending->run_id, $pending->node_id, $response);
+
+        $this->sendTelegram($botToken, $chatId, "\xE2\x9C\x85 Response received \xE2\x80\x94 processing...");
+        return true;
+    }
+
+    /**
+     * Parse free-text into a HumanResponse.
+     * Simple heuristic: if it looks like a number, it's a pick. Otherwise it's prompt_back.
+     */
+    private function parseTextResponse(string $text): HumanResponse
+    {
+        $trimmed = trim($text);
+
+        // "1", "2", "3" => pick by index (0-based)
+        if (preg_match('/^\d+$/', $trimmed) && (int) $trimmed > 0) {
+            return HumanResponse::pick((int) $trimmed - 1); // Convert 1-based to 0-based
+        }
+
+        // Everything else is prompt-back feedback
+        return HumanResponse::promptBack($trimmed);
+    }
+
+    /**
+     * Dispatch a ResumeWorkflowJob for the given run/node/response.
+     */
+    private function dispatchResume(string $runId, string $nodeId, HumanResponse $response): void
+    {
+        ResumeWorkflowJob::dispatch($runId, $nodeId, $response->toArray());
+    }
+
+    /**
+     * Edit a Telegram message to show the decision (remove buttons).
+     */
+    private function editMessageDecision(string $botToken, string $chatId, string $messageId, string $originalText, string $decision): void
+    {
+        if (empty($messageId)) {
+            return;
+        }
+
+        $updatedText = $originalText . "\n\n" . $decision . " \xE2\x80\x94 workflow resuming...";
+
+        try {
+            \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$botToken}/editMessageText", [
+                'chat_id' => $chatId,
+                'message_id' => $messageId,
+                'text' => mb_substr($updatedText, 0, 4096),
+                'parse_mode' => 'Markdown',
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to edit message', ['error' => $e->getMessage()]);
         }
     }
 

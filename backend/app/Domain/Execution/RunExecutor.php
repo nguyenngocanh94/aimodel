@@ -27,6 +27,7 @@ final class RunExecutor
         private RunCache $cache,
         private ProviderRouter $providerRouter,
         private ArtifactStoreContract $artifactStore,
+        private ProposalSender $proposalSender,
     ) {}
 
     public function execute(ExecutionRun $run): void
@@ -340,7 +341,11 @@ final class RunExecutor
 
         if ($result instanceof HumanProposal) {
             // Loop: save new pending interaction, stay in awaitingHuman
-            $this->savePendingInteraction($run, $nodeId, $result, $savedInputs);
+            $newPending = $this->savePendingInteraction($run, $nodeId, $result, $savedInputs);
+
+            // Send new proposal to channel
+            $channelConfig = $node['data']['config'] ?? $node['config'] ?? [];
+            $this->proposalSender->send($newPending, $channelConfig);
 
             broadcast(new \App\Events\NodeStatusChanged(
                 runId: $runId,
@@ -419,7 +424,11 @@ final class RunExecutor
             return;
         }
 
-        $this->savePendingInteraction($run, $node['id'], $proposal, $inputs);
+        $pending = $this->savePendingInteraction($run, $node['id'], $proposal, $inputs);
+
+        // Send proposal to the channel
+        $channelConfig = $node['data']['config'] ?? $node['config'] ?? [];
+        $this->proposalSender->send($pending, $channelConfig);
 
         $record->update([
             'status' => 'awaitingHuman',
