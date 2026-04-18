@@ -60,12 +60,49 @@ class AgentSession
 
     /**
      * Trim messages to the last $max entries, dropping the oldest.
+     *
+     * Tool-use/tool-result come in pairs (assistant.tool_use → user.tool_result).
+     * A naive tail-slice can cut through a pair and leave a tool_result message
+     * at the head with no preceding assistant tool_call, which OpenAI-compatible
+     * providers (Fireworks etc.) reject at the template-rendering step. After
+     * slicing we walk forward past any orphan tool_result user messages so the
+     * kept window always starts on a clean boundary.
      */
     public function trimMessages(int $max = 20): void
     {
-        if (count($this->messages) > $max) {
-            $this->messages = array_values(array_slice($this->messages, -$max));
+        if (count($this->messages) <= $max) {
+            return;
         }
+
+        $kept = array_values(array_slice($this->messages, -$max));
+
+        while ($kept !== [] && $this->isOrphanToolResult($kept[0])) {
+            array_shift($kept);
+        }
+
+        $this->messages = $kept;
+    }
+
+    /**
+     * A user message whose content is an array whose first block is a tool_result
+     * is a "tool_result user message" — it must be preceded by an assistant tool_use
+     * or it's an orphan.
+     *
+     * @param  array{role: string, content: mixed}  $msg
+     */
+    private function isOrphanToolResult(array $msg): bool
+    {
+        if (($msg['role'] ?? null) !== 'user') {
+            return false;
+        }
+
+        $content = $msg['content'] ?? null;
+        if (! is_array($content) || $content === []) {
+            return false;
+        }
+
+        $first = $content[0] ?? null;
+        return is_array($first) && ($first['type'] ?? null) === 'tool_result';
     }
 
     /**

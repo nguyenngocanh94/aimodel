@@ -101,6 +101,12 @@ final class FireworksToolUseClient implements ToolUseClientContract
             $out[] = ['role' => 'system', 'content' => $systemPrompt];
         }
 
+        // Track which assistant tool_call ids are currently "open" so we can drop
+        // orphan tool_result blocks. OpenAI-compatible providers reject a `tool`
+        // role message whose tool_call_id was not produced by a prior assistant
+        // message in the same turn.
+        $openToolCallIds = [];
+
         foreach ($messages as $msg) {
             $role = (string) ($msg['role'] ?? 'user');
             $content = $msg['content'] ?? '';
@@ -146,6 +152,9 @@ final class FireworksToolUseClient implements ToolUseClientContract
                 $assistantMsg['content'] = $text !== '' ? $text : null;
                 if ($toolCalls !== []) {
                     $assistantMsg['tool_calls'] = $toolCalls;
+                    foreach ($toolCalls as $tc) {
+                        $openToolCallIds[$tc['id']] = true;
+                    }
                 }
                 $out[] = $assistantMsg;
                 continue;
@@ -157,15 +166,25 @@ final class FireworksToolUseClient implements ToolUseClientContract
                     continue;
                 }
                 if (($block['type'] ?? null) === 'tool_result') {
+                    $toolUseId = (string) ($block['tool_use_id'] ?? '');
+
+                    // Defensive: skip orphan tool_results whose matching
+                    // assistant tool_call isn't in the kept window.
+                    if ($toolUseId === '' || ! isset($openToolCallIds[$toolUseId])) {
+                        continue;
+                    }
+
                     $toolContent = $block['content'] ?? '';
                     if (is_array($toolContent)) {
                         $toolContent = json_encode($toolContent, JSON_UNESCAPED_UNICODE);
                     }
                     $out[] = [
                         'role' => 'tool',
-                        'tool_call_id' => (string) ($block['tool_use_id'] ?? ''),
+                        'tool_call_id' => $toolUseId,
                         'content' => (string) $toolContent,
                     ];
+
+                    unset($openToolCallIds[$toolUseId]);
                 }
             }
         }
