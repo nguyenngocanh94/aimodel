@@ -84,12 +84,8 @@ abstract class NodeTemplate
     /**
      * Does this node require human interaction during execution?
      * Override and return true for nodes that need propose/handleResponse cycle.
-     * Receives the node's config so per-instance opt-in is possible
-     * (e.g. InteractsWithHuman reads `config.humanGate.enabled`).
-     *
-     * @param array<string, mixed> $config
      */
-    public function needsHumanLoop(array $config = []): bool
+    public function needsHumanLoop(): bool
     {
         return false;
     }
