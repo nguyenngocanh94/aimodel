@@ -44,8 +44,5 @@ return [
         'model' => env('FIREWORKS_MODEL', 'accounts/fireworks/models/minimax-m2p7'),
     ],
 
-    'telegram_agent' => [
-        'provider' => env('TELEGRAM_AGENT_PROVIDER', 'fireworks'),
-    ],
 
 ];
