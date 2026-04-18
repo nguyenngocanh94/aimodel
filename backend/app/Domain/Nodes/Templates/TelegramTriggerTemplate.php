@@ -12,6 +12,14 @@ use App\Domain\PortSchema;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\NodeTemplate;
 
+/**
+ * @deprecated 2026-04-18 Prefer the Workflow catalog + TelegramAgent path.
+ * Set Workflow::$triggerable = true and populate `nl_description` / `param_schema`
+ * so the centralized `TelegramAgent` can match user intent to the workflow.
+ * This node is kept for backward compatibility; runtime injection of
+ * `_triggerPayload` is still performed by `RunWorkflowTool` when a legacy
+ * workflow document embeds a `telegramTrigger` node.
+ */
 class TelegramTriggerTemplate extends NodeTemplate
 {
     public string $type { get => 'telegramTrigger'; }

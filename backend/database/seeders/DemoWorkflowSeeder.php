@@ -19,12 +19,17 @@ class DemoWorkflowSeeder extends Seeder
         Workflow::updateOrCreate(
             ['name' => 'M1 Demo – AI Video Pipeline'],
             [
-                'description' => 'End-to-end M1 content pipeline: takes a text prompt, writes a structured script, '
+                'description'    => 'End-to-end M1 content pipeline: takes a text prompt, writes a structured script, '
                     . 'splits it into visual scenes, refines each scene into image generation prompts, '
                     . 'generates images, and pauses at a review checkpoint for human approval.',
                 'schema_version' => 1,
-                'tags' => ['demo', 'video', 'ai', 'image', 'pipeline'],
-                'document' => self::buildDocument(),
+                'tags'           => ['demo', 'video', 'ai', 'image', 'pipeline'],
+                'document'       => self::buildDocument(),
+                // Catalog metadata — agent-triggerable
+                'slug'           => 'tvc-pipeline',
+                'triggerable'    => true,
+                'nl_description' => 'Pipeline đầy đủ: prompt → script → scenes → refined prompts → images → review checkpoint.',
+                'param_schema'   => ['prompt' => ['required', 'string', 'min:10']],
             ],
         );
 
