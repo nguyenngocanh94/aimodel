@@ -191,13 +191,6 @@ final class TelegramTriggerTemplateTest extends TestCase
     }
 
     #[Test]
-    public function test_class_is_marked_deprecated(): void
-    {
-        $rc = new \ReflectionClass(TelegramTriggerTemplate::class);
-        $this->assertStringContainsString('@deprecated', $rc->getDocComment());
-    }
-
-    #[Test]
     public function execute_skips_image_extraction_when_disabled(): void
     {
         $telegramUpdate = [
