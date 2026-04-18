@@ -8,9 +8,11 @@ use App\Models\ExecutionRun;
 use App\Models\NodeRunRecord;
 use App\Models\PendingInteraction;
 use App\Models\Workflow;
-use App\Services\TelegramAgent\AgentContext;
 use App\Services\TelegramAgent\Tools\GetRunStatusTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\JsonSchema\JsonSchemaTypeFactory;
+use Illuminate\JsonSchema\Types\StringType;
+use Laravel\Ai\Tools\Request;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -18,44 +20,37 @@ final class GetRunStatusToolTest extends TestCase
 {
     use RefreshDatabase;
 
-    private AgentContext $ctx;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->ctx = new AgentContext(
-            chatId: '123456',
-            userId: 'user-1',
-            sessionId: 'session-abc',
-            botToken: 'bot-token-xyz',
-        );
-    }
-
     private function makeRun(array $overrides = []): ExecutionRun
     {
         $workflow = Workflow::create([
-            'name' => 'Test Workflow',
+            'name'     => 'Test Workflow',
             'document' => ['nodes' => [], 'edges' => []],
         ]);
 
         return ExecutionRun::create(array_merge([
-            'workflow_id' => $workflow->id,
-            'trigger' => 'telegramWebhook',
-            'status' => 'running',
+            'workflow_id'       => $workflow->id,
+            'trigger'           => 'telegramWebhook',
+            'status'            => 'running',
             'document_snapshot' => ['nodes' => [], 'edges' => []],
-            'document_hash' => 'abc123',
+            'document_hash'     => 'abc123',
             'node_config_hashes' => [],
         ], $overrides));
     }
 
     #[Test]
-    public function definition_returns_correct_tool_definition(): void
+    public function description_returns_non_empty_string(): void
     {
         $tool = new GetRunStatusTool();
-        $def = $tool->definition();
+        $this->assertNotEmpty($tool->description());
+    }
 
-        $this->assertSame('get_run_status', $def->name);
+    #[Test]
+    public function schema_has_run_id_string_required(): void
+    {
+        $schema = (new GetRunStatusTool())->schema(new JsonSchemaTypeFactory());
+
+        $this->assertArrayHasKey('runId', $schema);
+        $this->assertInstanceOf(StringType::class, $schema['runId']);
     }
 
     #[Test]
@@ -63,8 +58,8 @@ final class GetRunStatusToolTest extends TestCase
     {
         $run = $this->makeRun(['status' => 'running']);
 
-        $tool = new GetRunStatusTool();
-        $result = $tool->execute(['runId' => $run->id], $this->ctx);
+        $tool   = new GetRunStatusTool();
+        $result = json_decode($tool->handle(new Request(['runId' => $run->id])), true);
 
         $this->assertSame($run->id, $result['runId']);
         $this->assertSame('running', $result['status']);
@@ -78,14 +73,13 @@ final class GetRunStatusToolTest extends TestCase
         $run = $this->makeRun(['status' => 'running']);
 
         NodeRunRecord::create([
-            'run_id' => $run->id,
-            'node_id' => 'node-abc',
-            'status' => 'running',
+            'run_id'     => $run->id,
+            'node_id'    => 'node-abc',
+            'status'     => 'running',
             'started_at' => now(),
         ]);
 
-        $tool = new GetRunStatusTool();
-        $result = $tool->execute(['runId' => $run->id], $this->ctx);
+        $result = json_decode((new GetRunStatusTool())->handle(new Request(['runId' => $run->id])), true);
 
         $this->assertSame('node-abc', $result['currentNodeId']);
     }
@@ -96,16 +90,15 @@ final class GetRunStatusToolTest extends TestCase
         $run = $this->makeRun(['status' => 'awaitingReview']);
 
         PendingInteraction::create([
-            'run_id' => $run->id,
-            'node_id' => 'node-gate',
-            'channel' => 'telegram',
-            'chat_id' => '123456',
-            'status' => 'waiting',
+            'run_id'           => $run->id,
+            'node_id'          => 'node-gate',
+            'channel'          => 'telegram',
+            'chat_id'          => '123456',
+            'status'           => 'waiting',
             'proposal_payload' => ['question' => 'Approve this?'],
         ]);
 
-        $tool = new GetRunStatusTool();
-        $result = $tool->execute(['runId' => $run->id], $this->ctx);
+        $result = json_decode((new GetRunStatusTool())->handle(new Request(['runId' => $run->id])), true);
 
         $this->assertNotNull($result['pending']);
         $this->assertSame('node-gate', $result['pending']['nodeId']);
@@ -116,8 +109,7 @@ final class GetRunStatusToolTest extends TestCase
     #[Test]
     public function returns_run_not_found_for_unknown_id(): void
     {
-        $tool = new GetRunStatusTool();
-        $result = $tool->execute(['runId' => 'non-existent-id'], $this->ctx);
+        $result = json_decode((new GetRunStatusTool())->handle(new Request(['runId' => 'non-existent-id'])), true);
 
         $this->assertSame('run_not_found', $result['error']);
     }
@@ -126,13 +118,12 @@ final class GetRunStatusToolTest extends TestCase
     public function returns_termination_reason_for_finished_run(): void
     {
         $run = $this->makeRun([
-            'status' => 'cancelled',
+            'status'             => 'cancelled',
             'termination_reason' => 'userCancelled',
-            'completed_at' => now(),
+            'completed_at'       => now(),
         ]);
 
-        $tool = new GetRunStatusTool();
-        $result = $tool->execute(['runId' => $run->id], $this->ctx);
+        $result = json_decode((new GetRunStatusTool())->handle(new Request(['runId' => $run->id])), true);
 
         $this->assertSame('cancelled', $result['status']);
         $this->assertSame('userCancelled', $result['terminationReason']);

@@ -4,50 +4,53 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\TelegramAgent\Tools;
 
-use App\Services\TelegramAgent\AgentContext;
 use App\Services\TelegramAgent\Tools\ReplyTool;
+use Illuminate\JsonSchema\JsonSchemaTypeFactory;
+use Illuminate\JsonSchema\Types\StringType;
 use Illuminate\Support\Facades\Http;
+use Laravel\Ai\Tools\Request;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 final class ReplyToolTest extends TestCase
 {
-    private const TELEGRAM_BASE = 'https://api.telegram.org/bot*';
     private const BOT_TOKEN = 'bot123:test-token';
+    private const CHAT_ID   = '999888';
 
-    private AgentContext $ctx;
-
-    protected function setUp(): void
+    private function makeTool(): ReplyTool
     {
-        parent::setUp();
-
-        $this->ctx = new AgentContext(
-            chatId: '999888',
-            userId: 'user-1',
-            sessionId: 'session-abc',
+        return new ReplyTool(
             botToken: self::BOT_TOKEN,
+            chatId: self::CHAT_ID,
         );
     }
 
     #[Test]
-    public function definition_returns_correct_tool_definition(): void
+    public function description_returns_non_empty_string_mentioning_telegram(): void
     {
-        $tool = new ReplyTool();
-        $def = $tool->definition();
+        $tool = $this->makeTool();
 
-        $this->assertSame('reply', $def->name);
-        $this->assertStringContainsString('Telegram', $def->description);
+        $this->assertNotEmpty($tool->description());
+        $this->assertStringContainsString('Telegram', $tool->description());
+    }
+
+    #[Test]
+    public function schema_has_text_string_required(): void
+    {
+        $schema = $this->makeTool()->schema(new JsonSchemaTypeFactory());
+
+        $this->assertArrayHasKey('text', $schema);
+        $this->assertInstanceOf(StringType::class, $schema['text']);
     }
 
     #[Test]
     public function successful_send_returns_delivered_true(): void
     {
         Http::fake([
-            'https://api.telegram.org/bot' . self::BOT_TOKEN . '/sendMessage' => Http::response(['ok' => true], 200),
+            'https://api.telegram.org/bot'.self::BOT_TOKEN.'/sendMessage' => Http::response(['ok' => true], 200),
         ]);
 
-        $tool = new ReplyTool();
-        $result = $tool->execute(['text' => 'Hello, user!'], $this->ctx);
+        $result = json_decode($this->makeTool()->handle(new Request(['text' => 'Hello, user!'])), true);
 
         $this->assertTrue($result['delivered']);
         $this->assertArrayNotHasKey('error', $result);
@@ -57,18 +60,17 @@ final class ReplyToolTest extends TestCase
     public function successful_send_hits_correct_telegram_endpoint_with_correct_body(): void
     {
         Http::fake([
-            'https://api.telegram.org/bot' . self::BOT_TOKEN . '/sendMessage' => Http::response(['ok' => true], 200),
+            'https://api.telegram.org/bot'.self::BOT_TOKEN.'/sendMessage' => Http::response(['ok' => true], 200),
         ]);
 
-        $tool = new ReplyTool();
-        $tool->execute(['text' => 'Hello, user!'], $this->ctx);
+        $this->makeTool()->handle(new Request(['text' => 'Hello, user!']));
 
         Http::assertSent(function (\Illuminate\Http\Client\Request $request): bool {
-            $body = $request->data();
-            $expectedUrl = 'https://api.telegram.org/bot' . self::BOT_TOKEN . '/sendMessage';
+            $body        = $request->data();
+            $expectedUrl = 'https://api.telegram.org/bot'.self::BOT_TOKEN.'/sendMessage';
 
             return $request->url() === $expectedUrl
-                && ($body['chat_id'] ?? '') === '999888'
+                && ($body['chat_id'] ?? '') === self::CHAT_ID
                 && ($body['text'] ?? '') === 'Hello, user!'
                 && ($body['parse_mode'] ?? '') === 'Markdown';
         });
@@ -78,11 +80,10 @@ final class ReplyToolTest extends TestCase
     public function non_2xx_response_returns_delivered_false(): void
     {
         Http::fake([
-            'https://api.telegram.org/bot' . self::BOT_TOKEN . '/sendMessage' => Http::response(['error' => 'Bad Request'], 400),
+            'https://api.telegram.org/bot'.self::BOT_TOKEN.'/sendMessage' => Http::response(['error' => 'Bad Request'], 400),
         ]);
 
-        $tool = new ReplyTool();
-        $result = $tool->execute(['text' => 'Hello'], $this->ctx);
+        $result = json_decode($this->makeTool()->handle(new Request(['text' => 'Hello'])), true);
 
         $this->assertFalse($result['delivered']);
         $this->assertArrayHasKey('error', $result);
@@ -92,16 +93,16 @@ final class ReplyToolTest extends TestCase
     public function long_text_is_truncated_to_4096_chars(): void
     {
         Http::fake([
-            'https://api.telegram.org/bot' . self::BOT_TOKEN . '/sendMessage' => Http::response(['ok' => true], 200),
+            'https://api.telegram.org/bot'.self::BOT_TOKEN.'/sendMessage' => Http::response(['ok' => true], 200),
         ]);
 
         $longText = str_repeat('a', 5000);
 
-        $tool = new ReplyTool();
-        $tool->execute(['text' => $longText], $this->ctx);
+        $this->makeTool()->handle(new Request(['text' => $longText]));
 
         Http::assertSent(function (\Illuminate\Http\Client\Request $request): bool {
             $body = $request->data();
+
             return mb_strlen((string) ($body['text'] ?? '')) === 4096;
         });
     }
@@ -110,13 +111,12 @@ final class ReplyToolTest extends TestCase
     public function network_exception_returns_delivered_false(): void
     {
         Http::fake([
-            'https://api.telegram.org/bot' . self::BOT_TOKEN . '/sendMessage' => function () {
+            'https://api.telegram.org/bot'.self::BOT_TOKEN.'/sendMessage' => function () {
                 throw new \RuntimeException('Connection refused');
             },
         ]);
 
-        $tool = new ReplyTool();
-        $result = $tool->execute(['text' => 'Hello'], $this->ctx);
+        $result = json_decode($this->makeTool()->handle(new Request(['text' => 'Hello'])), true);
 
         $this->assertFalse($result['delivered']);
         $this->assertArrayHasKey('error', $result);

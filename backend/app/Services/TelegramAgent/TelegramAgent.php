@@ -5,245 +5,149 @@ declare(strict_types=1);
 namespace App\Services\TelegramAgent;
 
 use App\Models\Workflow;
-use App\Services\Anthropic\ToolUseClientContract;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Laravel\Ai\Concerns\RemembersConversations;
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\Conversational;
+use Laravel\Ai\Contracts\HasTools;
+use Laravel\Ai\Promptable;
+use App\Services\TelegramAgent\Tools\CancelRunTool;
+use App\Services\TelegramAgent\Tools\GetRunStatusTool;
+use App\Services\TelegramAgent\Tools\ListWorkflowsTool;
+use App\Services\TelegramAgent\Tools\ReplyTool;
+use App\Services\TelegramAgent\Tools\RunWorkflowTool;
 use Throwable;
 
 /**
- * Orchestrator that ties together the Anthropic tool-use client, agent session,
- * slash command router, and individual agent tools into a coherent message handler.
+ * First-party laravel/ai Agent that handles inbound Telegram updates.
  *
- * Entry point: handle(array $update, string $botToken): void
- *
- * The handle() method:
- *  a) Extracts chat/user/text from the Telegram update.
- *  b) Routes slash commands directly (no LLM).
- *  c) Runs the multi-turn tool-use loop (capped at 8 iterations) for free text.
- *  d) Persists the session after every interaction.
+ * Each webhook hit constructs a fresh instance (not a singleton), sets
+ * chatId + botToken, and calls handle(). Conversation memory is kept via
+ * RemembersConversations + RedisConversationStore, keyed on
+ * "{chatId}:{botToken}" so conversations are isolated per-chat and per-bot.
  */
-final class TelegramAgent implements HandlesTelegramUpdate
+final class TelegramAgent implements Agent, Conversational, HasTools
 {
-    /** Maximum number of tool-use loop iterations before forcing a fallback reply. */
-    private const MAX_ITERATIONS = 8;
+    use Promptable;
+    use RemembersConversations;
 
-    /**
-     * @param  array<int, AgentTool>  $tools  Ordered list of available tools.
-     */
     public function __construct(
-        private readonly ToolUseClientContract $llm,
-        private readonly AgentSessionStore $sessionStore,
-        private readonly SlashCommandRouter $slashRouter,
-        private readonly array $tools,
+        public string $chatId,
+        public string $botToken,
+        private SlashCommandRouter $slashRouter,
     ) {}
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Agent contract
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function instructions(): string
+    {
+        $catalog = Workflow::triggerable()
+            ->get(['slug', 'name', 'nl_description', 'param_schema'])
+            ->toArray();
+
+        return SystemPrompt::build($catalog, $this->chatId);
+    }
+
+    public function tools(): iterable
+    {
+        return [
+            new ListWorkflowsTool(),
+            new RunWorkflowTool(chatId: $this->chatId),
+            new GetRunStatusTool(),
+            new CancelRunTool(),
+            new ReplyTool(botToken: $this->botToken, chatId: $this->chatId),
+        ];
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Entry point
+    // ─────────────────────────────────────────────────────────────────────────
 
     /**
      * Handle an inbound Telegram update.
      *
-     * @param  array<string, mixed>  $update    Raw decoded Telegram update object.
-     * @param  string                $botToken  Bot token (used for Telegram API calls & session key).
+     * @param  array<string, mixed>  $update
      */
     public function handle(array $update, string $botToken): void
     {
-        // ── a. Extract fields ──────────────────────────────────────────────────
-        $message = $update['message'] ?? $update['channel_post'] ?? [];
-        $chatId  = (string) ($message['chat']['id'] ?? '');
-        $userId  = isset($message['from']['id']) ? (string) $message['from']['id'] : null;
-        $text    = (string) ($message['text'] ?? $message['caption'] ?? '');
+        $message        = $update['message'] ?? $update['channel_post'] ?? [];
+        $this->chatId   = (string) data_get($message, 'chat.id', '');
+        $this->botToken = $botToken;
+        $text           = (string) data_get($message, 'text', data_get($message, 'caption', ''));
 
-        // ── b. Ignore empty messages ───────────────────────────────────────────
-        if ($text === '' || $chatId === '') {
+        if ($text === '' || $this->chatId === '') {
             return;
         }
 
-        // ── c. Slash command path ──────────────────────────────────────────────
+        // ── Slash command path ────────────────────────────────────────────────
         if ($text[0] === '/') {
-            // /reset must clear Redis before replying.
-            $trimmedCmd = strtolower(explode(' ', trim($text))[0]);
-            if ($trimmedCmd === '/reset') {
-                $this->sessionStore->forget($chatId, $botToken);
-            }
+            $reply = $this->slashRouter->route($text, $this->chatId);
 
-            $reply = $this->slashRouter->route($text, $chatId);
+            if ($reply === '🔄 Session reset. (Storage cleared by caller.)') {
+                $this->resetConversation();
+                $reply = '🔄 Lịch sử hội thoại đã được xoá.';
+            }
 
             if ($reply !== null) {
-                $this->sendTelegramMessage($botToken, $chatId, $reply);
-                return;
+                $this->sendTelegramMessage($this->botToken, $this->chatId, $reply);
             }
 
-            // Null means "not a slash command" — shouldn't happen for `/`-prefixed
-            // text per T6 contract, but fall through to LLM path as a guard.
+            return;
         }
 
-        // ── d. Load session ────────────────────────────────────────────────────
-        $session = $this->sessionStore->load($chatId, $botToken);
+        // ── LLM path ─────────────────────────────────────────────────────────
+        // Load or create conversation memory keyed on chatId:botToken.
+        $conversationUser = $this->makeConversationUser();
+        $this->continueLastConversation($conversationUser);
 
-        // ── e. Append user message ─────────────────────────────────────────────
-        $session->messages[] = ['role' => 'user', 'content' => $text];
-
-        // ── f. Build context ───────────────────────────────────────────────────
-        $ctx = new AgentContext(
-            chatId: $chatId,
-            userId: $userId,
-            sessionId: "{$chatId}:{$botToken}",
-            botToken: $botToken,
+        $response = $this->prompt(
+            $text,
+            provider: config('ai.default'),
         );
 
-        // ── g. Build catalog preview ───────────────────────────────────────────
-        $catalogPreview = Workflow::triggerable()
-            ->get(['slug', 'name', 'nl_description', 'param_schema'])
-            ->toArray();
-
-        // ── h. Build system prompt ─────────────────────────────────────────────
-        $systemPrompt = SystemPrompt::build($catalogPreview, $chatId);
-
-        // ── i. Build tool definitions ──────────────────────────────────────────
-        $toolDefinitions = array_map(
-            static fn (AgentTool $t) => $t->definition(),
-            $this->tools,
-        );
-
-        // ── j. Tool-use loop ───────────────────────────────────────────────────
-        $iteration    = 0;
-        $normalExit   = false;
-
-        while ($iteration < self::MAX_ITERATIONS) {
-            $iteration++;
-
-            $result = $this->llm->send($session->messages, $systemPrompt, $toolDefinitions);
-
-            $stopReason = $result->stopReason;
-
-            if ($stopReason === 'end_turn') {
-                // Emit any text blocks to the user.
-                $text = implode('', $result->textBlocks);
-                if ($text !== '') {
-                    $this->sendTelegramMessage($botToken, $chatId, $text);
-                }
-
-                // Persist full raw assistant message.
-                $session->messages[] = [
-                    'role'    => 'assistant',
-                    'content' => $result->rawAssistantMessage,
-                ];
-
-                $normalExit = true;
-                break;
-            }
-
-            if ($stopReason === 'max_tokens') {
-                $text = implode('', $result->textBlocks);
-                $suffix = "\n\n_(lời nhắn bị cắt, bạn có muốn tôi tiếp tục không?)_";
-                $combined = $text !== '' ? $text . $suffix : $suffix;
-                $this->sendTelegramMessage($botToken, $chatId, $combined);
-
-                $session->messages[] = [
-                    'role'    => 'assistant',
-                    'content' => $result->rawAssistantMessage,
-                ];
-
-                $normalExit = true;
-                break;
-            }
-
-            if ($stopReason === 'tool_use') {
-                // Append assistant turn with tool_use blocks.
-                $session->messages[] = [
-                    'role'    => 'assistant',
-                    'content' => $result->rawAssistantMessage,
-                ];
-
-                // Execute each tool call and collect tool_result blocks.
-                $toolResultBlocks = [];
-
-                foreach ($result->toolCalls as $call) {
-                    $toolResult = $this->executeToolCall($call, $ctx);
-
-                    $toolResultBlocks[] = [
-                        'type'        => 'tool_result',
-                        'tool_use_id' => $call['id'],
-                        'content'     => json_encode($toolResult, JSON_THROW_ON_ERROR),
-                    ];
-                }
-
-                // Append user turn with all tool_result blocks.
-                $session->messages[] = [
-                    'role'    => 'user',
-                    'content' => $toolResultBlocks,
-                ];
-
-                // Continue loop.
-                continue;
-            }
-
-            // Any other stop reason — log and treat as end_turn.
-            Log::warning('TelegramAgent: unexpected stopReason', [
-                'stopReason' => $stopReason,
-                'chatId'     => $chatId,
-                'iteration'  => $iteration,
-            ]);
-
-            $text = implode('', $result->textBlocks);
-            if ($text !== '') {
-                $this->sendTelegramMessage($botToken, $chatId, $text);
-            }
-
-            $session->messages[] = [
-                'role'    => 'assistant',
-                'content' => $result->rawAssistantMessage,
-            ];
-
-            $normalExit = true;
-            break;
+        // ReplyTool sends explicit replies during tool execution.
+        // Only forward $response->text if it's non-empty (end-of-turn narration).
+        if ($response->text !== '') {
+            $this->sendTelegramMessage($this->botToken, $this->chatId, $response->text);
         }
+    }
 
-        // ── k. Post-loop cleanup ───────────────────────────────────────────────
-        if (! $normalExit) {
-            // Cap was hit without an end_turn — send Vietnamese fallback.
-            $this->sendTelegramMessage(
-                $botToken,
-                $chatId,
-                'Tôi bị lạc — gõ /reset nếu cần bắt đầu lại.',
-            );
-        }
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────────────────
 
-        $this->sessionStore->save($session);
+    /**
+     * Create a simple user-like object whose id is "{chatId}:{botToken}".
+     * RemembersConversations uses $user->id as the key to retrieve/store conversations.
+     */
+    private function makeConversationUser(): object
+    {
+        return (object) ['id' => "{$this->chatId}:{$this->botToken}"];
     }
 
     /**
-     * Find the matching tool by name and execute it.
-     * Returns the tool result payload (always an array).
-     *
-     * @param  array{id: string, name: string, input: array}  $call
-     * @return array<string, mixed>
+     * Wipe conversation memory for /reset.
+     * Resets the in-memory trait state and deletes from the Redis store.
      */
-    private function executeToolCall(array $call, AgentContext $ctx): array
+    private function resetConversation(): void
     {
-        $toolName = $call['name'];
+        $userId = "{$this->chatId}:{$this->botToken}";
 
-        foreach ($this->tools as $tool) {
-            if ($tool->definition()->name === $toolName) {
-                try {
-                    return $tool->execute($call['input'], $ctx);
-                } catch (Throwable $e) {
-                    Log::warning('TelegramAgent: tool threw an exception', [
-                        'tool'    => $toolName,
-                        'error'   => $e->getMessage(),
-                        'chatId'  => $ctx->chatId,
-                    ]);
+        /** @var RedisConversationStore $store */
+        $store = resolve(RedisConversationStore::class);
+        $store->forgetUser($userId);
 
-                    return ['error' => $e->getMessage()];
-                }
-            }
-        }
-
-        // No matching tool found.
-        return ['error' => 'unknown_tool', 'name' => $toolName];
+        // Reset in-memory state so this handle() call starts clean.
+        $this->conversationId   = null;
+        $this->conversationUser = null;
     }
 
     /**
      * Send a plain Telegram message, truncating to 4096 characters.
-     * Errors are logged and swallowed — this is best-effort delivery.
+     * Errors are logged and swallowed — best-effort delivery.
      */
     private function sendTelegramMessage(string $botToken, string $chatId, string $text): void
     {

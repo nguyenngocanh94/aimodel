@@ -15,16 +15,16 @@ final class SystemPromptTest extends TestCase
 
         // Vietnamese guardrails must be present.
         $this->assertStringContainsString('cầu nối', $prompt);
-        $this->assertStringContainsString('list_workflows', $prompt);
-        $this->assertStringContainsString('run_workflow', $prompt);
-        $this->assertStringContainsString('reply', $prompt);
+        $this->assertStringContainsString('ListWorkflowsTool', $prompt);
+        $this->assertStringContainsString('RunWorkflowTool', $prompt);
+        $this->assertStringContainsString('ReplyTool', $prompt);
         $this->assertStringContainsString('param_schema', $prompt);
 
         // Chat ID must appear.
         $this->assertStringContainsString('12345', $prompt);
 
         // Empty-catalog placeholder.
-        $this->assertStringContainsString('list_workflows', $prompt);
+        $this->assertStringContainsString('ListWorkflowsTool', $prompt);
     }
 
     public function test_build_with_one_catalog_entry(): void
@@ -54,7 +54,7 @@ final class SystemPromptTest extends TestCase
 
         // Vietnamese guardrails.
         $this->assertStringContainsString('Tuyệt đối không tự bịa slug', $prompt);
-        $this->assertStringContainsString('run_workflow', $prompt);
+        $this->assertStringContainsString('RunWorkflowTool', $prompt);
     }
 
     public function test_build_with_two_catalog_entries(): void
@@ -100,8 +100,8 @@ final class SystemPromptTest extends TestCase
 
             // Core behavioural guardrails.
             $this->assertStringContainsString('Tuyệt đối không tự bịa slug', $prompt, 'no-fabricate-slug guardrail missing');
-            $this->assertStringContainsString('run_workflow', $prompt, 'run_workflow mention missing');
-            $this->assertStringContainsString('reply', $prompt, 'reply tool mention missing');
+            $this->assertStringContainsString('RunWorkflowTool', $prompt, 'RunWorkflowTool mention missing');
+            $this->assertStringContainsString('ReplyTool', $prompt, 'ReplyTool tool mention missing');
             $this->assertStringContainsString('stack trace', $prompt, 'stack-trace guardrail missing');
             $this->assertStringContainsString('từ chối lịch sự', $prompt, 'polite-decline guardrail missing');
         }

@@ -7,10 +7,13 @@ namespace Tests\Unit\Services\TelegramAgent\Tools;
 use App\Jobs\RunWorkflowJob;
 use App\Models\ExecutionRun;
 use App\Models\Workflow;
-use App\Services\TelegramAgent\AgentContext;
 use App\Services\TelegramAgent\Tools\RunWorkflowTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\JsonSchema\JsonSchemaTypeFactory;
+use Illuminate\JsonSchema\Types\ObjectType;
+use Illuminate\JsonSchema\Types\StringType;
 use Illuminate\Support\Facades\Queue;
+use Laravel\Ai\Tools\Request;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -18,32 +21,30 @@ final class RunWorkflowToolTest extends TestCase
 {
     use RefreshDatabase;
 
-    private AgentContext $ctx;
+    private const CHAT_ID = '123456';
 
     protected function setUp(): void
     {
         parent::setUp();
 
         Queue::fake();
+    }
 
-        $this->ctx = new AgentContext(
-            chatId: '123456',
-            userId: 'user-1',
-            sessionId: 'session-abc',
-            botToken: 'bot-token-xyz',
-        );
+    private function makeTool(): RunWorkflowTool
+    {
+        return new RunWorkflowTool(chatId: self::CHAT_ID);
     }
 
     private function makeTriggerable(array $overrides = []): Workflow
     {
         return Workflow::create(array_merge([
-            'name' => 'Test Workflow',
-            'slug' => 'test-slug',
+            'name'        => 'Test Workflow',
+            'slug'        => 'test-slug',
             'triggerable' => true,
-            'document' => [
+            'document'    => [
                 'nodes' => [
                     [
-                        'id' => 'node-1',
+                        'id'   => 'node-1',
                         'type' => 'scriptWriter',
                         'data' => ['config' => ['someKey' => 'someValue']],
                     ],
@@ -54,17 +55,33 @@ final class RunWorkflowToolTest extends TestCase
     }
 
     #[Test]
+    public function description_returns_non_empty_string(): void
+    {
+        $this->assertNotEmpty($this->makeTool()->description());
+    }
+
+    #[Test]
+    public function schema_returns_slug_and_params_with_correct_types(): void
+    {
+        $schema = $this->makeTool()->schema(new JsonSchemaTypeFactory());
+
+        $this->assertArrayHasKey('slug', $schema);
+        $this->assertArrayHasKey('params', $schema);
+        $this->assertInstanceOf(StringType::class, $schema['slug']);
+        $this->assertInstanceOf(ObjectType::class, $schema['params']);
+    }
+
+    #[Test]
     public function happy_path_dispatches_run_workflow_job_and_returns_run_id(): void
     {
         $this->makeTriggerable([
             'param_schema' => ['prompt' => ['required', 'string']],
         ]);
 
-        $tool = new RunWorkflowTool();
-        $result = $tool->execute([
-            'slug' => 'test-slug',
+        $result = json_decode($this->makeTool()->handle(new Request([
+            'slug'   => 'test-slug',
             'params' => ['prompt' => 'Make a TVC for Chocopie'],
-        ], $this->ctx);
+        ])), true);
 
         $this->assertArrayHasKey('runId', $result);
         $this->assertArrayHasKey('status', $result);
@@ -76,20 +93,19 @@ final class RunWorkflowToolTest extends TestCase
         });
 
         $this->assertDatabaseHas('execution_runs', [
-            'id' => $result['runId'],
+            'id'      => $result['runId'],
             'trigger' => 'telegramWebhook',
-            'status' => 'pending',
+            'status'  => 'pending',
         ]);
     }
 
     #[Test]
     public function unknown_slug_returns_workflow_not_found_error(): void
     {
-        $tool = new RunWorkflowTool();
-        $result = $tool->execute([
-            'slug' => 'does-not-exist',
+        $result = json_decode($this->makeTool()->handle(new Request([
+            'slug'   => 'does-not-exist',
             'params' => [],
-        ], $this->ctx);
+        ])), true);
 
         $this->assertSame('workflow_not_found', $result['error']);
         $this->assertSame('does-not-exist', $result['slug']);
@@ -104,11 +120,10 @@ final class RunWorkflowToolTest extends TestCase
             'param_schema' => ['prompt' => ['required', 'string', 'min:10']],
         ]);
 
-        $tool = new RunWorkflowTool();
-        $result = $tool->execute([
-            'slug' => 'test-slug',
+        $result = json_decode($this->makeTool()->handle(new Request([
+            'slug'   => 'test-slug',
             'params' => [], // missing 'prompt'
-        ], $this->ctx);
+        ])), true);
 
         $this->assertSame('validation_failed', $result['error']);
         $this->assertArrayHasKey('fields', $result);
@@ -122,15 +137,15 @@ final class RunWorkflowToolTest extends TestCase
     {
         $this->makeTriggerable([
             'param_schema' => [],
-            'document' => [
+            'document'     => [
                 'nodes' => [
                     [
-                        'id' => 'node-1',
+                        'id'   => 'node-1',
                         'type' => 'scriptWriter',
                         'data' => ['config' => ['someKey' => 'someValue']],
                     ],
                     [
-                        'id' => 'node-2',
+                        'id'   => 'node-2',
                         'type' => 'imageGenerator',
                         'data' => ['config' => ['style' => 'cinematic']],
                     ],
@@ -141,19 +156,18 @@ final class RunWorkflowToolTest extends TestCase
 
         $params = ['prompt' => 'Make a TVC for Chocopie'];
 
-        $tool = new RunWorkflowTool();
-        $result = $tool->execute([
-            'slug' => 'test-slug',
+        $result = json_decode($this->makeTool()->handle(new Request([
+            'slug'   => 'test-slug',
             'params' => $params,
-        ], $this->ctx);
+        ])), true);
 
         $this->assertArrayHasKey('runId', $result);
 
         $run = ExecutionRun::find($result['runId']);
         $this->assertNotNull($run);
 
-        $snapshot = $run->document_snapshot;
-        $firstNode = $snapshot['nodes'][0];
+        $snapshot   = $run->document_snapshot;
+        $firstNode  = $snapshot['nodes'][0];
         $secondNode = $snapshot['nodes'][1];
 
         // _agentParams must be in the first node's config
@@ -169,10 +183,10 @@ final class RunWorkflowToolTest extends TestCase
     {
         $this->makeTriggerable([
             'param_schema' => [],
-            'document' => [
+            'document'     => [
                 'nodes' => [
                     [
-                        'id' => 'node-1',
+                        'id'   => 'node-1',
                         'type' => 'telegramTrigger',
                         'data' => ['config' => ['botToken' => 'bot-token-xyz']],
                     ],
@@ -183,23 +197,22 @@ final class RunWorkflowToolTest extends TestCase
 
         $params = ['prompt' => 'Make a TVC'];
 
-        $tool = new RunWorkflowTool();
-        $result = $tool->execute([
-            'slug' => 'test-slug',
+        $result = json_decode($this->makeTool()->handle(new Request([
+            'slug'   => 'test-slug',
             'params' => $params,
-        ], $this->ctx);
+        ])), true);
 
         $run = ExecutionRun::find($result['runId']);
         $this->assertNotNull($run);
 
-        $snapshot = $run->document_snapshot;
+        $snapshot    = $run->document_snapshot;
         $triggerNode = $snapshot['nodes'][0];
 
         // _triggerPayload must be injected
         $this->assertArrayHasKey('_triggerPayload', $triggerNode['data']['config']);
         $triggerPayload = $triggerNode['data']['config']['_triggerPayload'];
         $this->assertArrayHasKey('message', $triggerPayload);
-        $this->assertSame((int) $this->ctx->chatId, $triggerPayload['message']['chat']['id']);
+        $this->assertSame((int) self::CHAT_ID, $triggerPayload['message']['chat']['id']);
         $this->assertSame('Make a TVC', $triggerPayload['message']['text']);
     }
 
@@ -207,17 +220,16 @@ final class RunWorkflowToolTest extends TestCase
     public function non_triggerable_workflow_with_same_slug_returns_not_found(): void
     {
         Workflow::create([
-            'name' => 'Hidden Workflow',
-            'slug' => 'test-slug',
+            'name'        => 'Hidden Workflow',
+            'slug'        => 'test-slug',
             'triggerable' => false,
-            'document' => ['nodes' => [], 'edges' => []],
+            'document'    => ['nodes' => [], 'edges' => []],
         ]);
 
-        $tool = new RunWorkflowTool();
-        $result = $tool->execute([
-            'slug' => 'test-slug',
+        $result = json_decode($this->makeTool()->handle(new Request([
+            'slug'   => 'test-slug',
             'params' => [],
-        ], $this->ctx);
+        ])), true);
 
         $this->assertSame('workflow_not_found', $result['error']);
         Queue::assertNothingPushed();

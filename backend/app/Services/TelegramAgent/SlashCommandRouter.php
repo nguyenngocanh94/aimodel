@@ -16,9 +16,9 @@ use App\Models\Workflow;
  *
  * /reset contract:
  *   This router returns a placeholder reply string for /reset but does NOT touch Redis.
- *   The TelegramAgent MUST call AgentSessionStore::forget($chatId, $botToken) before
- *   (or after) calling route(), then send the reply. The router is intentionally kept
- *   free of session/Redis dependencies so it can be tested without infrastructure.
+ *   The TelegramAgent MUST clear the conversation store before (or after) calling route(),
+ *   then send the reply. The router is intentionally kept free of session/Redis dependencies
+ *   so it can be tested without infrastructure.
  */
 final class SlashCommandRouter
 {
@@ -172,9 +172,8 @@ final class SlashCommandRouter
     /**
      * Returns a placeholder reply for /reset.
      *
-     * Storage (Redis session) must be cleared by the caller (TelegramAgent) via
-     * AgentSessionStore::forget($chatId, $botToken). This router is stateless and
-     * deliberately has no Redis dependency.
+     * Storage must be cleared by the caller (TelegramAgent) via the conversation store.
+     * This router is stateless and deliberately has no Redis dependency.
      */
     private function handleReset(): string
     {
