@@ -35,14 +35,5 @@ return [
         ],
     ],
 
-    'anthropic' => [
-        'api_key' => env('ANTHROPIC_API_KEY'),
-    ],
-
-    'fireworks' => [
-        'api_key' => env('FIREWORKS_API_KEY'),
-        'model' => env('FIREWORKS_MODEL', 'accounts/fireworks/models/minimax-m2p7'),
-    ],
-
 
 ];
