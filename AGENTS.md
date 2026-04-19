@@ -13,6 +13,10 @@ This repo builds an **AI Video Workflow Builder** — a browser-based visual pip
 - Data Inspector is the core differentiator
 - DAG-only, max ~15 nodes per workflow
 
+### Telegram Assistant (Laravel `backend/`)
+
+The Telegram-facing **Assistant** routes user messages to catalog workflows via `laravel/ai`. Its instructions are built from composable **Skills** in `backend/app/Services/TelegramAgent/Skills/`. To change tone or guardrails, edit an existing skill or add a class implementing `Skill` and list it in `backend/config/telegram_agent.php` (order matters). Avoid embedding one-off behavior in `TelegramAgent.php` or `SystemPrompt.php` except wiring.
+
 ## Tech Stack
 
 - **React** + **Vite** + **TypeScript** (strict mode)

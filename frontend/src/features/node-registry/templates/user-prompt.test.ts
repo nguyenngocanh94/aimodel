@@ -1,10 +1,25 @@
+/**
+ * userPrompt Node Template Tests - AiModel-9wx.4 (NM3 trim: configSchema assertions removed)
+ *
+ * Config validation is now backend-authoritative (NM1 + manifest).
+ * Tests cover registry shape, buildPreview, and fixtures.
+ */
+
 import { describe, it, expect } from 'vitest';
 import {
   userPromptTemplate,
-  UserPromptConfigSchema,
   type UserPromptConfig,
 } from './user-prompt';
 import type { PortPayload } from '@/features/workflows/domain/workflow-types';
+
+// Minimal valid config (replaces removed defaultConfig)
+const baseConfig: UserPromptConfig = {
+  topic: 'Introduction to Machine Learning',
+  goal: 'Explain the basics of ML in an engaging way',
+  audience: 'Technical beginners',
+  tone: 'educational',
+  durationSeconds: 120,
+};
 
 describe('userPrompt Node Template - AiModel-9wx.4', () => {
   describe('Template Structure', () => {
@@ -30,67 +45,12 @@ describe('userPrompt Node Template - AiModel-9wx.4', () => {
     it('should not have mockExecute (non-executable)', () => {
       expect(userPromptTemplate.mockExecute).toBeUndefined();
     });
-  });
 
-  describe('Config Schema', () => {
-    it('should validate valid config', () => {
-      const validConfig = {
-        topic: 'Test Topic',
-        goal: 'Test Goal',
-        audience: 'Test Audience',
-        tone: 'educational',
-        durationSeconds: 120,
-      };
-
-      const result = UserPromptConfigSchema.parse(validConfig);
-      expect(result.topic).toBe('Test Topic');
-      expect(result.tone).toBe('educational');
-      expect(result.durationSeconds).toBe(120);
-    });
-
-    it('should reject invalid tone values', () => {
-      const invalidConfig = {
-        topic: 'Test',
-        goal: 'Test',
-        audience: 'Test',
-        tone: 'invalid-tone',
-        durationSeconds: 120,
-      };
-
-      expect(() => UserPromptConfigSchema.parse(invalidConfig)).toThrow();
-    });
-
-    it('should reject duration outside range', () => {
-      const tooShort = {
-        topic: 'Test',
-        goal: 'Test',
-        audience: 'Test',
-        tone: 'educational',
-        durationSeconds: 3, // min is 5
-      };
-
-      const tooLong = {
-        topic: 'Test',
-        goal: 'Test',
-        audience: 'Test',
-        tone: 'educational',
-        durationSeconds: 700, // max is 600
-      };
-
-      expect(() => UserPromptConfigSchema.parse(tooShort)).toThrow();
-      expect(() => UserPromptConfigSchema.parse(tooLong)).toThrow();
-    });
-
-    it('should reject empty required strings', () => {
-      const emptyTopic = {
-        topic: '',
-        goal: 'Test',
-        audience: 'Test',
-        tone: 'educational',
-        durationSeconds: 120,
-      };
-
-      expect(() => UserPromptConfigSchema.parse(emptyTopic)).toThrow();
+    it('should have no configSchema (NM3 pilot stripped, manifest-driven)', () => {
+      // configSchema is intentionally absent — backend manifest is the source of truth
+      expect(userPromptTemplate.configSchema).toBeUndefined();
+      // defaultConfig is an empty sentinel ({}); real defaults come from manifest
+      expect(Object.keys(userPromptTemplate.defaultConfig as object).length).toBe(0);
     });
   });
 
@@ -108,7 +68,7 @@ describe('userPrompt Node Template - AiModel-9wx.4', () => {
 
       expect(result).toHaveProperty('prompt');
       const promptPayload = result.prompt as PortPayload;
-      
+
       expect(promptPayload.status).toBe('ready');
       expect(promptPayload.schemaType).toBe('prompt');
       expect(promptPayload.value).toBeDefined();
@@ -143,9 +103,9 @@ describe('userPrompt Node Template - AiModel-9wx.4', () => {
       expect(value.generatedAt).toBeDefined();
     });
 
-    it('should use default config when called with defaults', () => {
+    it('should use base config when called with defaults', () => {
       const result = userPromptTemplate.buildPreview({
-        config: userPromptTemplate.defaultConfig,
+        config: baseConfig,
         inputs: {},
       });
 
@@ -165,16 +125,11 @@ describe('userPrompt Node Template - AiModel-9wx.4', () => {
       expect(uniqueIds.size).toBe(ids.length);
     });
 
-    it('should have valid fixture configs', () => {
+    it('should have fixtures with required fields', () => {
       userPromptTemplate.fixtures.forEach(fixture => {
         expect(fixture.id).toBeDefined();
         expect(fixture.label).toBeDefined();
-        
-        // Validate partial config against schema
-        if (fixture.config) {
-          const partialConfig = { ...userPromptTemplate.defaultConfig, ...fixture.config };
-          expect(() => UserPromptConfigSchema.parse(partialConfig)).not.toThrow();
-        }
+        expect(fixture.config).toBeDefined();
       });
     });
 
@@ -182,27 +137,20 @@ describe('userPrompt Node Template - AiModel-9wx.4', () => {
       const tones = userPromptTemplate.fixtures
         .map(f => f.config?.tone)
         .filter(Boolean);
-      
+
       expect(tones).toContain('educational');
       expect(tones).toContain('cinematic');
       expect(tones).toContain('playful');
       expect(tones).toContain('dramatic');
     });
-  });
 
-  describe('Default Config', () => {
-    it('should have complete default values', () => {
-      expect(userPromptTemplate.defaultConfig.topic).toBeDefined();
-      expect(userPromptTemplate.defaultConfig.goal).toBeDefined();
-      expect(userPromptTemplate.defaultConfig.audience).toBeDefined();
-      expect(userPromptTemplate.defaultConfig.tone).toBeDefined();
-      expect(userPromptTemplate.defaultConfig.durationSeconds).toBeDefined();
-    });
-
-    it('should validate default config against schema', () => {
-      expect(() => 
-        UserPromptConfigSchema.parse(userPromptTemplate.defaultConfig)
-      ).not.toThrow();
+    it('fixtures produce valid preview outputs', () => {
+      userPromptTemplate.fixtures.forEach(fixture => {
+        const config: UserPromptConfig = { ...baseConfig, ...fixture.config };
+        const result = userPromptTemplate.buildPreview({ config, inputs: {} });
+        expect(result.prompt.status).toBe('ready');
+        expect(result.prompt.value).toBeDefined();
+      });
     });
   });
 });

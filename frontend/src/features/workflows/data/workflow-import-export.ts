@@ -249,10 +249,11 @@ export function importWorkflow(jsonString: string): ImportReport {
     }
   }
 
-  // Step 8: Validate configs
+  // Step 8: Validate configs (when local Zod schema is available)
+  // Pilot templates (NM3+) rely on backend validation; skip if configSchema absent.
   for (const node of document.nodes) {
     const template = getTemplate(node.type);
-    if (!template) continue;
+    if (!template || !template.configSchema) continue;
 
     const result = template.configSchema.safeParse(node.config);
     if (!result.success) {

@@ -10,8 +10,12 @@ use App\Domain\NodeCategory;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
+use App\Domain\Nodes\GuideKnob;
+use App\Domain\Nodes\GuidePort;
 use App\Domain\Nodes\NodeExecutionContext;
+use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplate;
+use App\Domain\Nodes\VibeImpact;
 
 class SceneSplitterTemplate extends NodeTemplate
 {
@@ -41,6 +45,9 @@ class SceneSplitterTemplate extends NodeTemplate
             'provider' => ['required', 'string'],
             'apiKey' => ['sometimes', 'string'],
             'model' => ['sometimes', 'string'],
+            // Planner-set creative knobs.
+            'edit_pace' => ['sometimes', 'string', 'in:slow_meditative,steady,fast_cut,rapid_fire'],
+            'scene_granularity' => ['sometimes', 'string', 'in:broad,normal,fine'],
         ];
     }
 
@@ -52,7 +59,77 @@ class SceneSplitterTemplate extends NodeTemplate
             'provider' => 'stub',
             'apiKey' => '',
             'model' => 'gpt-4o',
+            // Planner-set creative knobs.
+            'edit_pace' => 'steady',
+            'scene_granularity' => 'normal',
         ];
+    }
+
+    public function plannerGuide(): NodeGuide
+    {
+        return new NodeGuide(
+            nodeId: $this->type,
+            purpose: 'Split a script into a list of individual visual scenes. Canonical home for edit_pace.',
+            position: 'after scriptWriter (or storyWriter fallback), before promptRefiner',
+            vibeImpact: VibeImpact::Critical,
+            humanGate: false,
+            knobs: [
+                new GuideKnob(
+                    name: 'edit_pace',
+                    type: 'enum',
+                    options: ['slow_meditative', 'steady', 'fast_cut', 'rapid_fire'],
+                    default: 'steady',
+                    effect: 'Canonical. Drives scene count and cut rhythm. Downstream promptRefiner reads this as a hint.',
+                    vibeMapping: [
+                        'funny_storytelling' => 'fast_cut',
+                        'clean_education' => 'steady',
+                        'aesthetic_mood' => 'slow_meditative',
+                        'raw_authentic' => 'steady',
+                    ],
+                ),
+                new GuideKnob(
+                    name: 'scene_granularity',
+                    type: 'enum',
+                    options: ['broad', 'normal', 'fine'],
+                    default: 'normal',
+                    effect: 'Inverse of min-scene-duration. Higher granularity = more cuts.',
+                ),
+                new GuideKnob(
+                    name: 'humor_density',
+                    type: 'enum',
+                    options: ['none', 'punchline_only', 'throughout'],
+                    default: 'punchline_only',
+                    effect: 'Planner hint: permits comedic beat-splits. Canonical on storyWriter.',
+                    vibeMapping: [
+                        'funny_storytelling' => 'throughout',
+                        'clean_education' => 'none',
+                        'aesthetic_mood' => 'none',
+                        'raw_authentic' => 'none',
+                    ],
+                ),
+                new GuideKnob(
+                    name: 'product_emphasis',
+                    type: 'enum',
+                    options: ['subtle', 'balanced', 'hero'],
+                    default: 'balanced',
+                    effect: 'Planner hint: whether the product gets its own scene. Canonical on scriptWriter.',
+                    vibeMapping: [
+                        'funny_storytelling' => 'subtle',
+                        'clean_education' => 'hero',
+                        'aesthetic_mood' => 'subtle',
+                        'raw_authentic' => 'balanced',
+                    ],
+                ),
+            ],
+            readsFrom: ['scriptWriter', 'storyWriter'],
+            writesTo: ['promptRefiner'],
+            ports: [
+                GuidePort::input('script', 'script', true),
+                GuidePort::output('scenes', 'sceneList'),
+            ],
+            whenToInclude: 'always when a scene-level breakdown is needed before prompt generation',
+            whenToSkip: 'when downstream promptRefiner is configured in Wan mode and consumes the story directly',
+        );
     }
 
     public function execute(NodeExecutionContext $ctx): array

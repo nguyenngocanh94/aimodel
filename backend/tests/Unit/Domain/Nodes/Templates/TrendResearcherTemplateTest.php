@@ -118,4 +118,39 @@ final class TrendResearcherTemplateTest extends TestCase
         $this->assertStringContainsString('contentAngles', $systemPrompt);
         $this->assertStringContainsString('avoidList', $systemPrompt);
     }
+
+    #[Test]
+    public function planner_guide_exposes_expected_knob_names(): void
+    {
+        $guide = $this->template->plannerGuide();
+        $knobNames = array_map(fn ($k) => $k->name, $guide->knobs);
+
+        $this->assertContains('trend_usage', $knobNames);
+        $this->assertContains('content_angle_focus', $knobNames);
+        $this->assertContains('native_tone', $knobNames);
+    }
+
+    #[Test]
+    public function planner_guide_knobs_have_vibe_mappings_for_all_four_modes(): void
+    {
+        $guide = $this->template->plannerGuide();
+        foreach ($guide->knobs as $knob) {
+            $this->assertArrayHasKey('funny_storytelling', $knob->vibeMapping, "{$knob->name} missing funny_storytelling");
+            $this->assertArrayHasKey('clean_education', $knob->vibeMapping, "{$knob->name} missing clean_education");
+            $this->assertArrayHasKey('aesthetic_mood', $knob->vibeMapping, "{$knob->name} missing aesthetic_mood");
+            $this->assertArrayHasKey('raw_authentic', $knob->vibeMapping, "{$knob->name} missing raw_authentic");
+        }
+    }
+
+    #[Test]
+    public function config_rules_include_new_planner_knobs(): void
+    {
+        $rules = $this->template->configRules();
+        $this->assertArrayHasKey('trend_usage', $rules);
+        $this->assertArrayHasKey('content_angle_focus', $rules);
+
+        $defaults = $this->template->defaultConfig();
+        $this->assertSame('informed', $defaults['trend_usage']);
+        $this->assertSame('vibe_matched', $defaults['content_angle_focus']);
+    }
 }

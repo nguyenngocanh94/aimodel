@@ -15,24 +15,22 @@
  * - durationSeconds: number - Target duration in seconds
  */
 
-import { z } from 'zod';
 import type { NodeTemplate, NodeFixture } from '../node-registry';
 import type { PortDefinition, PortPayload } from '@/features/workflows/domain/workflow-types';
 
 // ============================================================
-// Configuration Schema
+// Configuration Type
+// Backend manifest is the authoritative source for config schema and defaults (NM3+).
+// The type alias is kept for use in buildPreview signatures.
 // ============================================================
 
-export const UserPromptConfigSchema = z.object({
-  topic: z.string().min(1).max(500).describe('The main subject or topic of the video'),
-  goal: z.string().min(1).max(500).describe('What you want to achieve with this video'),
-  audience: z.string().min(1).max(500).describe('Who the video is for'),
-  tone: z.enum(['educational', 'cinematic', 'playful', 'dramatic'])
-    .describe('The emotional tone and style of the video'),
-  durationSeconds: z.number().min(5).max(600).describe('Target duration in seconds (5-600)'),
-});
-
-export type UserPromptConfig = z.infer<typeof UserPromptConfigSchema>;
+export type UserPromptConfig = {
+  readonly topic: string;
+  readonly goal: string;
+  readonly audience: string;
+  readonly tone: 'educational' | 'cinematic' | 'playful' | 'dramatic';
+  readonly durationSeconds: number;
+};
 
 // ============================================================
 // Port Definitions
@@ -51,18 +49,6 @@ const outputs: readonly PortDefinition[] = [
     description: 'Structured prompt payload generated from form inputs',
   },
 ];
-
-// ============================================================
-// Default Configuration
-// ============================================================
-
-const defaultConfig: UserPromptConfig = {
-  topic: 'Introduction to Machine Learning',
-  goal: 'Explain the basics of ML in an engaging way',
-  audience: 'Technical beginners',
-  tone: 'educational',
-  durationSeconds: 120,
-};
 
 // ============================================================
 // Preview Builder
@@ -168,6 +154,9 @@ const fixtures: readonly NodeFixture<UserPromptConfig>[] = [
  * Non-executable: preview and run output are identical.
  * No async mockExecute needed.
  */
+// configSchema is intentionally omitted (NM3 pilot strip) — backend manifest is
+// the authoritative source. defaultConfig is an empty sentinel; actual defaults
+// come from manifestEntry.defaultConfig at runtime via useResolvedNodeTemplate.
 export const userPromptTemplate: NodeTemplate<UserPromptConfig> = {
   type: 'userPrompt',
   templateVersion: '1.0.0',
@@ -176,8 +165,7 @@ export const userPromptTemplate: NodeTemplate<UserPromptConfig> = {
   description: 'Collects initial creative intent through structured form inputs. Generates a prompt payload that serves as the foundation for the AI video workflow.',
   inputs,
   outputs,
-  defaultConfig,
-  configSchema: UserPromptConfigSchema,
+  defaultConfig: {} as unknown as UserPromptConfig,
   fixtures,
   executable: false,
   buildPreview,
