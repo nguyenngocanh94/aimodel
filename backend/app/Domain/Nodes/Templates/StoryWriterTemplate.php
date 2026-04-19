@@ -10,6 +10,7 @@ use App\Domain\NodeCategory;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
+use App\Domain\Nodes\Concerns\InteractsWithHuman;
 use App\Domain\Nodes\GuideKnob;
 use App\Domain\Nodes\GuidePort;
 use App\Domain\Nodes\NodeExecutionContext;
@@ -19,6 +20,8 @@ use App\Domain\Nodes\VibeImpact;
 
 class StoryWriterTemplate extends NodeTemplate
 {
+    use InteractsWithHuman;
+
     public string $type { get => 'storyWriter'; }
     public string $version { get => '1.0.0'; }
     public string $title { get => 'Story Writer'; }
@@ -42,7 +45,7 @@ class StoryWriterTemplate extends NodeTemplate
 
     public function configRules(): array
     {
-        return [
+        return array_merge([
             'provider' => ['required', 'string'],
             'apiKey' => ['sometimes', 'string'],
             'model' => ['sometimes', 'string'],
@@ -52,12 +55,12 @@ class StoryWriterTemplate extends NodeTemplate
             'productIntegrationStyle' => ['required', 'string', 'in:subtle_background,natural_use,hero_moment,transformation_reveal,comparison_story'],
             'genZAuthenticity' => ['required', 'string', 'in:low,medium,high,ultra'],
             'vietnameseDialect' => ['required', 'string', 'in:northern,central,southern,neutral'],
-        ];
+        ], $this->humanGateConfigRules());
     }
 
     public function defaultConfig(): array
     {
-        return [
+        return array_merge([
             'provider' => 'stub',
             'apiKey' => '',
             'model' => 'gpt-4o',
@@ -67,7 +70,7 @@ class StoryWriterTemplate extends NodeTemplate
             'productIntegrationStyle' => 'natural_use',
             'genZAuthenticity' => 'high',
             'vietnameseDialect' => 'neutral',
-        ];
+        ], $this->humanGateDefaultConfig());
     }
 
     public function plannerGuide(): NodeGuide
@@ -150,6 +153,33 @@ class StoryWriterTemplate extends NodeTemplate
                         'clean_education' => 'call_to_action',
                         'aesthetic_mood' => 'soft_loop',
                         'raw_authentic' => 'emotional_beat',
+                    ],
+                ),
+                // Shared (planner-only hints) — canonical homes: scriptWriter / trendResearcher.
+                new GuideKnob(
+                    name: 'native_tone',
+                    type: 'enum',
+                    options: ['polished', 'conversational', 'genz_native', 'ultra_slang'],
+                    default: 'genz_native',
+                    effect: 'Planner hint: how native/casual the voice feels. Shapes dialogue phrasing. Canonical on scriptWriter.',
+                    vibeMapping: [
+                        'funny_storytelling' => 'genz_native',
+                        'clean_education' => 'conversational',
+                        'aesthetic_mood' => 'polished',
+                        'raw_authentic' => 'ultra_slang',
+                    ],
+                ),
+                new GuideKnob(
+                    name: 'trend_usage',
+                    type: 'enum',
+                    options: ['ignore', 'informed', 'leaned_in', 'fully_on_trend'],
+                    default: 'leaned_in',
+                    effect: 'Planner hint: how much to lean on current trends from the trend brief. Canonical on trendResearcher.',
+                    vibeMapping: [
+                        'funny_storytelling' => 'leaned_in',
+                        'clean_education' => 'informed',
+                        'aesthetic_mood' => 'informed',
+                        'raw_authentic' => 'informed',
                     ],
                 ),
             ],
@@ -266,7 +296,60 @@ class StoryWriterTemplate extends NodeTemplate
             $parts[] = "Create a {$duration}-second Vietnamese GenZ TVC story arc.";
         }
 
+        $history = $config['_humanFeedbackHistory'] ?? [];
+        if (!empty($history)) {
+            $parts[] = "---\nPrevious drafts were rejected. Human feedback across rounds (latest last):";
+            foreach ($history as $i => $note) {
+                $parts[] = sprintf('  %d. %s', $i + 1, $note);
+            }
+            $parts[] = 'Revise the story to honour the latest feedback while preserving anything that has worked so far.';
+        }
+
         return implode("\n", $parts);
+    }
+
+    protected function humanGateFormatMessage(array $outputs, array $config): string
+    {
+        $arc = $outputs['storyArc'] ?? null;
+        $value = $arc?->value;
+
+        if (!is_array($value)) {
+            return (string) ($arc?->previewText ?? 'Story draft ready — please review.');
+        }
+
+        $attempt = count($config['_humanFeedbackHistory'] ?? []) + 1;
+        $title = $value['title'] ?? '(untitled)';
+        $hook = $value['hook'] ?? '';
+        $beats = array_map(
+            fn ($shot) => is_array($shot)
+                ? ($shot['description'] ?? $shot['beat'] ?? json_encode($shot, JSON_UNESCAPED_UNICODE))
+                : (string) $shot,
+            $value['shots'] ?? $value['beats'] ?? [],
+        );
+
+        $lines = [
+            "📝 *Story draft — round {$attempt}*",
+            "",
+            "*{$title}*",
+        ];
+
+        if ($hook !== '') {
+            $lines[] = "";
+            $lines[] = "Hook: _{$hook}_";
+        }
+
+        if (!empty($beats)) {
+            $lines[] = "";
+            $lines[] = "Beats:";
+            foreach ($beats as $i => $beat) {
+                $lines[] = sprintf('  %d. %s', $i + 1, $beat);
+            }
+        }
+
+        $lines[] = "";
+        $lines[] = "Reply *1* to approve, *2* to revise, or send feedback to re-draft.";
+
+        return implode("\n", $lines);
     }
 
     private function parseStoryArc(mixed $result): array

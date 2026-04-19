@@ -3,6 +3,7 @@ import { type ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { BootProvider } from './boot/boot-provider'
+import { ManifestProvider } from '@/features/node-registry/manifest/manifest-context'
 
 /**
  * QueryClient instance for TanStack Query
@@ -30,9 +31,11 @@ interface AppProvidersProps {
 export function AppProviders({ children }: AppProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
-      <BootProvider>
-        <ReactFlowProvider>{children}</ReactFlowProvider>
-      </BootProvider>
+      <ManifestProvider>
+        <BootProvider>
+          <ReactFlowProvider>{children}</ReactFlowProvider>
+        </BootProvider>
+      </ManifestProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   )

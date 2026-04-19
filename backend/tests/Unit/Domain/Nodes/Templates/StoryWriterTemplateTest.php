@@ -200,4 +200,44 @@ final class StoryWriterTemplateTest extends TestCase
         $this->assertStringContainsString('funny_storytelling', $guide->whenToInclude);
         $this->assertStringContainsString('raw_authentic', $guide->whenToInclude);
     }
+
+    #[Test]
+    public function planner_guide_exposes_expected_knob_names(): void
+    {
+        $guide = $this->template->plannerGuide();
+        $knobNames = array_map(fn ($k) => $k->name, $guide->knobs);
+
+        // Existing knobs.
+        $this->assertContains('story_tension_curve', $knobNames);
+        $this->assertContains('product_appearance_moment', $knobNames);
+        $this->assertContains('humor_density', $knobNames);
+        $this->assertContains('ending_type_preference', $knobNames);
+        // Newly added shared planner hints.
+        $this->assertContains('native_tone', $knobNames);
+        $this->assertContains('trend_usage', $knobNames);
+    }
+
+    #[Test]
+    public function planner_guide_knobs_have_vibe_mappings_for_all_four_modes(): void
+    {
+        $guide = $this->template->plannerGuide();
+        $expectVibeMapped = [
+            'story_tension_curve',
+            'product_appearance_moment',
+            'humor_density',
+            'ending_type_preference',
+            'native_tone',
+            'trend_usage',
+        ];
+
+        foreach ($guide->knobs as $knob) {
+            if (!in_array($knob->name, $expectVibeMapped, true)) {
+                continue;
+            }
+            $this->assertArrayHasKey('funny_storytelling', $knob->vibeMapping, "{$knob->name} missing funny_storytelling");
+            $this->assertArrayHasKey('clean_education', $knob->vibeMapping, "{$knob->name} missing clean_education");
+            $this->assertArrayHasKey('aesthetic_mood', $knob->vibeMapping, "{$knob->name} missing aesthetic_mood");
+            $this->assertArrayHasKey('raw_authentic', $knob->vibeMapping, "{$knob->name} missing raw_authentic");
+        }
+    }
 }
