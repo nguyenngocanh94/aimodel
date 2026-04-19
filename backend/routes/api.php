@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ArtifactController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\NodeManifestController;
 use App\Http\Controllers\RunController;
 use App\Http\Controllers\RunStreamController;
 use App\Http\Controllers\TelegramWebhookController;
@@ -9,6 +10,8 @@ use App\Http\Controllers\WorkflowController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [HealthController::class, 'check']);
+
+Route::get('/nodes/manifest', [NodeManifestController::class, 'show'])->name('nodes.manifest');
 
 Route::apiResource('workflows', WorkflowController::class);
 
