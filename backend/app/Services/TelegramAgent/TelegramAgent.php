@@ -16,6 +16,7 @@ use App\Services\TelegramAgent\Tools\CancelRunTool;
 use App\Services\TelegramAgent\Tools\ComposeWorkflowTool;
 use App\Services\TelegramAgent\Tools\GetRunStatusTool;
 use App\Services\TelegramAgent\Tools\ListWorkflowsTool;
+use App\Services\TelegramAgent\Tools\PersistWorkflowTool;
 use App\Services\TelegramAgent\Tools\RefinePlanTool;
 use App\Services\TelegramAgent\Tools\ReplyTool;
 use App\Services\TelegramAgent\Tools\RunWorkflowTool;
@@ -73,6 +74,10 @@ final class TelegramAgent implements Agent, Conversational, HasTools
                 'botToken' => $this->botToken,
             ]),
             app()->make(RefinePlanTool::class, [
+                'chatId'   => $this->chatId,
+                'botToken' => $this->botToken,
+            ]),
+            app()->make(PersistWorkflowTool::class, [
                 'chatId'   => $this->chatId,
                 'botToken' => $this->botToken,
             ]),
