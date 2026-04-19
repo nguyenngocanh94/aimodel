@@ -205,3 +205,18 @@ NM1 (backend manifest) ─► NM2 (frontend client + form) ─► NM3 (inspector
 ```
 
 Strictly sequential. Each task closes cleanly before the next starts; no parallelism beyond what a single task internally permits.
+
+---
+
+## Done — results
+
+| Task | Commit | Tests |
+|------|--------|-------|
+| NM1 — backend transpiler + `GET /api/nodes/manifest` | `505cbe6` | ConfigSchemaTranspilerTest + NodeManifestControllerTest (green) |
+| NM2 — frontend manifest client + JsonSchemaForm | `667b887` / `d47a582` | 22 tests green (fetcher + JsonSchemaForm) |
+| NM3 — inspector integration + pilot template strip | `c0db607` | storyWriter, humanGate, userPrompt stripped; inspector renders from manifest |
+| NM4 — drift parity tests + humanGate loop close | *(this commit)* | Backend: 90 tests / 236 assertions; Frontend: 7 tests |
+
+**humanGate-in-UI smoke summary:** The backend manifest for `storyWriter` emits a `humanGate` nested object under `configSchema.properties` with sub-keys `enabled` (boolean, default false), `channel` (enum: ui/telegram/mcp/any), `botToken`, `chatId`, `options` (array), `timeoutSeconds` (integer 0–86400). With NM3 landed, opening the "StoryWriter (per-node gate) – Telegram" workflow and clicking the storyWriter node would show a collapsible `humanGate` fieldset in the inspector with an `enabled` toggle, `channel` select, `botToken`/`chatId` text inputs, `options` array widget, and `timeoutSeconds` number field — all rendered generically by `JsonSchemaForm` from the live manifest without any TS schema duplication.
+
+**Follow-up (NM5):** The 18 non-pilot frontend templates still have local `configSchema` Zod definitions. A sweep bead can strip them using the same NM3 pattern once the manifest-driven inspector has proven stability in production. The frontend-only templates (`diverge`, `productImageInput`, `wanI2V`, `wanImageEdit`, `wanVideoEdit`) still need backend PHP counterparts — tracked in `FRONTEND_ONLY_TYPES` in the parity test.

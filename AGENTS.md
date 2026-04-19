@@ -219,6 +219,10 @@ Do not halt all agents for review. Designate 1–2 agents finishing beads for re
 - **Tailwind for styling.** No CSS modules, no styled-components.
 - **Small, focused commits.** One bead = one commit (or a few).
 
+## Node Schema Authority
+
+**Node schemas are backend-authoritative.** `GET /api/nodes/manifest` is the source of truth for ports, config rules, and defaults. Frontend templates own only `mockExecute`, `buildPreview`, `fixtures`, and visual hints — never re-author `configSchema` or `defaultConfig` in TS. To add a new config field to a node: edit `configRules()` on the PHP template, done. The inspector picks it up automatically via the manifest. See `docs/plans/2026-04-18-node-manifest-alignment.md`.
+
 ## Milestone Order
 
 Work proceeds through 6 milestones in sequence:
