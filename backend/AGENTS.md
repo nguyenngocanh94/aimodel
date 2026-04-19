@@ -51,6 +51,29 @@ docker exec backend-app-1 php artisan config:clear
 4. Conversation memory is keyed on `"{chatId}:{botToken}"` via `RedisConversationStore`.
 5. The `workflow-runs` queue must remain separate from the default queue.
 
+### Conversational workflow composition
+
+Users can create new workflows via Telegram chat. Example:
+
+> User: tạo workflow sinh video TVC 9:16 chăm sóc sức khỏe
+> Bot: [drafts plan via ComposeWorkflowTool, explains in Vietnamese]
+> User: chỉnh: thêm humor nhẹ
+> Bot: [re-plans via RefinePlanTool]
+> User: ok
+> Bot: ✅ Đã lưu workflow health-tvc-9x16.
+
+Three tools chain the flow (under `App\Services\TelegramAgent\Tools\`):
+`ComposeWorkflowTool` drafts via `WorkflowPlanner`, `RefinePlanTool` iterates
+on user feedback (max 5 per session), `PersistWorkflowTool` commits the plan
+as a triggerable `Workflow` row on approval. The skill driving this
+(`ComposeWorkflowSkill`) encodes approval/refinement/rejection vocabulary
+so the LLM can dispatch correctly. Plan state lives in
+`AgentSession::pendingPlan` (Redis, namespace `ai_session:`).
+
+Never persist without explicit approval ("ok", "đồng ý", "chốt", …).
+Never run `PersistWorkflowTool` from any context that isn't a direct
+response to user approval in the same conversation turn.
+
 ## References
 
 - Migration plan: `docs/plans/2026-04-18-migrate-to-laravel-ai.md`
