@@ -1,11 +1,8 @@
 import { z } from 'zod';
-import { useMemo } from 'react';
 import type {
   PortDefinition,
   PortPayload,
 } from '@/features/workflows/domain/workflow-types';
-import type { JsonSchemaNode, NodeManifest } from './manifest/types';
-import { useNodeManifestEntry } from './manifest/manifest-context';
 
 // Import all node templates for registration
 import {
@@ -83,16 +80,9 @@ interface NodeTemplateBase<TConfig> {
   readonly description: string;
   readonly inputs: readonly PortDefinition[];
   readonly outputs: readonly PortDefinition[];
-  /**
-   * Local default config. Required for all templates; pilot templates (NM3+) may
-   * provide an empty object — the manifest's defaultConfig overrides at runtime.
-   */
   readonly defaultConfig: Readonly<TConfig>;
-  /**
-   * Local Zod config schema. Optional for pilot templates migrated to manifest-driven
-   * rendering (NM3+). When absent, the inspector uses the manifest's JSON Schema.
-   */
-  readonly configSchema?: z.ZodType<TConfig, z.ZodTypeDef, unknown>;
+  /** Parses/validates config output `TConfig`; input may include undefined for `.default()` fields. */
+  readonly configSchema: z.ZodType<TConfig, z.ZodTypeDef, unknown>;
   readonly fixtures: readonly NodeFixture<TConfig>[];
   readonly buildPreview: (args: {
     readonly config: Readonly<TConfig>;
@@ -283,52 +273,4 @@ export function hasTemplate(type: string): boolean {
  */
 export function getTemplateCount(): number {
   return nodeTemplateRegistry.size;
-}
-
-// ============================================================
-// useResolvedNodeTemplate — NM3 hook
-// ============================================================
-
-export interface ResolvedNodeTemplate<TConfig = Record<string, unknown>> {
-  /** The registered TS template (may lack configSchema/defaultConfig for pilot nodes). */
-  readonly template: NodeTemplate<TConfig> | undefined;
-  /** Config schema from manifest when available, falls back to template.configSchema. */
-  readonly manifestConfigSchema: JsonSchemaNode | undefined;
-  /** Manifest entry, if loaded. */
-  readonly manifestEntry: NodeManifest | undefined;
-  /** Merged default config: manifest defaultConfig > template.defaultConfig > {}. */
-  readonly defaultConfig: Readonly<Record<string, unknown>>;
-}
-
-/**
- * useResolvedNodeTemplate — resolves a node template by type, enriched with
- * manifest data when available.
- *
- * - When manifest is loading: manifestConfigSchema is undefined; use local configSchema.
- * - When manifest has the type: use its configSchema and defaultConfig.
- * - Fallback to template.defaultConfig (or {}) if manifest not ready.
- *
- * Prefer this hook in the inspector over getTemplate() directly.
- */
-export function useResolvedNodeTemplate<TConfig = Record<string, unknown>>(
-  type: string,
-): ResolvedNodeTemplate<TConfig> {
-  const template = useMemo(() => getTemplate<TConfig>(type), [type]);
-  const manifestEntry = useNodeManifestEntry(type);
-
-  return useMemo((): ResolvedNodeTemplate<TConfig> => {
-    const manifestConfigSchema = manifestEntry?.configSchema as JsonSchemaNode | undefined;
-    // Manifest defaultConfig takes priority over local template.defaultConfig
-    const defaultConfig: Record<string, unknown> =
-      (manifestEntry?.defaultConfig as Record<string, unknown> | undefined) ??
-      (template?.defaultConfig as Record<string, unknown>) ??
-      {};
-
-    return {
-      template,
-      manifestConfigSchema,
-      manifestEntry,
-      defaultConfig,
-    };
-  }, [template, manifestEntry]);
 }

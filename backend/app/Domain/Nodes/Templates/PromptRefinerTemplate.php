@@ -10,12 +10,8 @@ use App\Domain\NodeCategory;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
-use App\Domain\Nodes\GuideKnob;
-use App\Domain\Nodes\GuidePort;
 use App\Domain\Nodes\NodeExecutionContext;
-use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplate;
-use App\Domain\Nodes\VibeImpact;
 use App\Domain\Wan\PromptDictionary;
 
 class PromptRefinerTemplate extends NodeTemplate
@@ -71,9 +67,6 @@ class PromptRefinerTemplate extends NodeTemplate
             'characterTags' => ['sometimes', 'array'],
             'characterTags.*' => ['string'],
             'includeSound' => ['sometimes', 'boolean'],
-            // Planner-set creative knobs.
-            'visual_polish' => ['sometimes', 'string', 'in:raw_authentic,natural_clean,polished_minimal,hyper_polished'],
-            'mood_palette' => ['sometimes', 'string', 'in:warm,cool,neutral,high_contrast,pastel,moody'],
         ];
     }
 
@@ -91,97 +84,7 @@ class PromptRefinerTemplate extends NodeTemplate
             'wanAspectRatio' => '9:16',
             'characterTags' => [],
             'includeSound' => false,
-            // Planner-set creative knobs.
-            'visual_polish' => 'natural_clean',
-            'mood_palette' => 'neutral',
         ];
-    }
-
-    public function plannerGuide(): NodeGuide
-    {
-        return new NodeGuide(
-            nodeId: $this->type,
-            purpose: 'Generate detailed image/video prompts for each scene. Canonical home for visual_polish and mood_palette.',
-            position: 'after sceneSplitter (or storyWriter in Wan mode), before the generator',
-            vibeImpact: VibeImpact::Critical,
-            humanGate: false,
-            knobs: [
-                new GuideKnob(
-                    name: 'visual_polish',
-                    type: 'enum',
-                    options: ['raw_authentic', 'natural_clean', 'polished_minimal', 'hyper_polished'],
-                    default: 'natural_clean',
-                    effect: 'Canonical. Finish level baked into the generated prompts.',
-                    vibeMapping: [
-                        'funny_storytelling' => 'natural_clean',
-                        'clean_education' => 'natural_clean',
-                        'aesthetic_mood' => 'polished_minimal',
-                        'raw_authentic' => 'raw_authentic',
-                    ],
-                ),
-                new GuideKnob(
-                    name: 'mood_palette',
-                    type: 'enum',
-                    options: ['warm', 'cool', 'neutral', 'high_contrast', 'pastel', 'moody'],
-                    default: 'neutral',
-                    effect: 'Canonical. Color/lighting family baked into prompts.',
-                    vibeMapping: [
-                        'funny_storytelling' => 'warm',
-                        'clean_education' => 'neutral',
-                        'aesthetic_mood' => 'pastel',
-                        'raw_authentic' => 'moody',
-                    ],
-                ),
-                new GuideKnob(
-                    name: 'humor_density',
-                    type: 'enum',
-                    options: ['none', 'punchline_only', 'throughout'],
-                    default: 'punchline_only',
-                    effect: 'Planner hint: permits comedic visual language. Canonical on storyWriter.',
-                    vibeMapping: [
-                        'funny_storytelling' => 'throughout',
-                        'clean_education' => 'none',
-                        'aesthetic_mood' => 'none',
-                        'raw_authentic' => 'none',
-                    ],
-                ),
-                new GuideKnob(
-                    name: 'product_emphasis',
-                    type: 'enum',
-                    options: ['subtle', 'balanced', 'hero'],
-                    default: 'balanced',
-                    effect: 'Planner hint: framing of the product in prompts. Canonical on scriptWriter.',
-                    vibeMapping: [
-                        'funny_storytelling' => 'subtle',
-                        'clean_education' => 'hero',
-                        'aesthetic_mood' => 'subtle',
-                        'raw_authentic' => 'balanced',
-                    ],
-                ),
-                new GuideKnob(
-                    name: 'edit_pace',
-                    type: 'enum',
-                    options: ['slow_meditative', 'steady', 'fast_cut', 'rapid_fire'],
-                    default: 'steady',
-                    effect: 'Planner hint: pacing informs shot duration and camera movement choices. Canonical on sceneSplitter.',
-                    vibeMapping: [
-                        'funny_storytelling' => 'fast_cut',
-                        'clean_education' => 'steady',
-                        'aesthetic_mood' => 'slow_meditative',
-                        'raw_authentic' => 'steady',
-                    ],
-                ),
-            ],
-            readsFrom: ['sceneSplitter', 'storyWriter'],
-            writesTo: ['videoGenerator', 'imageGenerator'],
-            ports: [
-                GuidePort::input('scenes', 'sceneList', false),
-                GuidePort::input('story', 'text', false),
-                GuidePort::output('prompts', 'promptList'),
-            ],
-            whenToInclude: 'always before calling an image/video generator',
-            whenToSkip: 'when scene prompts are authored by hand',
-        );
     }
 
     public function execute(NodeExecutionContext $ctx): array

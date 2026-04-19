@@ -10,12 +10,8 @@ use App\Domain\NodeCategory;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
-use App\Domain\Nodes\GuideKnob;
-use App\Domain\Nodes\GuidePort;
 use App\Domain\Nodes\NodeExecutionContext;
-use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplate;
-use App\Domain\Nodes\VibeImpact;
 
 class ProductAnalyzerTemplate extends NodeTemplate
 {
@@ -45,8 +41,6 @@ class ProductAnalyzerTemplate extends NodeTemplate
             'apiKey' => ['sometimes', 'string'],
             'model' => ['sometimes', 'string'],
             'analysisDepth' => ['sometimes', 'string', 'in:basic,detailed'],
-            // Planner-set creative knobs.
-            'analysis_angle' => ['sometimes', 'string', 'in:neutral,entertainment_ready,education_ready,aesthetic_ready'],
         ];
     }
 
@@ -57,57 +51,7 @@ class ProductAnalyzerTemplate extends NodeTemplate
             'apiKey' => '',
             'model' => 'gpt-4o',
             'analysisDepth' => 'detailed',
-            // Planner-set creative knobs.
-            'analysis_angle' => 'neutral',
         ];
-    }
-
-    public function plannerGuide(): NodeGuide
-    {
-        return new NodeGuide(
-            nodeId: $this->type,
-            purpose: 'Analyze product images and extract features, selling points, target audience, and suggested mood. Tilts the analysis wording toward the downstream vibe.',
-            position: 'early in the pipeline; feeds creative nodes',
-            vibeImpact: VibeImpact::Neutral,
-            humanGate: false,
-            knobs: [
-                new GuideKnob(
-                    name: 'analysis_angle',
-                    type: 'enum',
-                    options: ['neutral', 'entertainment_ready', 'education_ready', 'aesthetic_ready'],
-                    default: 'neutral',
-                    effect: 'Tilts selling-point wording and suggestedMood toward the downstream vibe.',
-                    vibeMapping: [
-                        'funny_storytelling' => 'entertainment_ready',
-                        'clean_education' => 'education_ready',
-                        'aesthetic_mood' => 'aesthetic_ready',
-                        'raw_authentic' => 'neutral',
-                    ],
-                ),
-                new GuideKnob(
-                    name: 'product_emphasis',
-                    type: 'enum',
-                    options: ['subtle', 'balanced', 'hero'],
-                    default: 'balanced',
-                    effect: 'Planner hint: which traits to foreground in the analysis report. Canonical on scriptWriter.',
-                    vibeMapping: [
-                        'funny_storytelling' => 'subtle',
-                        'clean_education' => 'hero',
-                        'aesthetic_mood' => 'subtle',
-                        'raw_authentic' => 'balanced',
-                    ],
-                ),
-            ],
-            readsFrom: [],
-            writesTo: ['storyWriter', 'scriptWriter', 'intentOutcomeSelector'],
-            ports: [
-                GuidePort::input('images', 'imageAssetList', true),
-                GuidePort::input('description', 'text', false),
-                GuidePort::output('analysis', 'json'),
-            ],
-            whenToInclude: 'always when a product is present in the brief',
-            whenToSkip: 'when the workflow is product-agnostic (e.g. seasonal brand-mood content)',
-        );
     }
 
     public function execute(NodeExecutionContext $ctx): array
