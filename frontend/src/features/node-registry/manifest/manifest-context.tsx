@@ -80,7 +80,7 @@ function writeCache(manifest: ManifestResponse): void {
 // Context
 // ────────────────────────────────────────────────────────────────
 
-const ManifestContext = createContext<ManifestContextValue | null>(null);
+export const ManifestContext = createContext<ManifestContextValue | null>(null);
 
 // ────────────────────────────────────────────────────────────────
 // Provider
