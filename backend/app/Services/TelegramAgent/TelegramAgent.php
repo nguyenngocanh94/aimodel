@@ -13,6 +13,7 @@ use Laravel\Ai\Contracts\Conversational;
 use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Promptable;
 use App\Services\TelegramAgent\Tools\CancelRunTool;
+use App\Services\TelegramAgent\Tools\ComposeWorkflowTool;
 use App\Services\TelegramAgent\Tools\GetRunStatusTool;
 use App\Services\TelegramAgent\Tools\ListWorkflowsTool;
 use App\Services\TelegramAgent\Tools\ReplyTool;
@@ -32,6 +33,13 @@ final class TelegramAgent implements Agent, Conversational, HasTools
     use Promptable;
     use RemembersConversations;
 
+    /**
+     * Last inbound Telegram update passed to handle() — used when building instructions() for appliesTo().
+     *
+     * @var array<string, mixed>
+     */
+    private array $instructionContextUpdate = [];
+
     public function __construct(
         public string $chatId,
         public string $botToken,
@@ -48,7 +56,7 @@ final class TelegramAgent implements Agent, Conversational, HasTools
             ->get(['slug', 'name', 'nl_description', 'param_schema'])
             ->toArray();
 
-        return SystemPrompt::build($catalog, $this->chatId);
+        return SystemPrompt::build($catalog, $this->chatId, $this->instructionContextUpdate);
     }
 
     public function tools(): iterable
@@ -59,6 +67,7 @@ final class TelegramAgent implements Agent, Conversational, HasTools
             new GetRunStatusTool(),
             new CancelRunTool(),
             new ReplyTool(botToken: $this->botToken, chatId: $this->chatId),
+            new ComposeWorkflowTool(),
         ];
     }
 
@@ -99,6 +108,8 @@ final class TelegramAgent implements Agent, Conversational, HasTools
         }
 
         // ── LLM path ─────────────────────────────────────────────────────────
+        $this->instructionContextUpdate = $update;
+
         // Load or create conversation memory keyed on chatId:botToken.
         $conversationUser = $this->makeConversationUser();
         $this->continueLastConversation($conversationUser);

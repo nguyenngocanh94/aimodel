@@ -309,3 +309,10 @@ TA5 can run in parallel with TA4 if desired — different files, no overlap. TA6
 
 - **Soft dep on aimodel-645 (AI Planner):** TA5's `ComposeWorkflowTool` is a stub. When 645 lands, swap the stub for the real planner invocation. The Assistant's contract doesn't change.
 - **No relation to aimodel-4cq (Node Manifest Alignment):** different surface.
+
+---
+
+## Done — results
+
+- Implemented TA1–TA6: `Skill` / `SkillComposer`, four skills, `SystemPrompt` + `config/telegram_agent.php`, `ComposeWorkflowTool`, `AssistantBehaviorTest` (with in-memory `ConversationStore` binding so PHPUnit does not require Redis), `AGENTS.md` note.
+- Filtered PHPUnit sweep (see TA6): run in Docker against a stack with Redis for `TelegramAgentTest` if exercising the full list including session persistence.
