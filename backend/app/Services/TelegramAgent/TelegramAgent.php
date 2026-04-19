@@ -67,7 +67,10 @@ final class TelegramAgent implements Agent, Conversational, HasTools
             new GetRunStatusTool(),
             new CancelRunTool(),
             new ReplyTool(botToken: $this->botToken, chatId: $this->chatId),
-            new ComposeWorkflowTool(),
+            app()->make(ComposeWorkflowTool::class, [
+                'chatId'   => $this->chatId,
+                'botToken' => $this->botToken,
+            ]),
         ];
     }
 

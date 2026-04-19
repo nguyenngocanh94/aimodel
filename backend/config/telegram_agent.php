@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Services\TelegramAgent\Skills\ComposeWorkflowSkill;
 use App\Services\TelegramAgent\Skills\ExtractProductBriefSkill;
 use App\Services\TelegramAgent\Skills\NoRamblingSkill;
 use App\Services\TelegramAgent\Skills\RouteOrRefuseSkill;
@@ -15,6 +16,7 @@ return [
      */
     'skills' => [
         RouteOrRefuseSkill::class,
+        ComposeWorkflowSkill::class,
         ExtractProductBriefSkill::class,
         VietnameseToneSkill::class,
         NoRamblingSkill::class,
