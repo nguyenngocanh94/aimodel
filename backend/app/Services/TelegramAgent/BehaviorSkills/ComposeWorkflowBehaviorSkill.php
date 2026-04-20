@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace App\Services\TelegramAgent\Skills;
+namespace App\Services\TelegramAgent\BehaviorSkills;
 
 /**
  * Teaches the model the propose → explain → approve → persist loop for
  * conversational workflow composition.
  *
- * Order matters: this skill slots AFTER {@see RouteOrRefuseSkill} so the model
+ * Order matters: this skill slots AFTER {@see RouteOrRefuseBehaviorSkill} so the model
  * first tries to match the catalog; only then does it fall through to drafting.
  */
-final class ComposeWorkflowSkill extends AbstractSkill
+final class ComposeWorkflowBehaviorSkill extends AbstractBehaviorSkill
 {
     public function name(): string
     {

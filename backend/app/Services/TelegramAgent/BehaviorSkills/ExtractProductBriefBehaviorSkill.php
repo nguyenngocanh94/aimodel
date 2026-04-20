@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Services\TelegramAgent\Skills;
+namespace App\Services\TelegramAgent\BehaviorSkills;
 
-final class ExtractProductBriefSkill extends AbstractSkill
+final class ExtractProductBriefBehaviorSkill extends AbstractBehaviorSkill
 {
     public function name(): string
     {

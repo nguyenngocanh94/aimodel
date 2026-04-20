@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\TelegramAgent;
 
-use App\Services\TelegramAgent\Skills\RouteOrRefuseSkill;
-use App\Services\TelegramAgent\Skills\VietnameseToneSkill;
+use App\Services\TelegramAgent\BehaviorSkills\RouteOrRefuseBehaviorSkill;
+use App\Services\TelegramAgent\BehaviorSkills\VietnameseToneBehaviorSkill;
 use App\Services\TelegramAgent\SystemPrompt;
 use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
@@ -100,9 +100,9 @@ final class SystemPromptTest extends TestCase
 
     public function test_build_respects_config_skill_order(): void
     {
-        Config::set('telegram_agent.skills', [
-            VietnameseToneSkill::class,
-            RouteOrRefuseSkill::class,
+        Config::set('telegram_agent.behavior_skills', [
+            VietnameseToneBehaviorSkill::class,
+            RouteOrRefuseBehaviorSkill::class,
         ]);
 
         $prompt = SystemPrompt::build([], '1');

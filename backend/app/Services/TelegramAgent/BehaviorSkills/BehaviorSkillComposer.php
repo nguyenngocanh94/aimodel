@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace App\Services\TelegramAgent\Skills;
+namespace App\Services\TelegramAgent\BehaviorSkills;
 
 /**
- * Builds the Telegram Assistant system prompt from ordered skills + catalog preview.
+ * Builds the Telegram Assistant system prompt from ordered behavior skills + catalog preview.
  *
  * Tool names match laravel/ai class_basename() derivation (see TelegramAgent::tools()).
  */
-final class SkillComposer
+final class BehaviorSkillComposer
 {
     /**
      * Registered agent tools (verbatim names the model must know).
@@ -26,7 +26,7 @@ final class SkillComposer
     ];
 
     /**
-     * @param  list<Skill>  $skills
+     * @param  list<BehaviorSkill>  $skills
      * @param  array<string, mixed>  $update
      * @param  array<int, array{slug: string, name: string, nl_description: string|null, param_schema: array|null}>  $catalogPreview
      */

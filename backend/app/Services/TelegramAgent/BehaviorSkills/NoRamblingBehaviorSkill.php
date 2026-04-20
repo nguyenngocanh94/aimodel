@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Services\TelegramAgent\Skills;
+namespace App\Services\TelegramAgent\BehaviorSkills;
 
-final class NoRamblingSkill extends AbstractSkill
+final class NoRamblingBehaviorSkill extends AbstractBehaviorSkill
 {
     public function name(): string
     {

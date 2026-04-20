@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Services\TelegramAgent\Skills;
+namespace App\Services\TelegramAgent\BehaviorSkills;
 
-abstract class AbstractSkill implements Skill
+abstract class AbstractBehaviorSkill implements BehaviorSkill
 {
     /**
      * @param  array<string, mixed>  $update

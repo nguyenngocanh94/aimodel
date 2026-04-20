@@ -15,7 +15,7 @@ This repo builds an **AI Video Workflow Builder** — a browser-based visual pip
 
 ### Telegram Assistant (Laravel `backend/`)
 
-The Telegram-facing **Assistant** routes user messages to catalog workflows via `laravel/ai`. Its instructions are built from composable **Skills** in `backend/app/Services/TelegramAgent/Skills/`. To change tone or guardrails, edit an existing skill or add a class implementing `Skill` and list it in `backend/config/telegram_agent.php` (order matters). Avoid embedding one-off behavior in `TelegramAgent.php` or `SystemPrompt.php` except wiring.
+The Telegram-facing **Assistant** routes user messages to catalog workflows via `laravel/ai`. Its instructions are built from composable **BehaviorSkills** in `backend/app/Services/TelegramAgent/BehaviorSkills/` (prompt guardrails, not tools). To change tone or guardrails, edit an existing `*BehaviorSkill` class or add a new one implementing `BehaviorSkill` and list it in `backend/config/telegram_agent.php` under `behavior_skills` (order matters). Tool capsules (progressive-disclosure `Skill`s for the sdk-skills package) live in `resources/skills/` — do not confuse the two.
 
 ## Tech Stack
 

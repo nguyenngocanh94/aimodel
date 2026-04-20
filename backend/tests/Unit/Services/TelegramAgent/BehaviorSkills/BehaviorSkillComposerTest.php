@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Services\TelegramAgent\Skills;
+namespace Tests\Unit\Services\TelegramAgent\BehaviorSkills;
 
-use App\Services\TelegramAgent\Skills\AbstractSkill;
-use App\Services\TelegramAgent\Skills\SkillComposer;
+use App\Services\TelegramAgent\BehaviorSkills\AbstractBehaviorSkill;
+use App\Services\TelegramAgent\BehaviorSkills\BehaviorSkillComposer;
 use PHPUnit\Framework\TestCase;
 
-final class SkillComposerTest extends TestCase
+final class BehaviorSkillComposerTest extends TestCase
 {
     public function test_compose_produces_vietnamese_preamble_with_chat_id(): void
     {
-        $composer = new SkillComposer();
+        $composer = new BehaviorSkillComposer();
         $out      = $composer->compose([], [], [], 'chat-xyz');
 
         $this->assertStringContainsString('chat-xyz', $out);
@@ -22,7 +22,7 @@ final class SkillComposerTest extends TestCase
 
     public function test_compose_includes_each_applying_skill_in_declared_order(): void
     {
-        $skillA = new class extends AbstractSkill
+        $skillA = new class extends AbstractBehaviorSkill
         {
             public function name(): string
             {
@@ -35,7 +35,7 @@ final class SkillComposerTest extends TestCase
             }
         };
 
-        $skillB = new class extends AbstractSkill
+        $skillB = new class extends AbstractBehaviorSkill
         {
             public function name(): string
             {
@@ -48,7 +48,7 @@ final class SkillComposerTest extends TestCase
             }
         };
 
-        $composer = new SkillComposer();
+        $composer = new BehaviorSkillComposer();
         $out      = $composer->compose([$skillA, $skillB], [], [], '1');
 
         $posA = strpos($out, 'FRAGMENT_A_FIRST');
@@ -60,7 +60,7 @@ final class SkillComposerTest extends TestCase
 
     public function test_compose_skips_skills_that_do_not_apply(): void
     {
-        $skipped = new class extends AbstractSkill
+        $skipped = new class extends AbstractBehaviorSkill
         {
             public function name(): string
             {
@@ -78,7 +78,7 @@ final class SkillComposerTest extends TestCase
             }
         };
 
-        $kept = new class extends AbstractSkill
+        $kept = new class extends AbstractBehaviorSkill
         {
             public function name(): string
             {
@@ -91,7 +91,7 @@ final class SkillComposerTest extends TestCase
             }
         };
 
-        $composer = new SkillComposer();
+        $composer = new BehaviorSkillComposer();
         $out      = $composer->compose([$skipped, $kept], [], [], '1');
 
         $this->assertStringNotContainsString('SHOULD_NOT_APPEAR', $out);
@@ -115,7 +115,7 @@ final class SkillComposerTest extends TestCase
             ],
         ];
 
-        $composer = new SkillComposer();
+        $composer = new BehaviorSkillComposer();
         $out      = $composer->compose([], [], $catalog, '1');
 
         $this->assertStringContainsString('- slug: wf-one', $out);
@@ -126,7 +126,7 @@ final class SkillComposerTest extends TestCase
 
     public function test_compose_includes_all_registered_tool_names(): void
     {
-        $composer = new SkillComposer();
+        $composer = new BehaviorSkillComposer();
         $out      = $composer->compose([], [], [], '1');
 
         foreach ([
@@ -143,7 +143,7 @@ final class SkillComposerTest extends TestCase
 
     public function test_abstract_skill_defaults_applies_to_true(): void
     {
-        $skill = new class extends AbstractSkill
+        $skill = new class extends AbstractBehaviorSkill
         {
             public function name(): string
             {

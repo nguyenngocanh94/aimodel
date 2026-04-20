@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Services\TelegramAgent\Skills;
+namespace App\Services\TelegramAgent\BehaviorSkills;
 
 /**
  * Composable instruction fragment for the Telegram Assistant system prompt.
  */
-interface Skill
+interface BehaviorSkill
 {
     /**
      * Slug for logging, config, and ordering (e.g. "route-or-refuse").

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Services\TelegramAgent\Skills;
+namespace App\Services\TelegramAgent\BehaviorSkills;
 
-final class RouteOrRefuseSkill extends AbstractSkill
+final class RouteOrRefuseBehaviorSkill extends AbstractBehaviorSkill
 {
     public function name(): string
     {
