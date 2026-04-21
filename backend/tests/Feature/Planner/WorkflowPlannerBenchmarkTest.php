@@ -54,7 +54,7 @@ final class WorkflowPlannerBenchmarkTest extends TestCase
         $transpiler = new ConfigSchemaTranspiler();
         $validator = new WorkflowPlanValidator($registry, new TypeCompatibility(), $transpiler);
         $manifestBuilder = new NodeManifestBuilder($transpiler);
-        $this->planner = new WorkflowPlanner($registry, $manifestBuilder, $validator);
+        $this->planner = new WorkflowPlanner($this->app, $registry, $manifestBuilder, $validator);
 
         $this->loader = new BenchmarkFixtureLoader();
     }

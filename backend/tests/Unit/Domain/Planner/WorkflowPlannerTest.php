@@ -36,7 +36,7 @@ final class WorkflowPlannerTest extends TestCase
         $validator = new WorkflowPlanValidator($registry, $typeCompat, $transpiler);
         $manifestBuilder = new NodeManifestBuilder($transpiler);
 
-        $this->planner = new WorkflowPlanner($registry, $manifestBuilder, $validator);
+        $this->planner = new WorkflowPlanner($this->app, $registry, $manifestBuilder, $validator);
     }
 
     #[Test]

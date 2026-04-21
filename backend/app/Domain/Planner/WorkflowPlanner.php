@@ -7,6 +7,7 @@ namespace App\Domain\Planner;
 use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeManifestBuilder;
 use App\Domain\Nodes\NodeTemplateRegistry;
+use Illuminate\Contracts\Container\Container;
 use Laravel\Ai\AnonymousAgent;
 use Laravel\Ai\Responses\AgentResponse;
 use Throwable;
@@ -27,6 +28,7 @@ use Throwable;
 final class WorkflowPlanner
 {
     public function __construct(
+        private readonly Container $app,
         private readonly NodeTemplateRegistry $registry,
         private readonly NodeManifestBuilder $manifestBuilder,
         private readonly WorkflowPlanValidator $validator,
@@ -131,6 +133,24 @@ final class WorkflowPlanner
     /**
      * @return list<NodeGuide>
      */
+    /**
+     * @return list<object>
+     */
+    /**
+     * @return list<object>
+     */
+    protected function plannerTools(): array
+    {
+        // tagged() returns RewindableGenerator when tag exists, [] otherwise.
+        /** @var iterable<object>|array $tagged */
+        $tagged = $this->app->tagged('planner.tools');
+
+        return $tagged === [] ? [] : array_values(iterator_to_array($tagged));
+    }
+
+    /**
+     * @return list<NodeGuide>
+     */
     private function buildCatalog(): array
     {
         $guides = $this->registry->guides();
@@ -144,7 +164,7 @@ final class WorkflowPlanner
         $agent = new AnonymousAgent(
             instructions: $prompt,
             messages: [],
-            tools: [],
+            tools: $this->plannerTools(),
         );
 
         // Empty user prompt — the "real" prompt sits in instructions. Most

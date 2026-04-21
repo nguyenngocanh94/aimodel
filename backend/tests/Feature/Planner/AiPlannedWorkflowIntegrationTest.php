@@ -63,7 +63,7 @@ final class AiPlannedWorkflowIntegrationTest extends TestCase
         $validator = new WorkflowPlanValidator($registry, new TypeCompatibility(), $transpiler);
         $manifestBuilder = new NodeManifestBuilder($transpiler);
 
-        $this->planner = new WorkflowPlanner($registry, $manifestBuilder, $validator);
+        $this->planner = new WorkflowPlanner($this->app, $registry, $manifestBuilder, $validator);
 
         /** @var list<Scorer> $scorers */
         $scorers = [
