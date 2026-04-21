@@ -12,6 +12,7 @@ use App\Domain\Nodes\NodeTemplate;
 use App\Domain\Nodes\NodeTemplateRegistry;
 use App\Domain\RunTrigger;
 use App\Events\NodeStatusChanged;
+use App\Events\NodeTokenDelta;
 use App\Models\ExecutionRun;
 use App\Models\NodeRunRecord;
 use App\Models\PendingInteraction;
@@ -191,6 +192,20 @@ final class RunExecutor
                 // Execute template
                 $startTime = hrtime(true);
 
+                // LP-C1/C2: build a per-node monotonic token-delta sink that
+                // broadcasts on the run's channel so the run page SSE stream
+                // sees `node.token.delta` frames interleaved with node.status.
+                $seq = 0;
+                $onTokenDelta = function (string $delta, string $messageId, string $nid, string $rid) use (&$seq): void {
+                    broadcast(new NodeTokenDelta(
+                        runId: $rid,
+                        nodeId: $nid,
+                        messageId: $messageId,
+                        delta: $delta,
+                        seq: $seq++,
+                    ));
+                };
+
                 $ctx = new NodeExecutionContext(
                     nodeId: $nodeId,
                     config: $node['data']['config'] ?? $node['config'] ?? [],
@@ -199,6 +214,7 @@ final class RunExecutor
                     artifactStore: $this->artifactStore,
                     memory: $this->memory,
                     workflowSlug: $this->workflowSlug($run),
+                    onTokenDelta: $onTokenDelta,
                 );
 
                 $outputs = $template->execute($ctx);
