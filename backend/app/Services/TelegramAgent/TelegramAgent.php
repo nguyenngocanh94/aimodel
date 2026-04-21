@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\TelegramAgent;
 
 use App\Models\Workflow;
+use App\Services\Ai\Middleware\RetryPrimary;
 use App\Services\Skills\SkillInclusionMode;
 use App\Services\Skills\Skillable;
 use Illuminate\Support\Facades\Http;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Log;
 use Laravel\Ai\Concerns\RemembersConversations;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
+use Laravel\Ai\Contracts\HasMiddleware;
 use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Promptable;
 use App\Services\TelegramAgent\Tools\ComposeWorkflowTool;
@@ -34,7 +36,7 @@ use Throwable;
  * the SkillRegistry. Full-mode tools (with constructor args) are returned by
  * {@see getSkillToolOverrides()}.
  */
-final class TelegramAgent implements Agent, Conversational, HasTools
+final class TelegramAgent implements Agent, Conversational, HasMiddleware, HasTools
 {
     use Promptable;
     use RemembersConversations;
@@ -71,6 +73,18 @@ final class TelegramAgent implements Agent, Conversational, HasTools
     public function tools(): iterable
     {
         return $this->skillTools();
+    }
+
+    /**
+     * Middleware pipeline (LP-H2/LP-H3): retry the primary provider on
+     * 429/overloaded with bounded backoff before the vendor failover loop
+     * advances to the next provider in config('ai.failover.text').
+     *
+     * @return array<int, object>
+     */
+    public function middleware(): array
+    {
+        return [new RetryPrimary((int) config('ai.failover.primary_max_retry_seconds', 10))];
     }
 
     /**
@@ -161,9 +175,14 @@ final class TelegramAgent implements Agent, Conversational, HasTools
         $conversationUser = $this->makeConversationUser();
         $this->continueLastConversation($conversationUser);
 
+        // LP-H3: use the ordered failover chain instead of a single provider.
+        // `withModelFailover()` iterates the array; RetryPrimary middleware (below)
+        // retries the primary on transient 429 / overloaded before failing over.
+        $chain = (array) config('ai.failover.text', [config('ai.default')]);
+
         $response = $this->prompt(
             $text,
-            provider: config('ai.default'),
+            provider: $chain,
         );
 
         // ReplyTool sends explicit replies during tool execution.

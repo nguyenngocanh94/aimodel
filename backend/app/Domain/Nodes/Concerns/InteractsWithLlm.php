@@ -71,9 +71,14 @@ trait InteractsWithLlm
      * Call laravel/ai for a text-generation round trip.
      * Templates should call this from execute() instead of a Provider adapter.
      *
+     * Provider resolution precedence (LP-H3):
+     *  1. `providerChain` array on the node config (per-node failover override).
+     *  2. `llm.provider` / legacy `provider` — single provider, no failover.
+     *  3. Global `config('ai.failover.text')` — ordered failover chain.
+     *  4. `config('ai.default')` scalar.
+     *
      * When the resolved provider is "stub", returns a JSON-encoded deterministic
-     * canned payload for offline tests. Callers that JSON-decode the response
-     * (the existing parse* helpers do) get a realistic shape back.
+     * canned payload for offline tests.
      */
     protected function callTextGeneration(
         NodeExecutionContext $ctx,
@@ -81,22 +86,58 @@ trait InteractsWithLlm
         string $prompt,
         ?int $maxTokens = null,
     ): string {
-        $provider = $this->resolveLlmProvider($ctx->config);
+        $providerArg = $this->resolveTextProviderArg($ctx->config);
 
-        if ($provider === 'stub') {
+        // Stub short-circuit — canned, offline output.
+        if ($providerArg === 'stub'
+            || (is_array($providerArg) && in_array('stub', $providerArg, true))
+        ) {
             return $this->stubTextGeneration($systemPrompt, $prompt);
         }
 
-        $model    = $this->resolveLlmModel($ctx->config, $provider) ?: null;
+        // Only a scalar (single-provider) path resolves a specific model; chains
+        // let each provider fall back to its own default_model.
+        $model = is_string($providerArg)
+            ? ($this->resolveLlmModel($ctx->config, $providerArg) ?: null)
+            : null;
 
         $agent = new AnonymousAgent($systemPrompt, [], []);
         $response = $agent->prompt(
             $prompt,
-            provider: $provider,
+            provider: $providerArg,
             model: $model,
         );
 
         return (string) $response->text;
+    }
+
+    /**
+     * Resolve the `provider` argument to pass to `$agent->prompt()`.
+     *
+     * @return string|array<int, string>
+     */
+    protected function resolveTextProviderArg(array $config): string|array
+    {
+        // 1. Per-node providerChain override — highest precedence.
+        $override = $config['providerChain'] ?? null;
+        if (is_array($override) && $override !== []) {
+            return array_values(array_map('strval', $override));
+        }
+
+        // 2. Explicit single-provider (legacy flat or llm.provider).
+        $explicit = $config['llm']['provider'] ?? $config['provider'] ?? '';
+        if (is_string($explicit) && $explicit !== '') {
+            return $explicit;
+        }
+
+        // 3. Global failover chain from config/ai.php.
+        $chain = (array) config('ai.failover.text', []);
+        if ($chain !== []) {
+            return array_values(array_map('strval', $chain));
+        }
+
+        // 4. Fallback to the legacy scalar default.
+        return (string) config('ai.default', 'fireworks');
     }
 
     /**
