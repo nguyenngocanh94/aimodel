@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domain\Nodes;
 
-use App\Domain\Capability;
 use App\Domain\DataType;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\PortPayload;
-use App\Domain\Providers\ProviderContract;
-use App\Domain\Providers\ProviderRouter;
 use App\Models\Artifact;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
@@ -19,7 +16,6 @@ final class NodeExecutionContextTest extends TestCase
 {
     private function makeContext(
         array $inputs = [],
-        ?ProviderRouter $router = null,
         ?ArtifactStoreContract $store = null,
     ): NodeExecutionContext {
         return new NodeExecutionContext(
@@ -27,7 +23,6 @@ final class NodeExecutionContextTest extends TestCase
             config: ['provider' => 'stub', 'model' => 'test'],
             inputs: $inputs,
             runId: 'run-abc',
-            providerRouter: $router ?? $this->createMock(ProviderRouter::class),
             artifactStore: $store ?? $this->createMock(ArtifactStoreContract::class),
         );
     }
@@ -74,24 +69,6 @@ final class NodeExecutionContextTest extends TestCase
         $ctx = $this->makeContext();
 
         $this->assertNull($ctx->inputValue('missing'));
-    }
-
-    #[Test]
-    public function provider_delegates_to_router_with_config(): void
-    {
-        $mockProvider = $this->createMock(ProviderContract::class);
-        $router = $this->createMock(ProviderRouter::class);
-
-        $router->expects($this->once())
-            ->method('resolve')
-            ->with(Capability::TextGeneration, ['provider' => 'stub', 'model' => 'test'])
-            ->willReturn($mockProvider);
-
-        $ctx = $this->makeContext(router: $router);
-
-        $result = $ctx->provider(Capability::TextGeneration);
-
-        $this->assertSame($mockProvider, $result);
     }
 
     #[Test]

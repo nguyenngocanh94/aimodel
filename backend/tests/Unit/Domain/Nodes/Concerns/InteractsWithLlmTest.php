@@ -126,7 +126,6 @@ final class InteractsWithLlmTest extends TestCase
             config: $config,
             inputs: [],
             runId: 'test-run',
-            providerRouter: $this->createMock(\App\Domain\Providers\ProviderRouter::class),
             artifactStore: $this->createMock(\App\Services\ArtifactStoreContract::class),
         );
     }

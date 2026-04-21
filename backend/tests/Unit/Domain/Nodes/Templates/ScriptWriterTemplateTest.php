@@ -10,11 +10,9 @@ use App\Domain\NodeCategory;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\Templates\ScriptWriterTemplate;
 use App\Domain\PortPayload;
-use App\Domain\Providers\Adapters\StubAdapter;
-use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 final class ScriptWriterTemplateTest extends TestCase
 {
@@ -22,6 +20,7 @@ final class ScriptWriterTemplateTest extends TestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
         $this->template = new ScriptWriterTemplate();
     }
 
@@ -50,11 +49,6 @@ final class ScriptWriterTemplateTest extends TestCase
     #[Test]
     public function execute_returns_script_via_provider(): void
     {
-        $router = $this->createMock(ProviderRouter::class);
-        $router->method('resolve')
-            ->with(Capability::TextGeneration, $this->anything())
-            ->willReturn(new StubAdapter());
-
         $ctx = new NodeExecutionContext(
             nodeId: 'node-2',
             config: ['provider' => 'stub'],
@@ -62,7 +56,6 @@ final class ScriptWriterTemplateTest extends TestCase
                 'prompt' => PortPayload::success('Write a script about nature', DataType::Prompt),
             ],
             runId: 'run-1',
-            providerRouter: $router,
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 

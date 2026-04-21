@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Domain\Nodes\Templates;
 
-use App\Domain\Capability;
 use App\Domain\DataType;
 use App\Domain\NodeCategory;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
+use App\Domain\Nodes\Concerns\InteractsWithLlm;
 use App\Domain\Nodes\GuideKnob;
 use App\Domain\Nodes\GuidePort;
 use App\Domain\Nodes\NodeExecutionContext;
@@ -19,6 +19,8 @@ use App\Domain\Nodes\VibeImpact;
 
 class ProductAnalyzerTemplate extends NodeTemplate
 {
+    use InteractsWithLlm;
+
     public string $type { get => 'productAnalyzer'; }
     public string $version { get => '1.0.0'; }
     public string $title { get => 'Product Analyzer'; }
@@ -140,19 +142,15 @@ class ProductAnalyzerTemplate extends NodeTemplate
             $imageUrls = array_merge($imageUrls, $urlMatches[0]);
         }
 
-        $input = [
-            'systemPrompt' => $this->buildSystemPrompt($analysisDepth),
-            'prompt' => $this->buildUserPrompt($images, $descText),
-        ];
-
+        $userPrompt = $this->buildUserPrompt($images, $descText);
         if (!empty($imageUrls)) {
-            $input['imageUrls'] = array_values(array_unique($imageUrls));
+            $userPrompt .= "\n\nReference image URLs:\n" . implode("\n", array_unique($imageUrls));
         }
 
-        $result = $ctx->provider(Capability::TextGeneration)->execute(
-            Capability::TextGeneration,
-            $input,
-            $config,
+        $result = $this->callTextGeneration(
+            $ctx,
+            $this->buildSystemPrompt($analysisDepth),
+            $userPrompt,
         );
 
         $analysis = $this->parseAnalysis($result);
@@ -204,6 +202,11 @@ class ProductAnalyzerTemplate extends NodeTemplate
 
             $decoded = json_decode(trim($cleaned), true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                // The canned stub response is a script-shaped array; recognise
+                // actual product analyses by the productType key.
+                if (!isset($decoded['productType'])) {
+                    return $this->fallbackAnalysis();
+                }
                 return $decoded;
             }
 

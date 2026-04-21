@@ -15,10 +15,6 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->renderable(function (\App\Domain\Providers\ProviderException $e) {
-            return response()->json($e->toArray(), 502);
-        });
-
         $exceptions->renderable(function (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json([
                 'error' => [

@@ -86,7 +86,7 @@ class HumanLoopStubTemplate extends StubTemplate
 {
     public string $type { get => 'humanLoopStub'; }
 
-    public function needsHumanLoop(): bool
+    public function needsHumanLoop(array $config = []): bool
     {
         return true;
     }

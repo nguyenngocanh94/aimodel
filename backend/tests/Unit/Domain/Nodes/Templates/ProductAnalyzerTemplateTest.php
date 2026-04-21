@@ -10,11 +10,9 @@ use App\Domain\NodeCategory;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\Templates\ProductAnalyzerTemplate;
 use App\Domain\PortPayload;
-use App\Domain\Providers\Adapters\StubAdapter;
-use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 final class ProductAnalyzerTemplateTest extends TestCase
 {
@@ -22,6 +20,7 @@ final class ProductAnalyzerTemplateTest extends TestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
         $this->template = new ProductAnalyzerTemplate();
     }
 
@@ -70,11 +69,6 @@ final class ProductAnalyzerTemplateTest extends TestCase
     #[Test]
     public function execute_with_stub_returns_json_analysis(): void
     {
-        $router = $this->createMock(ProviderRouter::class);
-        $router->method('resolve')
-            ->with(Capability::TextGeneration, $this->anything())
-            ->willReturn(new StubAdapter());
-
         $store = $this->createMock(ArtifactStoreContract::class);
 
         $ctx = new NodeExecutionContext(
@@ -90,7 +84,6 @@ final class ProductAnalyzerTemplateTest extends TestCase
                 ),
             ],
             runId: 'run-pa-1',
-            providerRouter: $router,
             artifactStore: $store,
         );
 

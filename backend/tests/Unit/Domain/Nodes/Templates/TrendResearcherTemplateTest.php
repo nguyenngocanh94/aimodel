@@ -10,11 +10,9 @@ use App\Domain\NodeCategory;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\Templates\TrendResearcherTemplate;
 use App\Domain\PortPayload;
-use App\Domain\Providers\Adapters\StubAdapter;
-use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 final class TrendResearcherTemplateTest extends TestCase
 {
@@ -22,6 +20,7 @@ final class TrendResearcherTemplateTest extends TestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
         $this->template = new TrendResearcherTemplate();
     }
 
@@ -71,11 +70,6 @@ final class TrendResearcherTemplateTest extends TestCase
     #[Test]
     public function execute_with_stub_returns_json_trend_brief(): void
     {
-        $router = $this->createMock(ProviderRouter::class);
-        $router->method('resolve')
-            ->with(Capability::TextGeneration, $this->anything())
-            ->willReturn(new StubAdapter());
-
         $ctx = new NodeExecutionContext(
             nodeId: 'node-trend-1',
             config: $this->template->defaultConfig(),
@@ -90,7 +84,6 @@ final class TrendResearcherTemplateTest extends TestCase
                 ),
             ],
             runId: 'run-trend-1',
-            providerRouter: $router,
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 

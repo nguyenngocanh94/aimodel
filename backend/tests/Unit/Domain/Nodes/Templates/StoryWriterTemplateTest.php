@@ -12,11 +12,9 @@ use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\Templates\StoryWriterTemplate;
 use App\Domain\Nodes\VibeImpact;
 use App\Domain\PortPayload;
-use App\Domain\Providers\Adapters\StubAdapter;
-use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 final class StoryWriterTemplateTest extends TestCase
 {
@@ -24,6 +22,7 @@ final class StoryWriterTemplateTest extends TestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
         $this->template = new StoryWriterTemplate();
     }
 
@@ -79,11 +78,6 @@ final class StoryWriterTemplateTest extends TestCase
     #[Test]
     public function execute_with_stub_returns_json_story_arc(): void
     {
-        $router = $this->createMock(ProviderRouter::class);
-        $router->method('resolve')
-            ->with(Capability::TextGeneration, $this->anything())
-            ->willReturn(new StubAdapter());
-
         $ctx = new NodeExecutionContext(
             nodeId: 'node-story-1',
             config: $this->template->defaultConfig(),
@@ -102,7 +96,6 @@ final class StoryWriterTemplateTest extends TestCase
                 ),
             ],
             runId: 'run-story-1',
-            providerRouter: $router,
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 

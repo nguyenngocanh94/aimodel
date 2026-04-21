@@ -10,7 +10,6 @@ use App\Domain\Nodes\HumanResponse;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\NodeTemplate;
 use App\Domain\Nodes\NodeTemplateRegistry;
-use App\Domain\Providers\ProviderRouter;
 use App\Domain\RunTrigger;
 use App\Events\NodeStatusChanged;
 use App\Models\ExecutionRun;
@@ -25,7 +24,6 @@ final class RunExecutor
         private InputResolver $inputResolver,
         private NodeTemplateRegistry $registry,
         private RunCache $cache,
-        private ProviderRouter $providerRouter,
         private ArtifactStoreContract $artifactStore,
         private ProposalSender $proposalSender,
     ) {}
@@ -113,7 +111,9 @@ final class RunExecutor
                 'started_at' => now(),
             ]);
 
-            if ($template->needsHumanLoop()) {
+            $nodeConfig = $node['data']['config'] ?? $node['config'] ?? [];
+
+            if ($template->needsHumanLoop($nodeConfig)) {
                 $this->executeHumanLoop($run, $node, $template, $document, $nodeMap, $nodeRunRecords, $record);
                 // Node returned awaitingHuman — stop the pipeline
                 // resume() will continue it later
@@ -172,7 +172,6 @@ final class RunExecutor
                     config: $node['data']['config'] ?? $node['config'] ?? [],
                     inputs: $inputs,
                     runId: $run->id,
-                    providerRouter: $this->providerRouter,
                     artifactStore: $this->artifactStore,
                 );
 
@@ -320,8 +319,8 @@ final class RunExecutor
             config: $node['data']['config'] ?? $node['config'] ?? [],
             inputs: $inputs,
             runId: $runId,
-            providerRouter: $this->providerRouter,
             artifactStore: $this->artifactStore,
+            humanProposalState: $pending->node_state ?? [],
         );
 
         // Mark the old pending interaction as responded
@@ -408,7 +407,6 @@ final class RunExecutor
             config: $node['data']['config'] ?? $node['config'] ?? [],
             inputs: $inputs,
             runId: $run->id,
-            providerRouter: $this->providerRouter,
             artifactStore: $this->artifactStore,
         );
 

@@ -10,11 +10,9 @@ use App\Domain\NodeCategory;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\Templates\SceneSplitterTemplate;
 use App\Domain\PortPayload;
-use App\Domain\Providers\Adapters\StubAdapter;
-use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 final class SceneSplitterTemplateTest extends TestCase
 {
@@ -22,6 +20,7 @@ final class SceneSplitterTemplateTest extends TestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
         $this->template = new SceneSplitterTemplate();
     }
 
@@ -50,11 +49,6 @@ final class SceneSplitterTemplateTest extends TestCase
     #[Test]
     public function execute_returns_scene_list(): void
     {
-        $router = $this->createMock(ProviderRouter::class);
-        $router->method('resolve')
-            ->with(Capability::TextGeneration, $this->anything())
-            ->willReturn(new StubAdapter());
-
         $scriptData = [
             'title' => 'Test Script',
             'beats' => ['Scene one', 'Scene two', 'Scene three'],
@@ -67,7 +61,6 @@ final class SceneSplitterTemplateTest extends TestCase
                 'script' => PortPayload::success($scriptData, DataType::Script),
             ],
             runId: 'run-1',
-            providerRouter: $router,
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 

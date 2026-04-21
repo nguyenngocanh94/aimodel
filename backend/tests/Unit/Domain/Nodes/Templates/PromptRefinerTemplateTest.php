@@ -10,11 +10,9 @@ use App\Domain\NodeCategory;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\Templates\PromptRefinerTemplate;
 use App\Domain\PortPayload;
-use App\Domain\Providers\Adapters\StubAdapter;
-use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 final class PromptRefinerTemplateTest extends TestCase
 {
@@ -22,6 +20,7 @@ final class PromptRefinerTemplateTest extends TestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
         $this->template = new PromptRefinerTemplate();
     }
 
@@ -52,11 +51,6 @@ final class PromptRefinerTemplateTest extends TestCase
     #[Test]
     public function execute_returns_prompt_list(): void
     {
-        $router = $this->createMock(ProviderRouter::class);
-        $router->method('resolve')
-            ->with(Capability::TextGeneration, $this->anything())
-            ->willReturn(new StubAdapter());
-
         $scenes = [
             ['id' => 'scene-1', 'description' => 'Opening shot'],
             ['id' => 'scene-2', 'description' => 'Main action'],
@@ -69,7 +63,6 @@ final class PromptRefinerTemplateTest extends TestCase
                 'scenes' => PortPayload::success($scenes, DataType::SceneList),
             ],
             runId: 'run-1',
-            providerRouter: $router,
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -222,11 +215,6 @@ final class PromptRefinerTemplateTest extends TestCase
     #[Test]
     public function execute_wan_mode_returns_prompt_list(): void
     {
-        $router = $this->createMock(ProviderRouter::class);
-        $router->method('resolve')
-            ->with(Capability::TextGeneration, $this->anything())
-            ->willReturn(new StubAdapter());
-
         $ctx = new NodeExecutionContext(
             nodeId: 'node-5',
             config: [
@@ -242,7 +230,6 @@ final class PromptRefinerTemplateTest extends TestCase
                 ),
             ],
             runId: 'run-2',
-            providerRouter: $router,
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 

@@ -4,17 +4,19 @@ declare(strict_types=1);
 
 namespace App\Domain\Nodes\Templates;
 
-use App\Domain\Capability;
 use App\Domain\DataType;
 use App\Domain\NodeCategory;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
+use App\Domain\Nodes\Concerns\InteractsWithLlm;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\NodeTemplate;
 
 class ImageAssetMapperTemplate extends NodeTemplate
 {
+    use InteractsWithLlm;
+
     public string $type { get => 'imageAssetMapper'; }
     public string $version { get => '1.0.0'; }
     public string $title { get => 'Image Asset Mapper'; }
@@ -35,30 +37,25 @@ class ImageAssetMapperTemplate extends NodeTemplate
 
     public function configRules(): array
     {
-        return [
-            'provider' => ['sometimes', 'string'],
-        ];
+        return $this->llmConfigRules();
     }
 
     public function defaultConfig(): array
     {
-        return [
-            'provider' => 'stub',
-        ];
+        return ['llm' => ['provider' => 'stub', 'model' => '']];
     }
 
     public function execute(NodeExecutionContext $ctx): array
     {
         $images = $ctx->inputValue('images');
-        $config = $ctx->config;
 
-        $result = $ctx->provider(Capability::StructuredTransform)->execute(
-            Capability::StructuredTransform,
-            ['images' => $images],
-            $config,
+        $result = $this->callStructuredTransform(
+            $ctx,
+            'You map a list of image assets into frame objects suitable for video composition. Return JSON with key "frames" as an array of {id, imageUrl, duration, order} objects.',
+            'Images: ' . json_encode($images, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
         );
 
-        $frames = is_array($result) ? $result : [];
+        $frames = !empty($result) ? $result : [];
 
         return [
             'frames' => PortPayload::success(

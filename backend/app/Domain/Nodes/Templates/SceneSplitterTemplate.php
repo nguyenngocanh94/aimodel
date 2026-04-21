@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Domain\Nodes\Templates;
 
-use App\Domain\Capability;
 use App\Domain\DataType;
 use App\Domain\NodeCategory;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
+use App\Domain\Nodes\Concerns\InteractsWithLlm;
 use App\Domain\Nodes\GuideKnob;
 use App\Domain\Nodes\GuidePort;
 use App\Domain\Nodes\NodeExecutionContext;
@@ -19,6 +19,8 @@ use App\Domain\Nodes\VibeImpact;
 
 class SceneSplitterTemplate extends NodeTemplate
 {
+    use InteractsWithLlm;
+
     public string $type { get => 'sceneSplitter'; }
     public string $version { get => '1.0.0'; }
     public string $title { get => 'Scene Splitter'; }
@@ -137,13 +139,10 @@ class SceneSplitterTemplate extends NodeTemplate
         $script = $ctx->inputValue('script');
         $config = $ctx->config;
 
-        $result = $ctx->provider(Capability::TextGeneration)->execute(
-            Capability::TextGeneration,
-            [
-                'systemPrompt' => $this->buildSystemPrompt($config),
-                'prompt' => $this->buildUserPrompt($script, $config),
-            ],
-            $config,
+        $result = $this->callTextGeneration(
+            $ctx,
+            $this->buildSystemPrompt($config),
+            $this->buildUserPrompt($script, $config),
         );
 
         $scenes = $this->parseScenes($result);

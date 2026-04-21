@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Domain\Nodes\Templates;
 
-use App\Domain\Capability;
 use App\Domain\DataType;
 use App\Domain\NodeCategory;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
+use App\Domain\Nodes\Concerns\InteractsWithLlm;
 use App\Domain\Nodes\GuideKnob;
 use App\Domain\Nodes\GuidePort;
 use App\Domain\Nodes\NodeExecutionContext;
@@ -20,6 +20,8 @@ use App\Domain\Wan\PromptDictionary;
 
 class PromptRefinerTemplate extends NodeTemplate
 {
+    use InteractsWithLlm;
+
     public string $type { get => 'promptRefiner'; }
     public string $version { get => '1.0.0'; }
     public string $title { get => 'Prompt Refiner'; }
@@ -205,13 +207,10 @@ class PromptRefinerTemplate extends NodeTemplate
         $scenes = $ctx->inputValue('scenes') ?? [];
         $config = $ctx->config;
 
-        $result = $ctx->provider(Capability::TextGeneration)->execute(
-            Capability::TextGeneration,
-            [
-                'systemPrompt' => $this->buildGenericSystemPrompt($config),
-                'prompt' => $this->buildGenericUserPrompt($scenes, $config),
-            ],
-            $config,
+        $result = $this->callTextGeneration(
+            $ctx,
+            $this->buildGenericSystemPrompt($config),
+            $this->buildGenericUserPrompt($scenes, $config),
         );
 
         $prompts = $this->parsePrompts($result, $scenes);
@@ -260,13 +259,10 @@ class PromptRefinerTemplate extends NodeTemplate
         $story = $ctx->inputValue('story') ?? '';
         $config = $ctx->config;
 
-        $result = $ctx->provider(Capability::TextGeneration)->execute(
-            Capability::TextGeneration,
-            [
-                'systemPrompt' => $this->buildWanSystemPrompt($config),
-                'prompt' => $this->buildWanUserPrompt($story, $config),
-            ],
-            $config,
+        $result = $this->callTextGeneration(
+            $ctx,
+            $this->buildWanSystemPrompt($config),
+            $this->buildWanUserPrompt($story, $config),
         );
 
         $prompts = $this->parsePrompts($result, is_array($story) ? $story : []);
