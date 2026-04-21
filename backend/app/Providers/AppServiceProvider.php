@@ -11,6 +11,8 @@ use App\Services\MediaProviders\FalClient;
 use App\Services\MediaProviders\ReplicateClient;
 use App\Services\ArtifactStoreContract;
 use App\Services\LocalArtifactStore;
+use App\Services\Memory\DatabaseRunMemoryStore;
+use App\Services\Memory\RunMemoryStore;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -21,6 +23,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(ArtifactStoreContract::class, LocalArtifactStore::class);
+        $this->app->singleton(RunMemoryStore::class, DatabaseRunMemoryStore::class);
 
         $this->app->bind(FalClient::class, fn () => new FalClient((string) env('FAL_KEY', '')));
         $this->app->bind(ReplicateClient::class, fn () => new ReplicateClient((string) env('REPLICATE_API_TOKEN', '')));
