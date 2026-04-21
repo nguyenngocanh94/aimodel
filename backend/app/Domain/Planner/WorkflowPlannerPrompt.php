@@ -142,6 +142,19 @@ final class WorkflowPlannerPrompt
 
     private static function rulesBlock(string $lang): string
     {
+        $toolsHeading = $lang === self::LANG_VI ? "TOOLS (bắt buộc):\n" : "TOOLS (required):\n";
+        $toolsBlock = $lang === self::LANG_VI
+            ? $toolsHeading
+                . "- CatalogLookupTool: tra catalog khi cần tìm node/workflow phù hợp.\n"
+                . "- PriorPlanRetrievalTool: xem plan cũ tương tự brief hiện tại (nếu có).\n"
+                . "- SchemaValidationTool: **BẮT BUỘC** gọi với draft plan trước khi emit JSON cuối. "
+                . "Chỉ emit output cuối cùng khi tool trả về `valid: true`.\n"
+            : $toolsHeading
+                . "- CatalogLookupTool: search the node/workflow catalog when picking types.\n"
+                . "- PriorPlanRetrievalTool: fetch similar past plans for reference (if any).\n"
+                . "- SchemaValidationTool: **MUST** call with your draft plan BEFORE emitting final JSON. "
+                . "Only emit the final output once the tool returns `valid: true`.\n";
+
         $rules = [
             'RULE 1: `vibeMode` MUST be exactly one of ['
                 . implode(', ', self::KNOWN_VIBE_MODES) . '].',
@@ -156,8 +169,9 @@ final class WorkflowPlannerPrompt
             'RULE 10: If the brief is ambiguous, still emit a valid plan and record the ambiguities in `assumptions[]`.',
         ];
 
-        return ($lang === self::LANG_VI ? "QUY TẮC (đọc kỹ):\n" : "RULES (ranked, read carefully):\n")
-            . implode("\n", $rules);
+        $rulesHeader = $lang === self::LANG_VI ? "QUY TẮC (đọc kỹ):\n" : "RULES (ranked, read carefully):\n";
+
+        return $toolsBlock . "\n" . $rulesHeader . implode("\n", $rules);
     }
 
     private static function vibeModeBlock(string $lang, ?string $vibeHint): string

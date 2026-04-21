@@ -44,10 +44,11 @@ final class WorkflowPlannerToolLoopTest extends TestCase
         $tools = $ref->invoke($planner);
 
         $this->assertIsArray($tools);
-        $this->assertGreaterThanOrEqual(2, count($tools));
+        $this->assertGreaterThanOrEqual(3, count($tools));
         $classes = array_map(fn ($t) => $t::class, $tools);
         $this->assertContains(\App\Domain\Planner\Tools\CatalogLookupTool::class, $classes);
         $this->assertContains(\App\Domain\Planner\Tools\PriorPlanRetrievalTool::class, $classes);
+        $this->assertContains(\App\Domain\Planner\Tools\SchemaValidationTool::class, $classes);
     }
 
     #[Test]

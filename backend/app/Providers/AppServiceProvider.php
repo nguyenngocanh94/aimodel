@@ -8,6 +8,7 @@ use App\Domain\Planner\Evaluation\Scorer;
 use App\Domain\Planner\Evaluation\WorkflowPlanEvaluator;
 use App\Domain\Planner\Tools\CatalogLookupTool;
 use App\Domain\Planner\Tools\PriorPlanRetrievalTool;
+use App\Domain\Planner\Tools\SchemaValidationTool;
 use App\Services\MediaProviders\DashScopeClient;
 use App\Services\MediaProviders\FalClient;
 use App\Services\MediaProviders\ReplicateClient;
@@ -35,6 +36,7 @@ class AppServiceProvider extends ServiceProvider
             $this->app->tag([
                 CatalogLookupTool::class,
                 PriorPlanRetrievalTool::class,
+                SchemaValidationTool::class,
             ], 'planner.tools');
         }
 
