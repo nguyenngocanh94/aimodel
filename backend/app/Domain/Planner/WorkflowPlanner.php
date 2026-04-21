@@ -13,7 +13,6 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\Log;
 use Laravel\Ai\Responses\AgentResponse;
 use Laravel\Ai\Responses\StructuredAgentResponse;
-use Laravel\Ai\StructuredAnonymousAgent;
 use Throwable;
 
 /**
@@ -176,7 +175,10 @@ final class WorkflowPlanner
      */
     private function invokeLlm(PlannerInput $input, string $prompt, string $providerName, string $modelName): array
     {
-        $agent = new StructuredAnonymousAgent(
+        // WorkflowPlannerAgent implements HasProviderOptions so the system
+        // prompt is cached against Anthropic (LC3). On non-Anthropic providers,
+        // providerOptions() returns [] — plain `system` string path, no regression.
+        $agent = new WorkflowPlannerAgent(
             instructions: $prompt,
             messages: [],
             tools: $this->plannerTools(),

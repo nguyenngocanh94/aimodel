@@ -14,6 +14,7 @@ use App\Domain\Nodes\Concerns\InteractsWithLlm;
 use App\Domain\Nodes\GuideKnob;
 use App\Domain\Nodes\GuidePort;
 use App\Domain\Nodes\NodeExecutionContext;
+use App\Domain\Nodes\CachedStructuredAgent;
 use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplate;
 use App\Domain\Nodes\VibeImpact;
@@ -222,6 +223,7 @@ class StoryWriterTemplate extends NodeTemplate
             $this->buildUserPrompt($productAnalysis, $trendBrief, $modelRoster, $seedIdea, $config, $previousStory),
             $this->storySchema(),
             fn () => $this->stubStoryArc(),
+            fn (string $sys, Closure $schema) => new CachedStructuredAgent($sys, [], [], $schema),
         );
 
         if ($storyArc === []) {

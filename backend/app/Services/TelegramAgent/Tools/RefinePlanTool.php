@@ -8,12 +8,12 @@ use App\Domain\Nodes\NodeManifestBuilder;
 use App\Domain\Nodes\NodeTemplateRegistry;
 use App\Domain\Planner\WorkflowPlan;
 use App\Domain\Planner\WorkflowPlanner;
+use App\Domain\Planner\WorkflowPlannerAgent;
 use App\Domain\Planner\WorkflowPlanValidator;
 use App\Services\TelegramAgent\AgentSessionStore;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Responses\StructuredAgentResponse;
-use Laravel\Ai\StructuredAnonymousAgent;
 use Laravel\Ai\Tools\Request;
 use Stringable;
 use Throwable;
@@ -105,7 +105,9 @@ final class RefinePlanTool implements Tool
 
         $prompt = RefinePlanPrompt::build($priorPlan, $feedback, $catalogPreview);
 
-        $agent = new StructuredAnonymousAgent(
+        // Use the named WorkflowPlannerAgent so refinement round-trips also
+        // benefit from Anthropic prompt caching on the refiner system prompt.
+        $agent = new WorkflowPlannerAgent(
             instructions: $prompt,
             messages: [],
             tools: [],

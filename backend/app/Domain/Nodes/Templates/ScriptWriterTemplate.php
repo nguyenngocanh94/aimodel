@@ -13,6 +13,7 @@ use App\Domain\Nodes\Concerns\InteractsWithLlm;
 use App\Domain\Nodes\GuideKnob;
 use App\Domain\Nodes\GuidePort;
 use App\Domain\Nodes\NodeExecutionContext;
+use App\Domain\Nodes\CachedStructuredAgent;
 use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplate;
 use App\Domain\Nodes\VibeImpact;
@@ -230,6 +231,7 @@ class ScriptWriterTemplate extends NodeTemplate
             $this->buildUserPrompt($prompt, $config),
             $this->scriptSchema(),
             fn () => $this->stubScript(),
+            fn (string $sys, Closure $schema) => new CachedStructuredAgent($sys, [], [], $schema),
         );
 
         if ($script === []) {

@@ -10,6 +10,9 @@
 - **Queue** (Laravel Horizon / `workflow-runs` queue) for async workflow execution
 - **LLM layer:** `laravel/ai` (first-party). Providers configured in `config/ai.php`; default selected by `AI_DEFAULT_PROVIDER` env (falls back to `fireworks`). `TelegramAgent` is a `Laravel\Ai\Contracts\Agent` with `Promptable` + `RemembersConversations`; conversation memory is Redis-backed via `RedisConversationStore`. Tools implement `Laravel\Ai\Contracts\Tool`. Do NOT reintroduce custom LLM clients.
 - **Driver note:** `laravel/ai`'s built-in `openai` driver targets the OpenAI Responses API (`/responses`), which is incompatible with Fireworks and other OpenAI-compatible Chat Completions providers. Use the `groq` driver with a custom `url` for any provider that exposes `/chat/completions`.
+- **Structured output:** schema-bound nodes (planner, StoryWriter, ScriptWriter, SceneSplitter, PromptRefiner, TrendResearcher, ProductAnalyzer, SubtitleFormatter, ImageAssetMapper, TtsVoiceoverPlanner) emit JSON via `InteractsWithLlm::callStructuredText()` + a schema closure. The gateway enforces the schema — no fence-stripping, no `json_decode` ladders.
+- **Prompt caching (Anthropic-only):** `App\Domain\Planner\WorkflowPlannerAgent` and `App\Domain\Nodes\CachedStructuredAgent` implement `Laravel\Ai\Contracts\HasProviderOptions` and tag the system prompt with `cache_control: ephemeral` when the active provider is `anthropic`. Minimum ~1024 tokens, 5-minute TTL (refreshed on hit). Non-Anthropic providers get `[]` — plain `system` string path. Fireworks (`groq` driver) does not support caching today.
+- **Image/audio/video:** image goes through `InteractsWithImage` → `Ai::provider($name)->image(...)` for `openai|gemini|xai`, otherwise a narrow `FalClient/ReplicateClient/DashScopeClient` under `App\Services\MediaProviders\`. Video uses `InteractsWithVideo`; audio uses `InteractsWithAudio`.
 
 ## Key Directories
 

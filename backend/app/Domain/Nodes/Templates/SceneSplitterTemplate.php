@@ -13,6 +13,7 @@ use App\Domain\Nodes\Concerns\InteractsWithLlm;
 use App\Domain\Nodes\GuideKnob;
 use App\Domain\Nodes\GuidePort;
 use App\Domain\Nodes\NodeExecutionContext;
+use App\Domain\Nodes\CachedStructuredAgent;
 use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplate;
 use App\Domain\Nodes\VibeImpact;
@@ -147,6 +148,7 @@ class SceneSplitterTemplate extends NodeTemplate
             $this->buildUserPrompt($script, $config),
             $this->sceneSchema(),
             fn () => $this->stubSceneList(),
+            fn (string $sys, Closure $schema) => new CachedStructuredAgent($sys, [], [], $schema),
         );
 
         $scenes = $result['scenes'] ?? [];

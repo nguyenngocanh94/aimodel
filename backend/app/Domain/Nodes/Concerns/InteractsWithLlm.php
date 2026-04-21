@@ -187,6 +187,7 @@ trait InteractsWithLlm
         string $prompt,
         Closure $schema,
         ?Closure $stubFallback = null,
+        ?Closure $agentFactory = null,
     ): array {
         $provider = $this->resolveLlmProvider($ctx->config);
 
@@ -196,7 +197,12 @@ trait InteractsWithLlm
 
         $model = $this->resolveLlmModel($ctx->config, $provider) ?: null;
 
-        $agent = new StructuredAnonymousAgent($systemPrompt, [], [], $schema);
+        // LC3: templates with large, stable system prompts can provide a factory
+        // that returns a named agent implementing HasProviderOptions for
+        // Anthropic prompt caching. Default is StructuredAnonymousAgent.
+        $agent = $agentFactory !== null
+            ? $agentFactory($systemPrompt, $schema)
+            : new StructuredAnonymousAgent($systemPrompt, [], [], $schema);
         $response = $agent->prompt(
             $prompt,
             provider: $provider,
