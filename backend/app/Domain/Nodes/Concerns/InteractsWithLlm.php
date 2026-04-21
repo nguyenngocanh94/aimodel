@@ -9,6 +9,7 @@ use Closure;
 use Illuminate\Support\Facades\Log;
 use Laravel\Ai\AnonymousAgent;
 use Laravel\Ai\Responses\StructuredAgentResponse;
+use Laravel\Ai\Streaming\Events\TextDelta;
 use Laravel\Ai\StructuredAnonymousAgent;
 
 trait InteractsWithLlm
@@ -102,6 +103,30 @@ trait InteractsWithLlm
             : null;
 
         $agent = new AnonymousAgent($systemPrompt, [], []);
+
+        // LP-C3: switch to stream() when the context has an attached token-delta
+        // sink (e.g., the run-page SSE subscriber). Each TextDelta is forwarded
+        // into $ctx->emitTokenDelta() which the RunExecutor broadcasts. The
+        // non-streaming path is kept for CLI / queued workers that have no
+        // subscriber and don't need the per-token overhead.
+        if ($ctx->hasTokenDeltaSink()) {
+            $response = $agent->stream(
+                $prompt,
+                provider: $providerArg,
+                model: $model,
+            );
+
+            $response->each(function ($event) use ($ctx): void {
+                if ($event instanceof TextDelta) {
+                    $ctx->emitTokenDelta($event->delta, $event->messageId);
+                }
+            });
+
+            // After iteration, StreamableAgentResponse populates $response->text
+            // by combining all TextDelta events (see vendor L142-144).
+            return (string) $response->text;
+        }
+
         $response = $agent->prompt(
             $prompt,
             provider: $providerArg,
