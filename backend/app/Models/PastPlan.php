@@ -26,6 +26,7 @@ class PastPlan extends Model
         'plan',
         'provider',
         'model',
+        'brief_embedding',
     ];
 
     protected function casts(): array
