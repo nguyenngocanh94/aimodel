@@ -348,3 +348,17 @@ LC1 and LC3 may start before LG closes. LC2 must wait. LC4 must be last.
 - **LC4:** docs + env + smoke cleanup only.
 
 Net: roughly −1 100 LOC, with the cache-control path as the only real new abstraction.
+
+---
+
+## Done — results (2026-04-21)
+
+- **LC1** (`aimodel-pvto`) CLOSED at commit `15a8d29` — image/audio/video migrated off ProviderRouter to `laravel/ai` + narrow `App\Services\MediaProviders\*` clients.
+- **LC2** (`aimodel-f7ez`) CLOSED at commit `edc56ba` — `InteractsWithLlm::callStructuredText()` + schema closures across 9 templates (6 text-gen + 3 structured-transform holdovers) + `WorkflowPlanner::planSchema()` + `RefinePlanTool`. Fence strippers, `extractJsonObject`, and `extractJson` deleted; prompt "no fences" boilerplate scrubbed.
+- **LC3** (`aimodel-svqv`) CLOSED at commit `7acb3e2` — `WorkflowPlannerAgent` (planner) + `CachedStructuredAgent` (StoryWriter/ScriptWriter/SceneSplitter) wired via the new `$agentFactory` parameter on `callStructuredText`. `providerOptions('anthropic')` emits `cache_control:ephemeral`; all other providers get `[]`.
+- **LC4** (`aimodel-alps`) in-flight. Deletion sweep:
+  - `grep -rn "App\\\\Domain\\\\Providers" backend/app` → 0 hits.
+  - `grep -rn "ProviderRouter\|ProviderContract" backend/app` → 0 hits.
+  - `grep -rn "preg_replace.*\\\`\\\`\\\`\|extractJsonObject" backend/app` → 0 hits.
+- AGENTS.md and `backend/.env.example` updated with structured-output / prompt-caching / media-provider conventions.
+- Filtered test output (LC2 + LC3 acceptance tests): 99 passed / 503 assertions / 3.59 s.
