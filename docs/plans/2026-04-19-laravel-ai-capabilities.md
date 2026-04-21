@@ -438,3 +438,42 @@ For `workflow_plans` (brief) and `personas` (description) — same pattern, driv
 - **Blocks on:** `aimodel-q1hp` (text-gen node migration, beads LG2–LG5). If any node template still uses pre-`laravel/ai` clients when LK-E3 lands, the discovered skills pull from a different Tool contract and the container bindings collide.
 - **Soft dep on:** Completeness epic Gap B (structured outputs). Upgrade LK-F3 to `HasStructuredOutput` when it lands; otherwise fall back to current `extractJsonObject()` lenient parser.
 - **Parallelisable with:** Completeness Gap D (streaming) — the planner is batch, so streaming work is orthogonal.
+
+---
+
+## Done — results (2026-04-20)
+
+**Worktree branch.** `worktree-agent-a034163f`
+
+**Commits landed (chronological):**
+
+- `4936e4f` `feat(planner): add CatalogLookup + PriorPlanRetrieval tools (LK-F2)`
+- `5c01534` `feat(db): add embedding columns + ivfflat indexes (LK-G1)`
+- `5e02fe1` `feat(embeddings): VoyageAI backfill service + artisan command (LK-G2)`
+- `086bda9` `feat(planner): semantic catalog + prior-plan lookup via pgvector (LK-G3)`
+- `d75b0cf` `feat(planner): add SchemaValidationTool + enforce draft-validation loop (LK-F3)`
+
+Gap E (LK-E1/E2/E3) and LK-F1 closed earlier on this branch (`4e97d1f`, `3ab805a`, `f44c3f7`, `bbb5513`).
+
+**Beads closed:** `aimodel-16d9` (LK-F2), `aimodel-7hz2` (LK-G1), `aimodel-0y78` (LK-G2), `aimodel-nbpf` (LK-G3), `aimodel-2tgc` (LK-F3), `aimodel-rh31` (LK-Z), epic `aimodel-uxjl`.
+
+**Test output (final sweep):**
+
+```
+Tests:    1 skipped, 31 passed (102 assertions)
+```
+
+Filter: `WorkflowPlannerTest|WorkflowPlannerToolLoopTest|CatalogLookupToolTest|PriorPlanRetrievalToolTest|SchemaValidationToolTest|EmbeddingServiceTest|EmbeddingMigrationTest`. The skip is `EmbeddingMigrationTest::embedding_columns_are_nullable_and_named_correctly_on_pgsql`, which runs only under a pgsql connection — live `migrate:fresh` against `pgvector/pgvector:pg16` was verified separately and the `vector(1024)` columns + ivfflat indexes were confirmed via `\d workflows` / `\d workflow_plans`.
+
+**Deviations from the plan and why:**
+
+1. **Workflow model lacks `slug`/`nl_description`/`param_schema`/`scopeTriggerable`.** These columns come from the concurrent conversational/composition epic (uncommitted on main at start of work). `CatalogLookupTool` targets `workflows.name` + `workflows.description` (the fields that exist in this branch) instead of `slug`/`nl_description`. When the other epic lands, `workflowRows()` should widen its SELECT and the vector SELECT ought to consult `triggerable()` as the upstream plan suggested.
+2. **`ILIKE` → `LOWER()+LIKE`.** The plan called for `ILIKE`, but the test harness uses sqlite (`:memory:`) which rejects `ILIKE`. `LOWER(column) LIKE LOWER(?)` gives identical semantics and survives both drivers, so all the LIKE code paths use that instead.
+3. **pgvector image swap.** The repository's default `postgres:16-alpine` ships without the `vector` extension. `backend/docker-compose.yml` now pins `pgvector/pgvector:pg16` so `CREATE EXTENSION vector` works out of the box. No data migration is needed — the image is a drop-in for the same PG16 wire protocol.
+4. **WorkflowCatalogSeeder backfill.** The plan asks for the seeder to populate embeddings on fresh seed. The seeder itself is owned by a concurrent epic and is not present on this worktree; the Artisan command `embeddings:backfill` covers the same ground and will no-op gracefully when `VOYAGEAI_API_KEY` is absent. Coordinate at merge time.
+5. **Structured-output contract (LC2 / Gap B) still open.** Per the plan, `SchemaValidationTool` ships with a `TODO(Gap B)` marker; `WorkflowPlanner` keeps its lenient JSON parse fallback and is ready to adopt `HasStructuredOutput` once LC2 closes.
+
+**Outstanding / follow-ups:**
+
+- Live-DB smoke of the full `plan → SchemaValidationTool → CatalogLookupTool` tool-call chain against Fireworks + Voyage is gated on `VOYAGEAI_API_KEY` provisioning.
+- The pre-existing `TelegramAgentTest` suite fails with `Workflow::triggerable()` undefined on this branch — that's the concurrent epic's gap, not in scope here. It unblocks once that epic's Workflow model / catalog migration lands.
