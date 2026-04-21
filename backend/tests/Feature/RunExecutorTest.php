@@ -105,6 +105,7 @@ final class RunExecutorTest extends TestCase
             new RunCache(),
             new LocalArtifactStore(),
             $proposalSender,
+            new \App\Services\Memory\DatabaseRunMemoryStore(),
         );
 
         $this->workflow = Workflow::create([

@@ -16,6 +16,7 @@ use App\Models\ExecutionRun;
 use App\Models\NodeRunRecord;
 use App\Models\PendingInteraction;
 use App\Services\ArtifactStoreContract;
+use App\Services\Memory\RunMemoryStore;
 
 final class RunExecutor
 {
@@ -26,7 +27,30 @@ final class RunExecutor
         private RunCache $cache,
         private ArtifactStoreContract $artifactStore,
         private ProposalSender $proposalSender,
+        private RunMemoryStore $memory,
     ) {}
+
+    /**
+     * Resolve the workflow slug for a run.
+     *
+     * Prefers a real `slug` column when it exists (pending catalog migration),
+     * falls back to the workflow UUID so memory scope is always deterministic.
+     */
+    private function workflowSlug(ExecutionRun $run): ?string
+    {
+        $workflow = $run->workflow;
+        if ($workflow === null) {
+            return null;
+        }
+
+        /** @var mixed $slug */
+        $slug = $workflow->slug ?? null;
+        if (is_string($slug) && $slug !== '') {
+            return $slug;
+        }
+
+        return (string) $workflow->id;
+    }
 
     public function execute(ExecutionRun $run): void
     {
@@ -173,6 +197,8 @@ final class RunExecutor
                     inputs: $inputs,
                     runId: $run->id,
                     artifactStore: $this->artifactStore,
+                    memory: $this->memory,
+                    workflowSlug: $this->workflowSlug($run),
                 );
 
                 $outputs = $template->execute($ctx);
@@ -321,6 +347,8 @@ final class RunExecutor
             runId: $runId,
             artifactStore: $this->artifactStore,
             humanProposalState: $pending->node_state ?? [],
+            memory: $this->memory,
+            workflowSlug: $this->workflowSlug($run),
         );
 
         // Mark the old pending interaction as responded
@@ -408,6 +436,8 @@ final class RunExecutor
             inputs: $inputs,
             runId: $run->id,
             artifactStore: $this->artifactStore,
+            memory: $this->memory,
+            workflowSlug: $this->workflowSlug($run),
         );
 
         try {

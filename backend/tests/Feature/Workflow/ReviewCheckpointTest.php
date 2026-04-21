@@ -75,6 +75,7 @@ final class ReviewCheckpointTest extends TestCase
             new RunCache(),
             new LocalArtifactStore(),
             app(\App\Domain\Execution\ProposalSender::class),
+            new \App\Services\Memory\DatabaseRunMemoryStore(),
         );
 
         $this->workflow = Workflow::create([
