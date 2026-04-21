@@ -8,6 +8,7 @@ use App\Domain\Planner\Tools\PriorPlanRetrievalTool;
 use App\Models\PastPlan;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\JsonSchema\JsonSchemaTypeFactory;
+use Laravel\Ai\Embeddings;
 use Laravel\Ai\Tools\Request;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -72,6 +73,27 @@ final class PriorPlanRetrievalToolTest extends TestCase
         );
 
         $this->assertCount(3, $result['priors']);
+    }
+
+    #[Test]
+    public function falls_back_to_like_when_embedder_throws(): void
+    {
+        Embeddings::fake([])->preventStrayEmbeddings();
+
+        PastPlan::create([
+            'brief' => 'Fallback chocopie lookup for coverage',
+            'brief_hash' => PastPlan::hashBrief('Fallback chocopie lookup for coverage'),
+            'plan' => ['nodes' => [], 'edges' => []],
+        ]);
+
+        $tool = $this->app->make(PriorPlanRetrievalTool::class);
+        $result = json_decode(
+            $tool->handle(new Request(['brief' => 'Fallback chocopie lookup for coverage'])),
+            true,
+        );
+
+        $this->assertNotEmpty($result['priors']);
+        $this->assertStringContainsString('chocopie', $result['priors'][0]['brief']);
     }
 
     #[Test]

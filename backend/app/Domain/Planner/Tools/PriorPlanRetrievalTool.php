@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace App\Domain\Planner\Tools;
 
 use App\Models\PastPlan;
+use App\Services\AI\EmbeddingService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Laravel\Ai\Tools\Request;
+use Throwable;
 
 /**
  * Planner tool: retrieve up to 3 past workflow plans with briefs similar to the
@@ -18,6 +22,10 @@ use Laravel\Ai\Tools\Request;
  */
 final class PriorPlanRetrievalTool implements PlannerTool
 {
+    public function __construct(
+        private readonly EmbeddingService $embedder,
+    ) {}
+
     public function description(): string
     {
         return 'Retrieve up to 3 past workflow plans with briefs similar to the current brief. '
@@ -44,16 +52,7 @@ final class PriorPlanRetrievalTool implements PlannerTool
             );
         }
 
-        // LIKE on a bounded prefix keeps the query selective — full-brief LIKE
-        // would either never match (too specific) or return everything.
-        // Use LOWER() + LIKE for cross-database case-insensitivity (pgsql + sqlite).
-        $needle = '%' . mb_strtolower(mb_substr($brief, 0, 80)) . '%';
-
-        $rows = PastPlan::query()
-            ->whereRaw('LOWER(brief) LIKE ?', [$needle])
-            ->orderByDesc('created_at')
-            ->limit(3)
-            ->get(['id', 'brief', 'plan', 'provider', 'model', 'created_at']);
+        $rows = $this->byVector($brief) ?? $this->byLike($brief);
 
         $priors = [];
         foreach ($rows as $row) {
@@ -71,5 +70,52 @@ final class PriorPlanRetrievalTool implements PlannerTool
             ['priors' => $priors],
             JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
         );
+    }
+
+    /**
+     * Vector-path retrieval; returns null on unrecoverable failure so the
+     * caller drops to ILIKE.
+     *
+     * @return \Illuminate\Support\Collection<int, PastPlan>|null
+     */
+    private function byVector(string $brief)
+    {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return null;
+        }
+
+        try {
+            $vector = $this->embedder->tryEmbed($brief);
+            if ($vector === null) {
+                return null;
+            }
+
+            $threshold = (float) config('planner.priors_min_similarity', 0.65);
+
+            return PastPlan::query()
+                ->whereNotNull('brief_embedding')
+                ->whereVectorSimilarTo('brief_embedding', $vector, $threshold)
+                ->limit(3)
+                ->get(['id', 'brief', 'plan', 'provider', 'model', 'created_at']);
+        } catch (Throwable $e) {
+            Log::warning('PriorPlanRetrievalTool: vector search failed, falling back to ILIKE', [
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, PastPlan>
+     */
+    private function byLike(string $brief)
+    {
+        $needle = '%' . mb_strtolower(mb_substr($brief, 0, 80)) . '%';
+
+        return PastPlan::query()
+            ->whereRaw('LOWER(brief) LIKE ?', [$needle])
+            ->orderByDesc('created_at')
+            ->limit(3)
+            ->get(['id', 'brief', 'plan', 'provider', 'model', 'created_at']);
     }
 }

@@ -9,6 +9,7 @@ use App\Domain\Planner\Tools\CatalogLookupTool;
 use App\Models\Workflow;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\JsonSchema\JsonSchemaTypeFactory;
+use Laravel\Ai\Embeddings;
 use Laravel\Ai\Tools\Request;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -99,6 +100,32 @@ final class CatalogLookupToolTest extends TestCase
         );
 
         $this->assertLessThanOrEqual(20, count($result['matches']));
+    }
+
+    #[Test]
+    public function falls_back_to_like_when_embedder_throws(): void
+    {
+        // preventStrayEmbeddings on empty fake causes tryEmbed to return null,
+        // which triggers the ILIKE fallback path. On sqlite this is always the
+        // path taken anyway, so the assertion is: the tool still returns
+        // results rather than crashing.
+        Embeddings::fake([])->preventStrayEmbeddings();
+
+        Workflow::create([
+            'name' => 'Fallback Workflow',
+            'description' => 'Stream-only fallback path coverage.',
+            'tags' => [],
+            'document' => ['nodes' => [], 'edges' => []],
+        ]);
+
+        $tool = $this->app->make(CatalogLookupTool::class);
+        $result = json_decode(
+            $tool->handle(new Request(['query' => 'Fallback', 'kind' => 'workflow'])),
+            true,
+        );
+
+        $this->assertNotEmpty($result['matches']);
+        $this->assertSame('Fallback Workflow', $result['matches'][0]['name']);
     }
 
     #[Test]

@@ -7,8 +7,12 @@ namespace App\Domain\Planner\Tools;
 use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplateRegistry;
 use App\Models\Workflow;
+use App\Services\AI\EmbeddingService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Laravel\Ai\Tools\Request;
+use Throwable;
 
 /**
  * Planner tool: search the workflow + node-template catalog for entries that
@@ -23,6 +27,7 @@ final class CatalogLookupTool implements PlannerTool
 {
     public function __construct(
         private readonly NodeTemplateRegistry $registry,
+        private readonly EmbeddingService $embedder,
     ) {}
 
     public function description(): string
@@ -84,9 +89,70 @@ final class CatalogLookupTool implements PlannerTool
     }
 
     /**
+     * Workflow retrieval. Prefers pgvector cosine similarity via
+     * {@see EmbeddingService}; falls back to case-insensitive LIKE on any
+     * failure (missing API key, Voyage outage, non-pgsql driver).
+     *
      * @return list<array{kind:string, id:string, name:string, why:string}>
      */
     protected function workflowRows(string $query, int $limit): array
+    {
+        $vectorRows = $this->workflowRowsByVector($query, $limit);
+        if ($vectorRows !== null) {
+            return $vectorRows;
+        }
+
+        return $this->workflowRowsByLike($query, $limit);
+    }
+
+    /**
+     * @return list<array{kind:string, id:string, name:string, why:string}>|null
+     *         null signals "fall back to ILIKE" — caller decides how to handle.
+     */
+    private function workflowRowsByVector(string $query, int $limit): ?array
+    {
+        // pgvector requires pgsql; sqlite tests always fall through.
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return null;
+        }
+
+        try {
+            $vector = $this->embedder->tryEmbed($query);
+            if ($vector === null) {
+                return null;
+            }
+
+            $threshold = (float) config('planner.catalog_min_similarity', 0.6);
+
+            $rows = Workflow::query()
+                ->whereNotNull('catalog_embedding')
+                ->whereVectorSimilarTo('catalog_embedding', $vector, $threshold)
+                ->limit($limit)
+                ->get(['id', 'name', 'description']);
+
+            $out = [];
+            foreach ($rows as $row) {
+                $out[] = [
+                    'kind' => 'workflow',
+                    'id' => (string) $row->id,
+                    'name' => (string) $row->name,
+                    'why' => 'matched via semantic similarity',
+                ];
+            }
+
+            return $out;
+        } catch (Throwable $e) {
+            Log::warning('CatalogLookupTool: vector search failed, falling back to ILIKE', [
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * @return list<array{kind:string, id:string, name:string, why:string}>
+     */
+    private function workflowRowsByLike(string $query, int $limit): array
     {
         $like = '%' . mb_strtolower($query) . '%';
 
