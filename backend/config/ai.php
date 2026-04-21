@@ -14,6 +14,34 @@ return [
     */
 
     'default' => env('AI_DEFAULT_PROVIDER', 'fireworks'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Failover Chains (LP-H1)
+    |--------------------------------------------------------------------------
+    |
+    | Ordered provider chains consumed by Promptable::withModelFailover().
+    | A chain value takes precedence over the scalar 'default' above when an
+    | agent or shared text-gen helper opts into the failover wrapper.
+    |
+    | Each entry may be a provider name (string — uses the provider's default
+    | model) or a [provider => model] pair. The vendor loop catches any
+    | FailoverableException (e.g. RateLimitedException, ProviderOverloadedException)
+    | thrown by an earlier entry and advances to the next.
+    |
+    */
+
+    'failover' => [
+        'text' => [
+            env('AI_PRIMARY_PROVIDER', 'fireworks'),
+            env('AI_FAILOVER_PROVIDER', 'anthropic'),
+        ],
+        // Max wall-clock seconds the RetryPrimary middleware will retry the
+        // primary provider on 429 / overloaded before rethrowing so failover
+        // moves to the next entry. 0 = fail over immediately, no retry.
+        'primary_max_retry_seconds' => (int) env('AI_PRIMARY_RETRY_SECONDS', 10),
+    ],
+
     'default_for_images' => 'gemini',
     'default_for_audio' => 'openai',
     'default_for_transcription' => 'openai',
