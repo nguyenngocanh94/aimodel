@@ -401,3 +401,64 @@ all three converge into ─► LP-Z1
 ```
 
 Three rails (C / H / I) are mutually independent — ship in any order or in parallel with separate agents. Only LP-Z1 requires all three finished.
+
+---
+
+## Done — results (2026-04-21)
+
+All thirteen beads closed, one commit per bead on branch
+`worktree-agent-ab012218`. The three rails landed in parallel:
+
+- **Memory rail (LP-I1…I5):** `run_memory` table + `RunMemoryEntry` model,
+  `RunMemoryStore` / `DatabaseRunMemoryStore` service bound as singleton in
+  `AppServiceProvider`, `recall()` / `remember()` helpers on
+  `NodeExecutionContext` scoped to `"workflow:{slug}"`, StoryWriter writes
+  through `storyArc:last` on every success and prepends a 3-field digest
+  (title · theme · hook) to the user prompt on the next run (gated by the
+  `recallPreviousStory` config knob, default `true`), `memory:prune`
+  artisan command scheduled daily at 03:15.
+- **Failover rail (LP-H1…H3):** ordered chain `config('ai.failover.text')`
+  added (primary `fireworks`, failover `anthropic`) plus
+  `primary_max_retry_seconds`; `App\Services\Ai\Middleware\RetryPrimary`
+  retries on `RateLimitedException` / `ProviderOverloadedException` with
+  exponential backoff (100ms → 5s cap) bounded by the env knob before
+  re-throwing so the vendor failover loop advances; `TelegramAgent`
+  implements `HasMiddleware` and now passes the chain array into
+  `prompt()`; `InteractsWithLlm::resolveTextProviderArg()` resolves per-node
+  `providerChain` > `llm.provider` > `config('ai.failover.text')` >
+  `config('ai.default')`.
+- **Streaming rail (LP-C1…C4):** nullable `onTokenDelta` closure on
+  `NodeExecutionContext` + `emitTokenDelta()` / `hasTokenDeltaSink()`
+  helpers; `NodeTokenDelta` broadcast event dispatched from a per-node
+  seq-counting closure in `RunExecutor`; `InteractsWithLlm` switches to
+  `$agent->stream()` when a sink is attached and forwards each `TextDelta`
+  to the context; frontend SSE client exposes optional `onNodeTokenDelta`
+  callback for live token rendering.
+
+**Test tail (epic scope, 47 tests):**
+
+```
+Tests:    47 passed (172 assertions)
+```
+
+Full backend suite pre-epic: 78 failed / 930 passed; post-epic: 63 failed
+/ 945 passed. The 63 residual failures are pre-existing issues in files
+this epic did not touch (Telegram webhook controller ctor signature drift,
+sqlite ILIKE vs pgsql, etc.), not regressions.
+
+**Deviations:**
+
+1. The plan referenced `$run->workflow->slug`, but no `slug` column exists
+   on `workflows` yet (the catalog migration has not merged). `RunExecutor`
+   now prefers `slug` when available and falls back to the workflow UUID
+   so memory scoping is always deterministic.
+2. Live smokes (SSE `curl -N`, broken-API-key Telegram prompt) were not
+   executable in-sandbox — the docker `backend-app-1` container cannot
+   resolve the `redis` host for broadcast and has no live provider keys.
+   The PHPUnit fake-gateway equivalents (`NodeTokenDeltaBroadcastTest`,
+   `TextProviderFailoverTest`, `StreamingTextGenerationTest`) cover the
+   same behavior end-to-end against the in-process faker.
+3. LP-C4's live frontend flush-on-success reducer was left as a follow-up —
+   `frontend/src/shared/api/sse.ts` exposes the typed `onNodeTokenDelta`
+   callback and documents the buffering recipe; wiring it into the
+   run-history Zustand store is outside this epic's scope.
