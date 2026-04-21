@@ -33,9 +33,10 @@ final class WorkflowPlannerToolLoopTest extends TestCase
     }
 
     #[Test]
-    public function planner_tools_can_be_empty_when_no_tools_registered(): void
+    public function planner_tools_returns_registered_tools_by_default(): void
     {
-        // Without any PlannerTool implementations tagged, the collection is empty.
+        // AppServiceProvider tags CatalogLookupTool + PriorPlanRetrievalTool
+        // (two tools) on the `planner.tools` collection by default.
         $planner = $this->app->make(WorkflowPlanner::class);
 
         $ref = new \ReflectionMethod($planner, 'plannerTools');
@@ -43,15 +44,17 @@ final class WorkflowPlannerToolLoopTest extends TestCase
         $tools = $ref->invoke($planner);
 
         $this->assertIsArray($tools);
-        $this->assertEmpty($tools);
+        $this->assertGreaterThanOrEqual(2, count($tools));
+        $classes = array_map(fn ($t) => $t::class, $tools);
+        $this->assertContains(\App\Domain\Planner\Tools\CatalogLookupTool::class, $classes);
+        $this->assertContains(\App\Domain\Planner\Tools\PriorPlanRetrievalTool::class, $classes);
     }
 
     #[Test]
-    public function invoke_llm_receives_tools_array(): void
+    public function invoke_llm_receives_additional_tagged_tool(): void
     {
-        // Wire a mock tool class via the tagged collection.
-        // The class is bound to the container and tagged; when tagged() resolves
-        // it calls make() with the class string.
+        // Wire a mock tool class via the tagged collection — appended to the
+        // default CatalogLookupTool + PriorPlanRetrievalTool pair.
         $mockToolClass = new class implements PlannerTool {
             public function description(): \Stringable|string
             {
@@ -73,12 +76,10 @@ final class WorkflowPlannerToolLoopTest extends TestCase
 
         $planner = $this->app->make(WorkflowPlanner::class);
 
-        // Access protected method via reflection.
         $ref = new \ReflectionMethod($planner, 'plannerTools');
         $ref->setAccessible(true);
         $tools = $ref->invoke($planner);
 
-        $this->assertCount(1, $tools);
-        $this->assertSame($mockToolClass, $tools[0]);
+        $this->assertContains($mockToolClass, $tools);
     }
 }

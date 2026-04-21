@@ -7,7 +7,9 @@ namespace App\Domain\Planner;
 use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeManifestBuilder;
 use App\Domain\Nodes\NodeTemplateRegistry;
+use App\Models\PastPlan;
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Support\Facades\Log;
 use Laravel\Ai\AnonymousAgent;
 use Laravel\Ai\Responses\AgentResponse;
 use Throwable;
@@ -105,6 +107,8 @@ final class WorkflowPlanner
             $finalPlan = $plan;
 
             if ($validation->valid) {
+                $this->persistSuccessfulPlan($input, $plan, $providerName, $modelName);
+
                 return new PlannerResult(
                     plan: $plan,
                     validation: $validation,
@@ -251,6 +255,37 @@ final class WorkflowPlanner
         }
 
         return null;
+    }
+
+    /**
+     * Persist a successful plan for the PriorPlanRetrievalTool. Guarded by
+     * config('planner.persist_plans'); errors are swallowed to avoid breaking
+     * the planner's happy path (e.g. missing migration in tests).
+     */
+    private function persistSuccessfulPlan(
+        PlannerInput $input,
+        WorkflowPlan $plan,
+        string $providerName,
+        string $modelName,
+    ): void {
+        if (! (bool) config('planner.persist_plans', true)) {
+            return;
+        }
+
+        try {
+            PastPlan::create([
+                'brief' => $input->brief,
+                'brief_hash' => PastPlan::hashBrief($input->brief),
+                'plan' => $plan->toArray(),
+                'provider' => $providerName !== '' ? $providerName : null,
+                'model' => $modelName !== '' ? $modelName : null,
+            ]);
+        } catch (Throwable $e) {
+            // Persistence is best-effort — log and move on.
+            Log::warning('WorkflowPlanner: failed to persist past plan', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
