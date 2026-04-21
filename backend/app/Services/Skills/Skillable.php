@@ -54,6 +54,13 @@ trait Skillable
             new SkillReadTool($registry),
         ];
 
+        // Allow subclasses to provide manually-constructed tool instances
+        // (e.g. when a tool needs constructor args that app() can't resolve).
+        foreach ($this->getSkillToolOverrides() as $tool) {
+            $tools[] = $tool;
+        }
+
+        // Also resolve tools from the registry for Full-mode skills.
         foreach ($this->resolveSkillTools($registry) as $tool) {
             $tools[] = $tool;
         }
@@ -105,6 +112,18 @@ trait Skillable
             : '';
 
         return $staticPrompt.$skillSection.$fullSection."\n\n".$dynamicPrompt;
+    }
+
+    /**
+     * Override this in subclasses to provide manually-constructed tool instances
+     * that need constructor arguments (e.g. chatId, botToken) that cannot be
+     * resolved via app()->make().
+     *
+     * @return array<int, object>
+     */
+    protected function getSkillToolOverrides(): array
+    {
+        return [];
     }
 
     protected function getSkillRegistry(): SkillRegistry

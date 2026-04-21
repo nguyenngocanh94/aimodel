@@ -83,15 +83,64 @@ final class Skill
         }
 
         $yaml = trim($parts[1]);
+        $lines = explode("\n", $yaml);
         $parsed = [];
-        foreach (explode("\n", $yaml) as $line) {
-            if (preg_match('/^(\w+):\s*(.*)$/', $line, $m)) {
-                $value = trim($m[2], '\'" ');
-                if (str_starts_with($value, '[') && str_ends_with($value, ']')) {
-                    $value = array_filter(array_map('trim', explode(',', substr($value, 1, -1))));
+        $currentKey = null;
+        $currentArray = [];
+
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+
+            // Multi-line array item: starts with "  - " or "    - "
+            if (preg_match('/^(-)\s+(.+)$/', $trimmed, $m)) {
+                if ($currentKey !== null) {
+                    $currentArray[] = trim($m[2]);
                 }
-                $parsed[$m[1]] = $value;
+                continue;
             }
+
+            // Flush any pending multi-line array
+            if ($currentKey !== null && $currentArray !== []) {
+                $parsed[$currentKey] = $currentArray;
+                $currentKey = null;
+                $currentArray = [];
+            }
+
+            // Key-value pair
+            if (preg_match('/^(\w+):\s*(.*)$/', $trimmed, $m)) {
+                $key = $m[1];
+                $rawValue = trim($m[2]);
+
+                // Flush any pending multi-line array before processing new key
+                if ($currentKey !== null && $currentArray !== []) {
+                    $parsed[$currentKey] = $currentArray;
+                    $currentKey = null;
+                    $currentArray = [];
+                }
+
+                if ($rawValue === '') {
+                    // Empty value — could be followed by multi-line values
+                    $currentKey = $key;
+                    $currentArray = [];
+                    $parsed[$key] = [];
+                } elseif (str_starts_with($rawValue, '[') && str_ends_with(rtrim($rawValue, ' '), ']')) {
+                    // Inline array: [Foo, Bar] or [Foo]
+                    $inner = substr(rtrim($rawValue, ' '), 1, -1);
+                    if ($inner === '') {
+                        $parsed[$key] = [];
+                    } else {
+                        $items = array_filter(array_map('trim', explode(',', $inner)));
+                        $parsed[$key] = $items;
+                    }
+                } else {
+                    $parsed[$key] = trim($rawValue, '\'" ');
+                }
+            }
+        }
+
+        // Flush any remaining multi-line array at end of file
+        if ($currentKey !== null && $currentArray !== []) {
+            $parsed[$currentKey] = $currentArray;
         }
 
         return $parsed;
@@ -103,11 +152,12 @@ final class Skill
             return $content;
         }
 
-        $parts = preg_split('/^---$/m', $content, 2);
+        $parts = preg_split('/^---$/m', $content, 3);
         if ($parts === false || count($parts) < 2) {
             return $content;
         }
 
-        return trim($parts[2]);
+        // parts[0] = '' (before first ---), parts[1] = yaml, parts[2] = body
+        return trim($parts[2] ?? $parts[1] ?? '');
     }
 }

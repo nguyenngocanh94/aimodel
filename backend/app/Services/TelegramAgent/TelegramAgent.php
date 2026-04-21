@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services\TelegramAgent;
 
 use App\Models\Workflow;
+use App\Services\Skills\SkillInclusionMode;
+use App\Services\Skills\Skillable;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Laravel\Ai\Concerns\RemembersConversations;
@@ -12,10 +14,7 @@ use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
 use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Promptable;
-use App\Services\TelegramAgent\Tools\CancelRunTool;
 use App\Services\TelegramAgent\Tools\ComposeWorkflowTool;
-use App\Services\TelegramAgent\Tools\GetRunStatusTool;
-use App\Services\TelegramAgent\Tools\ListWorkflowsTool;
 use App\Services\TelegramAgent\Tools\PersistWorkflowTool;
 use App\Services\TelegramAgent\Tools\RefinePlanTool;
 use App\Services\TelegramAgent\Tools\ReplyTool;
@@ -29,11 +28,17 @@ use Throwable;
  * chatId + botToken, and calls handle(). Conversation memory is kept via
  * RemembersConversations + RedisConversationStore, keyed on
  * "{chatId}:{botToken}" so conversations are isolated per-chat and per-bot.
+ *
+ * Uses the {@see Skillable} trait for progressive-disclosure skill management.
+ * Tool instructions come from resources/skills/{slug}/SKILL.md discovered by
+ * the SkillRegistry. Full-mode tools (with constructor args) are returned by
+ * {@see getSkillToolOverrides()}.
  */
 final class TelegramAgent implements Agent, Conversational, HasTools
 {
     use Promptable;
     use RemembersConversations;
+    use Skillable;
 
     /**
      * Last inbound Telegram update passed to handle() — used when building instructions() for appliesTo().
@@ -58,16 +63,45 @@ final class TelegramAgent implements Agent, Conversational, HasTools
             ->get(['slug', 'name', 'nl_description', 'param_schema'])
             ->toArray();
 
-        return SystemPrompt::build($catalog, $this->chatId, $this->instructionContextUpdate);
+        $static = SystemPrompt::build($catalog, $this->chatId, $this->instructionContextUpdate);
+
+        return $this->withSkillInstructions($static);
     }
 
     public function tools(): iterable
     {
+        return $this->skillTools();
+    }
+
+    /**
+     * Skill slugs the agent may invoke. Lite-mode skills are listed by name+desc
+     * only; Full-mode skills are fully inlined and their tools appear in tools().
+     *
+     * @return iterable<string, SkillInclusionMode|string>
+     */
+    public function skills(): iterable
+    {
         return [
-            new ListWorkflowsTool(),
+            'list-workflows',
+            'run-workflow',
+            'get-run-status',
+            'cancel-run',
+            'reply',
+            'compose-workflow',
+            'catalog',
+        ];
+    }
+
+    /**
+     * Return manually-constructed Full-mode tools that need constructor args
+     * (chatId, botToken) which the SkillRegistry's app()->make() cannot resolve.
+     *
+     * @return array<int, object>
+     */
+    protected function getSkillToolOverrides(): array
+    {
+        return [
             new RunWorkflowTool(chatId: $this->chatId),
-            new GetRunStatusTool(),
-            new CancelRunTool(),
             new ReplyTool(botToken: $this->botToken, chatId: $this->chatId),
             app()->make(ComposeWorkflowTool::class, [
                 'chatId'   => $this->chatId,
