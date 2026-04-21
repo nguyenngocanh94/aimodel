@@ -17,6 +17,8 @@ use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplate;
 use App\Domain\Nodes\VibeImpact;
+use Closure;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 class StoryWriterTemplate extends NodeTemplate
 {
@@ -56,6 +58,7 @@ class StoryWriterTemplate extends NodeTemplate
             'productIntegrationStyle' => ['required', 'string', 'in:subtle_background,natural_use,hero_moment,transformation_reveal,comparison_story'],
             'genZAuthenticity' => ['required', 'string', 'in:low,medium,high,ultra'],
             'vietnameseDialect' => ['required', 'string', 'in:northern,central,southern,neutral'],
+            'recallPreviousStory' => ['sometimes', 'boolean'],
         ], $this->humanGateConfigRules());
     }
 
@@ -71,6 +74,7 @@ class StoryWriterTemplate extends NodeTemplate
             'productIntegrationStyle' => 'natural_use',
             'genZAuthenticity' => 'high',
             'vietnameseDialect' => 'neutral',
+            'recallPreviousStory' => true,
         ], $this->humanGateDefaultConfig());
     }
 
@@ -206,13 +210,26 @@ class StoryWriterTemplate extends NodeTemplate
         $seedIdea = $ctx->inputValue('seedIdea');
         $config = $ctx->config;
 
-        $result = $this->callTextGeneration(
+        // LP-I4: recall the last story arc from this workflow for style continuity.
+        $previousStory = null;
+        if (($config['recallPreviousStory'] ?? true) === true) {
+            $previousStory = $ctx->recall('storyArc:last');
+        }
+
+        $storyArc = $this->callStructuredText(
             $ctx,
             $this->buildSystemPrompt($config),
-            $this->buildUserPrompt($productAnalysis, $trendBrief, $modelRoster, $seedIdea, $config),
+            $this->buildUserPrompt($productAnalysis, $trendBrief, $modelRoster, $seedIdea, $config, $previousStory),
+            $this->storySchema(),
+            fn () => $this->stubStoryArc(),
         );
 
-        $storyArc = $this->parseStoryArc($result);
+        if ($storyArc === []) {
+            $storyArc = $this->emptyStoryArc();
+        }
+
+        // LP-I4: write-through on every successful execute. 7-day TTL.
+        $ctx->remember('storyArc:last', $storyArc, expires: now()->addDays(7));
 
         return [
             'storyArc' => PortPayload::success(
@@ -225,6 +242,24 @@ class StoryWriterTemplate extends NodeTemplate
                     . ($storyArc['formula'] ?? 'unknown'),
             ),
         ];
+    }
+
+    /**
+     * Extract a compact digest of a prior story arc — title, theme, hook only —
+     * so we keep style continuity without blowing the token budget.
+     */
+    private function digestPreviousStory(array $previous): string
+    {
+        $title = trim((string) ($previous['title'] ?? ''));
+        $theme = trim((string) ($previous['theme'] ?? ''));
+        $hook  = trim((string) ($previous['hook'] ?? ''));
+
+        $parts = [];
+        if ($title !== '') $parts[] = "title: {$title}";
+        if ($theme !== '') $parts[] = "theme: {$theme}";
+        if ($hook !== '')  $parts[] = "hook: {$hook}";
+
+        return implode(' · ', $parts);
     }
 
     private function buildSystemPrompt(array $config): string
@@ -242,19 +277,80 @@ class StoryWriterTemplate extends NodeTemplate
             "Emotional tone: {$tone}. Product integration style: {$integration}.",
             "GenZ authenticity level: {$authenticity}. Vietnamese dialect: {$dialect}.",
             'Focus on human emotions and relatable situations. The product should enhance the story, not dominate it.',
-            'Return valid JSON with the following keys:',
-            '"title" (string - story title),',
-            '"theme" (string - central theme),',
-            '"formula" (string - story formula used),',
-            '"hook" (string - opening hook to grab attention in first 3 seconds),',
-            '"shots" (array of objects with: shotNumber, timestamp, description, dialogue, emotion, setting, cameraDirection),',
-            '"cast" (object with "lead" and "supporting" arrays describing characters),',
-            '"toneDirection" (string - overall tone guidance for director),',
-            '"soundDirection" (string - music/sound design guidance),',
-            '"productMoment" (string - description of the key product integration moment).',
+            'Populate all schema fields: shots cover the full duration; cast names the lead and supporting characters;',
+            'toneDirection and soundDirection guide the director; productMoment describes the key product integration.',
         ];
 
         return implode(' ', $parts);
+    }
+
+    private function storySchema(): Closure
+    {
+        return static fn (JsonSchema $s) => [
+            'title'   => $s->string(),
+            'theme'   => $s->string(),
+            'formula' => $s->string(),
+            'hook'    => $s->string(),
+            'shots'   => $s->array()->items($s->object([
+                'shotNumber'      => $s->integer(),
+                'timestamp'       => $s->string(),
+                'description'     => $s->string(),
+                'dialogue'        => $s->string(),
+                'emotion'         => $s->string(),
+                'setting'         => $s->string(),
+                'cameraDirection' => $s->string(),
+            ])),
+            'cast' => $s->object([
+                'lead'       => $s->array()->items($s->string()),
+                'supporting' => $s->array()->items($s->string()),
+            ]),
+            'toneDirection'  => $s->string(),
+            'soundDirection' => $s->string(),
+            'productMoment'  => $s->string(),
+        ];
+    }
+
+    private function stubStoryArc(): array
+    {
+        return [
+            'title' => 'The Journey Begins',
+            'theme' => 'transformation',
+            'formula' => 'problem_agitation_solution',
+            'hook' => 'What if you could transform your ideas into reality?',
+            'shots' => [
+                [
+                    'shotNumber' => 1,
+                    'timestamp' => '0:00-0:05',
+                    'description' => 'Introduce the central concept',
+                    'dialogue' => '',
+                    'emotion' => 'curiosity',
+                    'setting' => 'home',
+                    'cameraDirection' => 'medium shot',
+                ],
+                [
+                    'shotNumber' => 2,
+                    'timestamp' => '0:05-0:20',
+                    'description' => 'Show the transformation process',
+                    'dialogue' => '',
+                    'emotion' => 'excitement',
+                    'setting' => 'home',
+                    'cameraDirection' => 'close-up',
+                ],
+                [
+                    'shotNumber' => 3,
+                    'timestamp' => '0:20-0:30',
+                    'description' => 'Reveal the stunning result',
+                    'dialogue' => '',
+                    'emotion' => 'delight',
+                    'setting' => 'home',
+                    'cameraDirection' => 'wide shot',
+                ],
+            ],
+            'cast' => ['lead' => ['protagonist'], 'supporting' => []],
+            'toneDirection' => 'warm and relatable',
+            'soundDirection' => 'upbeat acoustic',
+            'productMoment' => 'product appears as a natural solution in the reveal',
+        ];
     }
 
     private function buildUserPrompt(
@@ -263,8 +359,16 @@ class StoryWriterTemplate extends NodeTemplate
         mixed $modelRoster,
         mixed $seedIdea,
         array $config,
+        ?array $previousStory = null,
     ): string {
         $parts = [];
+
+        if ($previousStory !== null) {
+            $digest = $this->digestPreviousStory($previousStory);
+            if ($digest !== '') {
+                $parts[] = "Previous story for this workflow (for style consistency, do not copy): {$digest}";
+            }
+        }
 
         if ($productAnalysis !== null) {
             $text = is_array($productAnalysis) ? json_encode($productAnalysis) : (string) $productAnalysis;
@@ -348,36 +452,6 @@ class StoryWriterTemplate extends NodeTemplate
         $lines[] = "Reply *1* to approve, *2* to revise, or send feedback to re-draft.";
 
         return implode("\n", $lines);
-    }
-
-    private function parseStoryArc(mixed $result): array
-    {
-        if (is_string($result)) {
-            // Strip markdown code fences (```json ... ``` or ``` ... ```)
-            $cleaned = preg_replace('/^```(?:json)?\s*\n?/i', '', trim($result));
-            $cleaned = preg_replace('/\n?```\s*$/i', '', $cleaned);
-
-            $decoded = json_decode(trim($cleaned), true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                return $decoded;
-            }
-
-            // Try to find JSON object in the response
-            if (preg_match('/\{[\s\S]*\}/u', $result, $matches)) {
-                $decoded = json_decode($matches[0], true);
-                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                    return $decoded;
-                }
-            }
-
-            return $this->emptyStoryArc();
-        }
-
-        if (is_array($result)) {
-            return $result;
-        }
-
-        return $this->emptyStoryArc();
     }
 
     private function emptyStoryArc(): array

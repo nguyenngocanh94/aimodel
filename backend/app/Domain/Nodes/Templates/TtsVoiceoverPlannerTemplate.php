@@ -12,6 +12,8 @@ use App\Domain\PortSchema;
 use App\Domain\Nodes\Concerns\InteractsWithLlm;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\NodeTemplate;
+use Closure;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 class TtsVoiceoverPlannerTemplate extends NodeTemplate
 {
@@ -49,10 +51,22 @@ class TtsVoiceoverPlannerTemplate extends NodeTemplate
     {
         $scenes = $ctx->inputValue('scenes');
 
-        $result = $this->callStructuredTransform(
+        $result = $this->callStructuredText(
             $ctx,
-            'You plan a voice-over timeline for a list of scenes. Return JSON with key "segments" as an array of {sceneId, text, voice, durationSec} objects.',
+            'You plan a voice-over timeline for a list of scenes. Populate "segments" as an array of {sceneId, text, voice, durationSec} entries.',
             'Scenes: ' . json_encode($scenes, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            static fn (JsonSchema $s) => [
+                'segments' => $s->array()->items($s->object([
+                    'sceneId'     => $s->string(),
+                    'text'        => $s->string(),
+                    'voice'       => $s->string(),
+                    'durationSec' => $s->number(),
+                ])),
+            ],
+            fn () => ['segments' => [
+                ['sceneId' => 'scene-1', 'text' => 'Opening line.', 'voice' => 'narrator', 'durationSec' => 3.0],
+                ['sceneId' => 'scene-2', 'text' => 'Closing line.', 'voice' => 'narrator', 'durationSec' => 2.0],
+            ]],
         );
 
         $audioPlan = !empty($result) ? $result : ['segments' => []];

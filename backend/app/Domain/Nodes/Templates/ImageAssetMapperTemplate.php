@@ -12,6 +12,8 @@ use App\Domain\PortSchema;
 use App\Domain\Nodes\Concerns\InteractsWithLlm;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\NodeTemplate;
+use Closure;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 class ImageAssetMapperTemplate extends NodeTemplate
 {
@@ -49,10 +51,22 @@ class ImageAssetMapperTemplate extends NodeTemplate
     {
         $images = $ctx->inputValue('images');
 
-        $result = $this->callStructuredTransform(
+        $result = $this->callStructuredText(
             $ctx,
-            'You map a list of image assets into frame objects suitable for video composition. Return JSON with key "frames" as an array of {id, imageUrl, duration, order} objects.',
+            'You map image assets into frame objects for video composition. Populate "frames" as an array of {id, imageUrl, duration, order} entries.',
             'Images: ' . json_encode($images, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            static fn (JsonSchema $s) => [
+                'frames' => $s->array()->items($s->object([
+                    'id'       => $s->string(),
+                    'imageUrl' => $s->string(),
+                    'duration' => $s->number(),
+                    'order'    => $s->integer(),
+                ])),
+            ],
+            fn () => ['frames' => [
+                ['id' => 'frame-1', 'imageUrl' => 'stub://frame-1', 'duration' => 2.0, 'order' => 0],
+                ['id' => 'frame-2', 'imageUrl' => 'stub://frame-2', 'duration' => 2.0, 'order' => 1],
+            ]],
         );
 
         $frames = !empty($result) ? $result : [];

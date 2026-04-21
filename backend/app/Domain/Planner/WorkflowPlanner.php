@@ -7,9 +7,13 @@ namespace App\Domain\Planner;
 use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeManifestBuilder;
 use App\Domain\Nodes\NodeTemplateRegistry;
+use App\Models\PastPlan;
 use Illuminate\Contracts\Container\Container;
-use Laravel\Ai\AnonymousAgent;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Log;
 use Laravel\Ai\Responses\AgentResponse;
+use Laravel\Ai\Responses\StructuredAgentResponse;
+use Laravel\Ai\StructuredAnonymousAgent;
 use Throwable;
 
 /**
@@ -66,13 +70,19 @@ final class WorkflowPlanner
                 );
             }
 
-            $raw = $this->invokeLlm($input, $currentPrompt, $providerName, $modelName);
+            [$raw, $structured] = $this->invokeLlm($input, $currentPrompt, $providerName, $modelName);
 
-            // Parse JSON (lenient — strip fences / commentary first).
+            // Hydrate WorkflowPlan from the already-decoded structured response.
+            // The schema is enforced by the gateway, so fence-strip / lenient
+            // JSON parsing is not needed. Parse errors here mean the provider
+            // returned an empty/off-schema payload, which we treat as a retry.
             $parseError = null;
             $plan = null;
             try {
-                $plan = $this->parsePlan($raw);
+                if ($structured === []) {
+                    throw new \RuntimeException('empty structured output from LLM');
+                }
+                $plan = WorkflowPlan::fromArray($structured);
             } catch (Throwable $e) {
                 $parseError = $e->getMessage();
             }
@@ -105,6 +115,8 @@ final class WorkflowPlanner
             $finalPlan = $plan;
 
             if ($validation->valid) {
+                $this->persistSuccessfulPlan($input, $plan, $providerName, $modelName);
+
                 return new PlannerResult(
                     plan: $plan,
                     validation: $validation,
@@ -159,12 +171,16 @@ final class WorkflowPlanner
         return array_values($guides);
     }
 
-    private function invokeLlm(PlannerInput $input, string $prompt, string $providerName, string $modelName): string
+    /**
+     * @return array{0: string, 1: array<string, mixed>} [rawText, structuredPayload]
+     */
+    private function invokeLlm(PlannerInput $input, string $prompt, string $providerName, string $modelName): array
     {
-        $agent = new AnonymousAgent(
+        $agent = new StructuredAnonymousAgent(
             instructions: $prompt,
             messages: [],
             tools: $this->plannerTools(),
+            schema: self::planSchema(),
         );
 
         // Empty user prompt — the "real" prompt sits in instructions. Most
@@ -179,78 +195,75 @@ final class WorkflowPlanner
             model: $modelName === '' ? null : $modelName,
         );
 
-        return $response instanceof AgentResponse ? $response->text : (string) $response;
+        $raw = $response instanceof AgentResponse ? $response->text : (string) $response;
+        $structured = $response instanceof StructuredAgentResponse
+            ? (is_array($response->structured) ? $response->structured : [])
+            : [];
+
+        return [$raw, $structured];
     }
 
     /**
-     * Lenient JSON parsing — strips markdown fences and pre/post commentary.
-     * Throws on unrecoverable parse failure; caller treats as retry trigger.
+     * JSON schema mirroring {@see WorkflowPlan::fromArray}. Used by
+     * {@see StructuredAnonymousAgent} + {@see RefinePlanTool} so the gateway
+     * enforces plan shape and we hydrate the typed plan directly.
      */
-    private function parsePlan(string $raw): WorkflowPlan
+    public static function planSchema(): \Closure
     {
-        $cleaned = trim($raw);
-
-        // Strip markdown code fences if present (```json ... ``` or ``` ... ```).
-        if (str_starts_with($cleaned, '```')) {
-            $cleaned = preg_replace('/^```(?:json|JSON)?\s*\n?/', '', $cleaned) ?? $cleaned;
-            $cleaned = preg_replace('/\n?```\s*$/', '', $cleaned) ?? $cleaned;
-            $cleaned = trim($cleaned);
-        }
-
-        // If the model included prose before/after JSON, try to extract the
-        // outermost balanced {...} block.
-        $json = $this->extractJsonObject($cleaned);
-        if ($json === null) {
-            throw new \RuntimeException('no JSON object found in LLM output');
-        }
-
-        /** @var array<string, mixed>|null $data */
-        $data = json_decode($json, true);
-        if (!is_array($data)) {
-            $jsonError = json_last_error_msg();
-            throw new \RuntimeException("invalid JSON: {$jsonError}");
-        }
-
-        return WorkflowPlan::fromArray($data);
+        return static fn (JsonSchema $s) => [
+            'intent'   => $s->string(),
+            'vibeMode' => $s->string(),
+            'nodes'    => $s->array()->items($s->object([
+                'id'     => $s->string(),
+                'type'   => $s->string(),
+                'config' => $s->object(),
+                'reason' => $s->string(),
+                'label'  => $s->string(),
+            ])),
+            'edges' => $s->array()->items($s->object([
+                'sourceNodeId'  => $s->string(),
+                'sourcePortKey' => $s->string(),
+                'targetNodeId'  => $s->string(),
+                'targetPortKey' => $s->string(),
+                'reason'        => $s->string(),
+            ])),
+            'assumptions' => $s->array()->items($s->string()),
+            'rationale'   => $s->string(),
+            'meta'        => $s->object([
+                'plannerVersion' => $s->string(),
+            ]),
+        ];
     }
 
     /**
-     * Extract the outermost JSON object from a string by brace-counting.
-     * Handles strings (with escaped quotes) without going full parser.
+     * Persist a successful plan for the PriorPlanRetrievalTool. Guarded by
+     * config('planner.persist_plans'); errors are swallowed to avoid breaking
+     * the planner's happy path (e.g. missing migration in tests).
      */
-    private function extractJsonObject(string $s): ?string
-    {
-        $len = strlen($s);
-        $start = -1;
-        $depth = 0;
-        $inString = false;
-        $escape = false;
-
-        for ($i = 0; $i < $len; $i++) {
-            $ch = $s[$i];
-
-            if ($inString) {
-                if ($escape) { $escape = false; continue; }
-                if ($ch === '\\') { $escape = true; continue; }
-                if ($ch === '"') { $inString = false; }
-                continue;
-            }
-
-            if ($ch === '"') { $inString = true; continue; }
-            if ($ch === '{') {
-                if ($depth === 0) { $start = $i; }
-                $depth++;
-                continue;
-            }
-            if ($ch === '}') {
-                $depth--;
-                if ($depth === 0 && $start !== -1) {
-                    return substr($s, $start, $i - $start + 1);
-                }
-            }
+    private function persistSuccessfulPlan(
+        PlannerInput $input,
+        WorkflowPlan $plan,
+        string $providerName,
+        string $modelName,
+    ): void {
+        if (! (bool) config('planner.persist_plans', true)) {
+            return;
         }
 
-        return null;
+        try {
+            PastPlan::create([
+                'brief' => $input->brief,
+                'brief_hash' => PastPlan::hashBrief($input->brief),
+                'plan' => $plan->toArray(),
+                'provider' => $providerName !== '' ? $providerName : null,
+                'model' => $modelName !== '' ? $modelName : null,
+            ]);
+        } catch (Throwable $e) {
+            // Persistence is best-effort — log and move on.
+            Log::warning('WorkflowPlanner: failed to persist past plan', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

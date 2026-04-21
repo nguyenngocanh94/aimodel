@@ -12,6 +12,8 @@ use App\Domain\PortSchema;
 use App\Domain\Nodes\Concerns\InteractsWithLlm;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\NodeTemplate;
+use Closure;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 class SubtitleFormatterTemplate extends NodeTemplate
 {
@@ -49,10 +51,22 @@ class SubtitleFormatterTemplate extends NodeTemplate
     {
         $audioPlan = $ctx->inputValue('audioPlan');
 
-        $result = $this->callStructuredTransform(
+        $result = $this->callStructuredText(
             $ctx,
-            'You format subtitles from an audio plan. Return JSON with key "segments" as an array of {id, text, start, end} objects.',
+            'You format subtitles from an audio plan. Populate "segments" as an array of {id, text, start, end} entries.',
             'Audio plan: ' . json_encode($audioPlan, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            static fn (JsonSchema $s) => [
+                'segments' => $s->array()->items($s->object([
+                    'id'    => $s->string(),
+                    'text'  => $s->string(),
+                    'start' => $s->number(),
+                    'end'   => $s->number(),
+                ])),
+            ],
+            fn () => ['segments' => [
+                ['id' => 'sub-1', 'text' => 'Hello', 'start' => 0.0, 'end' => 1.0],
+                ['id' => 'sub-2', 'text' => 'World', 'start' => 1.0, 'end' => 2.0],
+            ]],
         );
 
         $subtitles = !empty($result) ? $result : ['segments' => []];

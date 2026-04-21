@@ -11,9 +11,9 @@ use App\Domain\Planner\WorkflowPlanner;
 use App\Domain\Planner\WorkflowPlanValidator;
 use App\Services\TelegramAgent\AgentSessionStore;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Laravel\Ai\AnonymousAgent;
 use Laravel\Ai\Contracts\Tool;
-use Laravel\Ai\Responses\AgentResponse;
+use Laravel\Ai\Responses\StructuredAgentResponse;
+use Laravel\Ai\StructuredAnonymousAgent;
 use Laravel\Ai\Tools\Request;
 use Stringable;
 use Throwable;
@@ -105,10 +105,11 @@ final class RefinePlanTool implements Tool
 
         $prompt = RefinePlanPrompt::build($priorPlan, $feedback, $catalogPreview);
 
-        $agent = new AnonymousAgent(
+        $agent = new StructuredAnonymousAgent(
             instructions: $prompt,
             messages: [],
             tools: [],
+            schema: WorkflowPlanner::planSchema(),
         );
 
         try {
@@ -123,20 +124,19 @@ final class RefinePlanTool implements Tool
             ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         }
 
-        $raw = $response instanceof AgentResponse ? $response->text : (string) $response;
+        $structured = $response instanceof StructuredAgentResponse && is_array($response->structured)
+            ? $response->structured
+            : [];
 
-        $json = $this->extractJson($raw);
-        $parsed = json_decode($json, true);
-        if (!is_array($parsed)) {
+        if ($structured === []) {
             return json_encode([
                 'error'   => 'parse_failed',
-                'message' => 'Không parse được response từ LLM.',
-                'raw'     => mb_substr($raw, 0, 500),
+                'message' => 'LLM trả về payload rỗng hoặc không đúng schema.',
             ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         }
 
         try {
-            $refinedPlan = WorkflowPlan::fromArray($parsed);
+            $refinedPlan = WorkflowPlan::fromArray($structured);
         } catch (Throwable $e) {
             return json_encode([
                 'error'   => 'hydrate_failed',
@@ -177,51 +177,4 @@ final class RefinePlanTool implements Tool
         ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     }
 
-    /**
-     * Lenient JSON extractor — strips markdown fences and returns the outermost
-     * balanced {...} block. Copy of the logic in {@see WorkflowPlanner::parsePlan}
-     * (kept private there; we inline a small version so this tool stays self-contained).
-     */
-    private function extractJson(string $raw): string
-    {
-        $cleaned = trim($raw);
-
-        if (str_starts_with($cleaned, '```')) {
-            $cleaned = preg_replace('/^```(?:json|JSON)?\s*\n?/', '', $cleaned) ?? $cleaned;
-            $cleaned = preg_replace('/\n?```\s*$/', '', $cleaned) ?? $cleaned;
-            $cleaned = trim($cleaned);
-        }
-
-        $len = strlen($cleaned);
-        $start = -1;
-        $depth = 0;
-        $inString = false;
-        $escape = false;
-
-        for ($i = 0; $i < $len; $i++) {
-            $ch = $cleaned[$i];
-
-            if ($inString) {
-                if ($escape) { $escape = false; continue; }
-                if ($ch === '\\') { $escape = true; continue; }
-                if ($ch === '"') { $inString = false; }
-                continue;
-            }
-
-            if ($ch === '"') { $inString = true; continue; }
-            if ($ch === '{') {
-                if ($depth === 0) { $start = $i; }
-                $depth++;
-                continue;
-            }
-            if ($ch === '}') {
-                $depth--;
-                if ($depth === 0 && $start !== -1) {
-                    return substr($cleaned, $start, $i - $start + 1);
-                }
-            }
-        }
-
-        return $cleaned;
-    }
 }

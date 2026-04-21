@@ -77,6 +77,16 @@ class LlmStubTemplate extends NodeTemplate
     {
         return $this->callTextGeneration($ctx, $sys, $prompt);
     }
+
+    public function publicCallStructuredText(
+        NodeExecutionContext $ctx,
+        string $sys,
+        string $prompt,
+        \Closure $schema,
+        ?\Closure $stub = null,
+    ): array {
+        return $this->callStructuredText($ctx, $sys, $prompt, $schema, $stub);
+    }
 }
 
 final class InteractsWithLlmTest extends TestCase
@@ -346,6 +356,82 @@ final class InteractsWithLlmTest extends TestCase
             }
             $body = $request->data();
             return ($body['model'] ?? '') === 'accounts/fireworks/models/minimax-m2p7';
+        });
+    }
+
+    // ────────────────────────────────────────────────────────────────────
+    // 11. callStructuredText — stub fallback short-circuits
+    // ────────────────────────────────────────────────────────────────────
+
+    #[Test]
+    public function callStructuredText_returns_stub_fallback_when_provider_is_stub(): void
+    {
+        $ctx = $this->makeCtx(['llm' => ['provider' => 'stub', 'model' => '']]);
+
+        $template = new LlmStubTemplate();
+        $result = $template->publicCallStructuredText(
+            $ctx,
+            'sys',
+            'user',
+            static fn (\Illuminate\Contracts\JsonSchema\JsonSchema $s) => ['foo' => $s->string()],
+            fn () => ['foo' => 'bar'],
+        );
+
+        $this->assertSame(['foo' => 'bar'], $result);
+    }
+
+    // ────────────────────────────────────────────────────────────────────
+    // 12. callStructuredText — sends a structured-output request and decodes
+    // ────────────────────────────────────────────────────────────────────
+
+    #[Test]
+    public function callStructuredText_hydrates_structured_response_via_laravel_ai(): void
+    {
+        config()->set('ai.default', 'fireworks');
+
+        Http::fake([
+            'api.fireworks.ai/*' => Http::response([
+                'id' => 'cmpl-test',
+                'object' => 'chat.completion',
+                'created' => time(),
+                'model' => 'accounts/fireworks/models/minimax-m2p7',
+                'choices' => [[
+                    'index' => 0,
+                    'message' => [
+                        'role' => 'assistant',
+                        'content' => json_encode(['foo' => 'bar', 'count' => 3]),
+                    ],
+                    'finish_reason' => 'stop',
+                ]],
+                'usage' => ['prompt_tokens' => 10, 'completion_tokens' => 5, 'total_tokens' => 15],
+            ], 200),
+        ]);
+
+        $ctx = $this->makeCtx([
+            'llm' => ['provider' => 'fireworks', 'model' => 'accounts/fireworks/models/minimax-m2p7'],
+        ]);
+
+        $template = new LlmStubTemplate();
+        $result = $template->publicCallStructuredText(
+            $ctx,
+            'sys',
+            'user',
+            static fn (\Illuminate\Contracts\JsonSchema\JsonSchema $s) => [
+                'foo'   => $s->string(),
+                'count' => $s->integer(),
+            ],
+        );
+
+        $this->assertSame(['foo' => 'bar', 'count' => 3], $result);
+
+        // Verify request carried a response_format=json_schema body — that's
+        // the tell-tale of structured output going through laravel/ai.
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+            if (!str_contains($request->url(), 'api.fireworks.ai')) {
+                return false;
+            }
+            $body = $request->data();
+            return ($body['response_format']['type'] ?? '') === 'json_schema';
         });
     }
 }

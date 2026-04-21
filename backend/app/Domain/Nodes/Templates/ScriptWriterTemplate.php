@@ -16,6 +16,8 @@ use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplate;
 use App\Domain\Nodes\VibeImpact;
+use Closure;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 class ScriptWriterTemplate extends NodeTemplate
 {
@@ -222,13 +224,17 @@ class ScriptWriterTemplate extends NodeTemplate
         $prompt = $ctx->inputValue('prompt');
         $config = $ctx->config;
 
-        $result = $this->callTextGeneration(
+        $script = $this->callStructuredText(
             $ctx,
             $this->buildSystemPrompt($config),
             $this->buildUserPrompt($prompt, $config),
+            $this->scriptSchema(),
+            fn () => $this->stubScript(),
         );
 
-        $script = $this->parseScript($result);
+        if ($script === []) {
+            $script = ['title' => 'Script', 'beats' => [], 'narration' => '', 'hook' => null, 'cta' => null];
+        }
 
         return [
             'script' => PortPayload::success(
@@ -238,6 +244,32 @@ class ScriptWriterTemplate extends NodeTemplate
                 sourcePortKey: 'script',
                 previewText: ($script['title'] ?? 'Script') . ' · ' . count($script['beats'] ?? []) . ' beats',
             ),
+        ];
+    }
+
+    private function scriptSchema(): Closure
+    {
+        return static fn (JsonSchema $s) => [
+            'title'     => $s->string(),
+            'hook'      => $s->string(),
+            'beats'     => $s->array()->items($s->string()),
+            'narration' => $s->string(),
+            'cta'       => $s->string(),
+        ];
+    }
+
+    private function stubScript(): array
+    {
+        return [
+            'title' => 'The Journey Begins',
+            'hook' => 'What if you could transform your ideas into reality?',
+            'beats' => [
+                'Introduce the central concept',
+                'Show the transformation process',
+                'Reveal the stunning result',
+            ],
+            'narration' => 'In a world of endless possibilities, one tool stands above the rest.',
+            'cta' => 'Start creating today.',
         ];
     }
 
@@ -261,7 +293,7 @@ class ScriptWriterTemplate extends NodeTemplate
             $parts[] = "End with a clear call-to-action.";
         }
 
-        $parts[] = "Return valid JSON: {\"title\": string, \"hook\": string|null, \"beats\": string[], \"narration\": string, \"cta\": string|null}";
+        $parts[] = 'Populate all schema fields: title, hook, beats, narration, cta.';
 
         return implode(' ', $parts);
     }
@@ -274,20 +306,4 @@ class ScriptWriterTemplate extends NodeTemplate
         return "Create a {$duration}-second video script about: {$text}";
     }
 
-    private function parseScript(mixed $result): array
-    {
-        if (is_string($result)) {
-            $decoded = json_decode($result, true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                return $decoded;
-            }
-            return ['title' => 'Generated Script', 'beats' => [$result], 'narration' => $result, 'hook' => null, 'cta' => null];
-        }
-
-        if (is_array($result)) {
-            return $result;
-        }
-
-        return ['title' => 'Script', 'beats' => [], 'narration' => '', 'hook' => null, 'cta' => null];
-    }
 }

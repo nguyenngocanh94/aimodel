@@ -71,7 +71,6 @@ final class RefinePlanPrompt
             'RULE 5: Node `type` values must stay within the NODE CATALOG below.',
             'RULE 6: If the user asks to add a node, pick from the catalog; if they ask to remove one, drop it AND any edges touching it.',
             'RULE 7: If the user asks to change a knob, set it on the correct node\'s `config` — do not invent new knob names.',
-            'RULE 8: Output MUST be a single JSON object — no prose, no markdown fences, no comments.',
         ];
 
         return ($lang === self::LANG_VI ? "QUY TẮC CHỈNH SỬA:\n" : "REFINEMENT RULES:\n")
@@ -148,8 +147,9 @@ JSON;
 
     private static function outputGuard(string $lang): string
     {
+        // Structured output is enforced by the gateway schema.
         return $lang === self::LANG_VI
-            ? 'OUTPUT: Emit CHỈ 1 JSON object duy nhất. Không markdown. Không prose. Không code fence.'
-            : 'OUTPUT: Emit ONLY a single JSON object. No markdown. No prose. No code fences.';
+            ? 'OUTPUT: Trả về đúng schema đã khai báo — giữ nguyên trường, chỉ cập nhật theo yêu cầu.'
+            : 'OUTPUT: Return the declared schema — keep fields intact and only update what the user requested.';
     }
 }

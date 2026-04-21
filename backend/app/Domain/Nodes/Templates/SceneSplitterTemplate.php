@@ -16,6 +16,8 @@ use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplate;
 use App\Domain\Nodes\VibeImpact;
+use Closure;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 class SceneSplitterTemplate extends NodeTemplate
 {
@@ -139,13 +141,18 @@ class SceneSplitterTemplate extends NodeTemplate
         $script = $ctx->inputValue('script');
         $config = $ctx->config;
 
-        $result = $this->callTextGeneration(
+        $result = $this->callStructuredText(
             $ctx,
             $this->buildSystemPrompt($config),
             $this->buildUserPrompt($script, $config),
+            $this->sceneSchema(),
+            fn () => $this->stubSceneList(),
         );
 
-        $scenes = $this->parseScenes($result);
+        $scenes = $result['scenes'] ?? [];
+        if (!is_array($scenes)) {
+            $scenes = [];
+        }
 
         return [
             'scenes' => PortPayload::success(
@@ -155,6 +162,31 @@ class SceneSplitterTemplate extends NodeTemplate
                 sourcePortKey: 'scenes',
                 previewText: count($scenes) . ' scene(s)',
             ),
+        ];
+    }
+
+    private function sceneSchema(): Closure
+    {
+        return static fn (JsonSchema $s) => [
+            'scenes' => $s->array()->items($s->object([
+                'index'             => $s->integer(),
+                'title'             => $s->string(),
+                'description'       => $s->string(),
+                'visualDescription' => $s->string(),
+                'durationSeconds'   => $s->number(),
+                'narration'         => $s->string(),
+            ])),
+        ];
+    }
+
+    private function stubSceneList(): array
+    {
+        return [
+            'scenes' => [
+                ['index' => 0, 'title' => 'Scene 1', 'description' => 'Opening shot', 'visualDescription' => 'Wide angle establishing shot', 'durationSeconds' => 3.0, 'narration' => ''],
+                ['index' => 1, 'title' => 'Scene 2', 'description' => 'Main action', 'visualDescription' => 'Medium shot of main subject', 'durationSeconds' => 5.0, 'narration' => ''],
+                ['index' => 2, 'title' => 'Scene 3', 'description' => 'Closing reveal', 'visualDescription' => 'Close-up of final result', 'durationSeconds' => 2.0, 'narration' => ''],
+            ],
         ];
     }
 
@@ -171,7 +203,7 @@ class SceneSplitterTemplate extends NodeTemplate
             $parts[] = "Include detailed visual descriptions for each scene suitable for image generation.";
         }
 
-        $parts[] = "Return valid JSON: {\"scenes\": [{\"index\": number, \"title\": string, \"description\": string, \"visualDescription\": string, \"durationSeconds\": number, \"narration\": string}]}";
+        $parts[] = 'Populate the "scenes" array where each scene has index, title, description, visualDescription, durationSeconds, narration.';
 
         return implode(' ', $parts);
     }
@@ -184,20 +216,4 @@ class SceneSplitterTemplate extends NodeTemplate
         return "Split this script into up to {$maxScenes} distinct visual scenes:\n\n{$scriptText}";
     }
 
-    private function parseScenes(mixed $result): array
-    {
-        if (is_string($result)) {
-            $decoded = json_decode($result, true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                return $decoded['scenes'] ?? $decoded['beats'] ?? [$decoded];
-            }
-            return [['index' => 0, 'title' => 'Scene 1', 'description' => $result, 'visualDescription' => $result]];
-        }
-
-        if (is_array($result)) {
-            return $result['scenes'] ?? $result['beats'] ?? [$result];
-        }
-
-        return [];
-    }
 }

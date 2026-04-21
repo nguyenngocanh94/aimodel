@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace App\Domain\Nodes\Concerns;
 
 use App\Domain\Nodes\NodeExecutionContext;
+use Closure;
 use Illuminate\Support\Facades\Log;
 use Laravel\Ai\AnonymousAgent;
+use Laravel\Ai\Responses\StructuredAgentResponse;
+use Laravel\Ai\Streaming\Events\TextDelta;
+use Laravel\Ai\StructuredAnonymousAgent;
 
 trait InteractsWithLlm
 {
@@ -68,9 +72,14 @@ trait InteractsWithLlm
      * Call laravel/ai for a text-generation round trip.
      * Templates should call this from execute() instead of a Provider adapter.
      *
+     * Provider resolution precedence (LP-H3):
+     *  1. `providerChain` array on the node config (per-node failover override).
+     *  2. `llm.provider` / legacy `provider` — single provider, no failover.
+     *  3. Global `config('ai.failover.text')` — ordered failover chain.
+     *  4. `config('ai.default')` scalar.
+     *
      * When the resolved provider is "stub", returns a JSON-encoded deterministic
-     * canned payload for offline tests. Callers that JSON-decode the response
-     * (the existing parse* helpers do) get a realistic shape back.
+     * canned payload for offline tests.
      */
     protected function callTextGeneration(
         NodeExecutionContext $ctx,
@@ -78,18 +87,49 @@ trait InteractsWithLlm
         string $prompt,
         ?int $maxTokens = null,
     ): string {
-        $provider = $this->resolveLlmProvider($ctx->config);
+        $providerArg = $this->resolveTextProviderArg($ctx->config);
 
-        if ($provider === 'stub') {
+        // Stub short-circuit — canned, offline output.
+        if ($providerArg === 'stub'
+            || (is_array($providerArg) && in_array('stub', $providerArg, true))
+        ) {
             return $this->stubTextGeneration($systemPrompt, $prompt);
         }
 
-        $model    = $this->resolveLlmModel($ctx->config, $provider) ?: null;
+        // Only a scalar (single-provider) path resolves a specific model; chains
+        // let each provider fall back to its own default_model.
+        $model = is_string($providerArg)
+            ? ($this->resolveLlmModel($ctx->config, $providerArg) ?: null)
+            : null;
 
         $agent = new AnonymousAgent($systemPrompt, [], []);
+
+        // LP-C3: switch to stream() when the context has an attached token-delta
+        // sink (e.g., the run-page SSE subscriber). Each TextDelta is forwarded
+        // into $ctx->emitTokenDelta() which the RunExecutor broadcasts. The
+        // non-streaming path is kept for CLI / queued workers that have no
+        // subscriber and don't need the per-token overhead.
+        if ($ctx->hasTokenDeltaSink()) {
+            $response = $agent->stream(
+                $prompt,
+                provider: $providerArg,
+                model: $model,
+            );
+
+            $response->each(function ($event) use ($ctx): void {
+                if ($event instanceof TextDelta) {
+                    $ctx->emitTokenDelta($event->delta, $event->messageId);
+                }
+            });
+
+            // After iteration, StreamableAgentResponse populates $response->text
+            // by combining all TextDelta events (see vendor L142-144).
+            return (string) $response->text;
+        }
+
         $response = $agent->prompt(
             $prompt,
-            provider: $provider,
+            provider: $providerArg,
             model: $model,
         );
 
@@ -97,31 +137,90 @@ trait InteractsWithLlm
     }
 
     /**
-     * Call laravel/ai for a structured-data round trip.
+     * Resolve the `provider` argument to pass to `$agent->prompt()`.
      *
-     * Interim helper for nodes that used to go through
-     * `Capability::StructuredTransform`. Returns an array for direct
-     * consumption. Until LC2 lands full `HasStructuredOutput` support,
-     * this short-circuits stubs deterministically and otherwise asks the
-     * text LLM to emit JSON and decodes it.
+     * @return string|array<int, string>
+     */
+    protected function resolveTextProviderArg(array $config): string|array
+    {
+        // 1. Per-node providerChain override — highest precedence.
+        $override = $config['providerChain'] ?? null;
+        if (is_array($override) && $override !== []) {
+            return array_values(array_map('strval', $override));
+        }
+
+        // 2. Explicit single-provider (legacy flat or llm.provider).
+        $explicit = $config['llm']['provider'] ?? $config['provider'] ?? '';
+        if (is_string($explicit) && $explicit !== '') {
+            return $explicit;
+        }
+
+        // 3. Global failover chain from config/ai.php.
+        $chain = (array) config('ai.failover.text', []);
+        if ($chain !== []) {
+            return array_values(array_map('strval', $chain));
+        }
+
+        // 4. Fallback to the legacy scalar default.
+        return (string) config('ai.default', 'fireworks');
+    }
+
+    /**
+     * Call laravel/ai for a structured-data round trip via
+     * {@see StructuredAnonymousAgent}. The gateway enforces the schema, so the
+     * response is already-decoded — no fence-strip, no json_decode ladder.
      *
+     * The $schema closure receives an `Illuminate\Contracts\JsonSchema\JsonSchema`
+     * instance and returns `['fieldName' => $s->string(), ...]`.
+     *
+     * Stub short-circuit: when provider is "stub" and a `$stubFallback` closure
+     * is supplied, its return value is used verbatim (deterministic test path).
+     * Otherwise stub returns `[]` and callers must tolerate it.
+     *
+     * @param Closure $schema        fn (JsonSchema $s): array<string, Type>
+     * @param ?Closure $stubFallback fn (): array — deterministic stub output
      * @return array<string, mixed>
      */
-    protected function callStructuredTransform(
+    protected function callStructuredText(
         NodeExecutionContext $ctx,
         string $systemPrompt,
         string $prompt,
+        Closure $schema,
+        ?Closure $stubFallback = null,
     ): array {
         $provider = $this->resolveLlmProvider($ctx->config);
 
         if ($provider === 'stub') {
-            return $this->stubStructuredTransform($systemPrompt, $prompt);
+            return $stubFallback !== null ? (array) $stubFallback() : [];
         }
 
-        $raw = $this->callTextGeneration($ctx, $systemPrompt, $prompt);
-        $decoded = json_decode($raw, true);
+        $model = $this->resolveLlmModel($ctx->config, $provider) ?: null;
 
-        return is_array($decoded) ? $decoded : [];
+        $agent = new StructuredAnonymousAgent($systemPrompt, [], [], $schema);
+        $response = $agent->prompt(
+            $prompt,
+            provider: $provider,
+            model: $model,
+        );
+
+        if ($response instanceof StructuredAgentResponse) {
+            $structured = $response->structured ?? [];
+            if ($structured === []) {
+                Log::warning('InteractsWithLlm: structured output missing', [
+                    'template' => static::class,
+                    'provider' => $provider,
+                    'model'    => $model,
+                ]);
+            }
+            return is_array($structured) ? $structured : [];
+        }
+
+        Log::warning('InteractsWithLlm: structured output missing (non-structured response)', [
+            'template' => static::class,
+            'provider' => $provider,
+            'model'    => $model,
+        ]);
+        return [];
     }
 
     /**
@@ -172,36 +271,6 @@ trait InteractsWithLlm
         ];
 
         return json_encode($payloads[$idx], JSON_THROW_ON_ERROR);
-    }
-
-    /**
-     * Deterministic canned structured-transform output for `provider: stub`.
-     * Mirrors legacy StubAdapter shape for StructuredTransform.
-     *
-     * @return array<string, mixed>
-     */
-    private function stubStructuredTransform(string $systemPrompt, string $prompt): array
-    {
-        $seed = hash('sha256', $systemPrompt . '|' . $prompt);
-        $idx = hexdec(substr($seed, 0, 4)) % 2;
-
-        return match ($idx) {
-            0 => [
-                'scenes' => [
-                    ['id' => 'scene-1', 'description' => 'Opening shot establishing context', 'duration' => 3.0],
-                    ['id' => 'scene-2', 'description' => 'Main action sequence', 'duration' => 5.0],
-                    ['id' => 'scene-3', 'description' => 'Closing with call to action', 'duration' => 2.0],
-                ],
-            ],
-            1 => [
-                'scenes' => [
-                    ['id' => 'scene-1', 'description' => 'Wide angle landscape view', 'duration' => 4.0],
-                    ['id' => 'scene-2', 'description' => 'Close-up detail shot', 'duration' => 3.0],
-                    ['id' => 'scene-3', 'description' => 'Dynamic transition sequence', 'duration' => 3.0],
-                    ['id' => 'scene-4', 'description' => 'Final reveal and branding', 'duration' => 2.0],
-                ],
-            ],
-        };
     }
 
     /** Guarded once-per-run deprecation logger. */

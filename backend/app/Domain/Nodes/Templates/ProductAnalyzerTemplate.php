@@ -16,6 +16,8 @@ use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplate;
 use App\Domain\Nodes\VibeImpact;
+use Closure;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 class ProductAnalyzerTemplate extends NodeTemplate
 {
@@ -147,13 +149,17 @@ class ProductAnalyzerTemplate extends NodeTemplate
             $userPrompt .= "\n\nReference image URLs:\n" . implode("\n", array_unique($imageUrls));
         }
 
-        $result = $this->callTextGeneration(
+        $analysis = $this->callStructuredText(
             $ctx,
             $this->buildSystemPrompt($analysisDepth),
             $userPrompt,
+            $this->analysisSchema(),
+            fn () => $this->fallbackAnalysis(),
         );
 
-        $analysis = $this->parseAnalysis($result);
+        if ($analysis === [] || !isset($analysis['productType'])) {
+            $analysis = $this->fallbackAnalysis();
+        }
 
         return [
             'analysis' => PortPayload::success(
@@ -170,15 +176,33 @@ class ProductAnalyzerTemplate extends NodeTemplate
     {
         $parts = [
             'You are a product analysis AI with vision capabilities.',
-            'Analyze the provided product images and return a structured JSON report.',
+            'Analyze the provided product images and populate the structured analysis schema.',
             "Analysis depth: {$analysisDepth}.",
-            'Return valid JSON with these fields:',
-            '{"productType": string, "productName": string, "colors": string[], "materials": string[],',
-            '"style": string, "sellingPoints": string[], "targetAudience": {"age": string, "gender": string, "occasion": string, "lifestyle": string},',
-            '"pricePositioning": "budget"|"mid-range"|"premium"|"luxury", "suggestedMood": string}',
+            'Cover productType, productName, colors, materials, style, sellingPoints,',
+            'targetAudience (age/gender/occasion/lifestyle), pricePositioning (budget|mid-range|premium|luxury), and suggestedMood.',
         ];
 
         return implode(' ', $parts);
+    }
+
+    private function analysisSchema(): Closure
+    {
+        return static fn (JsonSchema $s) => [
+            'productType'    => $s->string(),
+            'productName'    => $s->string(),
+            'colors'         => $s->array()->items($s->string()),
+            'materials'      => $s->array()->items($s->string()),
+            'style'          => $s->string(),
+            'sellingPoints'  => $s->array()->items($s->string()),
+            'targetAudience' => $s->object([
+                'age'       => $s->string(),
+                'gender'    => $s->string(),
+                'occasion'  => $s->string(),
+                'lifestyle' => $s->string(),
+            ]),
+            'pricePositioning' => $s->string(),
+            'suggestedMood'    => $s->string(),
+        ];
     }
 
     private function buildUserPrompt(mixed $images, string $description): string
@@ -191,48 +215,6 @@ class ProductAnalyzerTemplate extends NodeTemplate
         }
 
         return $prompt;
-    }
-
-    private function parseAnalysis(mixed $result): array
-    {
-        if (is_string($result)) {
-            // Strip markdown code fences
-            $cleaned = preg_replace('/^```(?:json)?\s*\n?/i', '', trim($result));
-            $cleaned = preg_replace('/\n?```\s*$/i', '', $cleaned);
-
-            $decoded = json_decode(trim($cleaned), true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                // The canned stub response is a script-shaped array; recognise
-                // actual product analyses by the productType key.
-                if (!isset($decoded['productType'])) {
-                    return $this->fallbackAnalysis();
-                }
-                return $decoded;
-            }
-
-            // Try to find JSON object in the response
-            if (preg_match('/\{[\s\S]*\}/u', $result, $matches)) {
-                $decoded = json_decode($matches[0], true);
-                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                    return $decoded;
-                }
-            }
-
-            return $this->fallbackAnalysis();
-        }
-
-        if (is_array($result)) {
-            // The StubAdapter returns script-like arrays for TextGeneration.
-            // Check if the result looks like a product analysis (has productType key).
-            if (isset($result['productType'])) {
-                return $result;
-            }
-
-            // Fallback: the stub returned a script-shaped response, not product analysis.
-            return $this->fallbackAnalysis();
-        }
-
-        return $this->fallbackAnalysis();
     }
 
     private function fallbackAnalysis(): array

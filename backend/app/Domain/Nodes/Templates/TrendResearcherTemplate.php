@@ -16,6 +16,8 @@ use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplate;
 use App\Domain\Nodes\VibeImpact;
+use Closure;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 class TrendResearcherTemplate extends NodeTemplate
 {
@@ -137,13 +139,17 @@ class TrendResearcherTemplate extends NodeTemplate
         $topic = $ctx->inputValue('topic');
         $config = $ctx->config;
 
-        $result = $this->callTextGeneration(
+        $trendBrief = $this->callStructuredText(
             $ctx,
             $this->buildSystemPrompt($config),
             $this->buildUserPrompt($context, $topic),
+            $this->trendBriefSchema(),
+            fn () => $this->stubTrendBrief(),
         );
 
-        $trendBrief = $this->parseTrendBrief($result);
+        if ($trendBrief === []) {
+            $trendBrief = $this->emptyTrendBrief();
+        }
 
         return [
             'trendBrief' => PortPayload::success(
@@ -166,19 +172,49 @@ class TrendResearcherTemplate extends NodeTemplate
 
         $parts = [
             "You are a social media trend researcher specializing in {$market} market, {$platform} platform.",
-            "Analyze current trends and return a structured trend brief.",
+            "Analyze current trends and populate the structured trend brief schema.",
             "Respond in {$language} language where appropriate.",
-            'Return valid JSON with the following keys:',
-            '"trendingFormats" (array of current popular video formats, e.g. "POV videos", "before/after"),',
-            '"trendingHashtags" (array of relevant hashtags for the market),',
-            '"trendingSounds" (array of popular audio/music trends),',
-            '"culturalMoments" (array of current cultural events, holidays, memes),',
-            '"contentAngles" (array of suggested angles to approach the product/topic),',
-            '"audienceInsights" (object describing what the target audience responds to right now),',
-            '"avoidList" (array of topics/formats that are declining or risky).',
+            'Fields cover: trendingFormats, trendingHashtags, trendingSounds, culturalMoments, contentAngles,',
+            'audienceInsights (tone/age/interests/behaviors), and avoidList (declining or risky topics/formats).',
         ];
 
         return implode(' ', $parts);
+    }
+
+    private function trendBriefSchema(): Closure
+    {
+        return static fn (JsonSchema $s) => [
+            'trendingFormats'  => $s->array()->items($s->string()),
+            'trendingHashtags' => $s->array()->items($s->string()),
+            'trendingSounds'   => $s->array()->items($s->string()),
+            'culturalMoments'  => $s->array()->items($s->string()),
+            'contentAngles'    => $s->array()->items($s->string()),
+            'audienceInsights' => $s->object([
+                'tone'      => $s->string(),
+                'age'       => $s->string(),
+                'interests' => $s->array()->items($s->string()),
+                'behaviors' => $s->array()->items($s->string()),
+            ]),
+            'avoidList' => $s->array()->items($s->string()),
+        ];
+    }
+
+    private function stubTrendBrief(): array
+    {
+        return [
+            'trendingFormats' => ['POV storytelling', 'before/after transformation'],
+            'trendingHashtags' => ['#genz', '#vietnam', '#tiktok'],
+            'trendingSounds' => ['upbeat indie pop', 'lo-fi'],
+            'culturalMoments' => ['back-to-school season'],
+            'contentAngles' => ['relatable humor', 'authentic testimonial'],
+            'audienceInsights' => [
+                'tone' => 'casual, authentic',
+                'age' => '16-24',
+                'interests' => ['beauty', 'lifestyle'],
+                'behaviors' => ['scrolls quickly', 'values authenticity'],
+            ],
+            'avoidList' => ['overt hard-sell', 'cliché taglines'],
+        ];
     }
 
     private function buildUserPrompt(mixed $context, mixed $topic): string
@@ -200,24 +236,6 @@ class TrendResearcherTemplate extends NodeTemplate
         }
 
         return implode("\n", $parts);
-    }
-
-    private function parseTrendBrief(mixed $result): array
-    {
-        if (is_string($result)) {
-            $decoded = json_decode($result, true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                return $decoded;
-            }
-
-            return $this->emptyTrendBrief();
-        }
-
-        if (is_array($result)) {
-            return $result;
-        }
-
-        return $this->emptyTrendBrief();
     }
 
     private function emptyTrendBrief(): array

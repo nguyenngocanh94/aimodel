@@ -17,6 +17,8 @@ use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplate;
 use App\Domain\Nodes\VibeImpact;
 use App\Domain\Wan\PromptDictionary;
+use Closure;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 class PromptRefinerTemplate extends NodeTemplate
 {
@@ -207,13 +209,18 @@ class PromptRefinerTemplate extends NodeTemplate
         $scenes = $ctx->inputValue('scenes') ?? [];
         $config = $ctx->config;
 
-        $result = $this->callTextGeneration(
+        $result = $this->callStructuredText(
             $ctx,
             $this->buildGenericSystemPrompt($config),
             $this->buildGenericUserPrompt($scenes, $config),
+            $this->genericPromptSchema(),
+            fn () => $this->stubGenericPromptList(),
         );
 
-        $prompts = $this->parsePrompts($result, $scenes);
+        $prompts = $result['prompts'] ?? [];
+        if (!is_array($prompts)) {
+            $prompts = [];
+        }
 
         return [
             'prompts' => PortPayload::success(
@@ -223,6 +230,47 @@ class PromptRefinerTemplate extends NodeTemplate
                 sourcePortKey: 'prompts',
                 previewText: count($prompts) . ' prompt(s)',
             ),
+        ];
+    }
+
+    private function genericPromptSchema(): Closure
+    {
+        return static fn (JsonSchema $s) => [
+            'prompts' => $s->array()->items($s->object([
+                'sceneIndex'     => $s->integer(),
+                'prompt'         => $s->string(),
+                'negativePrompt' => $s->string(),
+            ])),
+        ];
+    }
+
+    private function stubGenericPromptList(): array
+    {
+        return [
+            'prompts' => [
+                ['sceneIndex' => 0, 'prompt' => 'Wide establishing shot, cinematic lighting', 'negativePrompt' => 'blurry, low quality'],
+                ['sceneIndex' => 1, 'prompt' => 'Medium shot of subject, soft light', 'negativePrompt' => 'distorted, oversaturated'],
+            ],
+        ];
+    }
+
+    private function wanPromptSchema(): Closure
+    {
+        return static fn (JsonSchema $s) => [
+            'prompts' => $s->array()->items($s->object([
+                'sceneIndex' => $s->integer(),
+                'prompt'     => $s->string(),
+            ])),
+        ];
+    }
+
+    private function stubWanPromptList(): array
+    {
+        return [
+            'prompts' => [
+                ['sceneIndex' => 0, 'prompt' => 'Wide establishing shot, cinematic style, warm tones, 9:16'],
+                ['sceneIndex' => 1, 'prompt' => 'Medium shot, soft daylight, eye-level angle, natural motion'],
+            ],
         ];
     }
 
@@ -238,7 +286,7 @@ class PromptRefinerTemplate extends NodeTemplate
             "Style: {$style}. Aspect ratio: {$aspect}. Detail level: {$detail}.",
             "Each prompt should describe the scene visually in rich detail suitable for text-to-image models.",
             "Include lighting, composition, mood, and camera angle when appropriate.",
-            "Return valid JSON: {\"prompts\": [{\"sceneIndex\": number, \"prompt\": string, \"negativePrompt\": string}]}",
+            'Populate "prompts" as an array where each entry covers one scene with sceneIndex, prompt, negativePrompt.',
         ]);
     }
 
@@ -259,13 +307,18 @@ class PromptRefinerTemplate extends NodeTemplate
         $story = $ctx->inputValue('story') ?? '';
         $config = $ctx->config;
 
-        $result = $this->callTextGeneration(
+        $result = $this->callStructuredText(
             $ctx,
             $this->buildWanSystemPrompt($config),
             $this->buildWanUserPrompt($story, $config),
+            $this->wanPromptSchema(),
+            fn () => $this->stubWanPromptList(),
         );
 
-        $prompts = $this->parsePrompts($result, is_array($story) ? $story : []);
+        $prompts = $result['prompts'] ?? [];
+        if (!is_array($prompts)) {
+            $prompts = [];
+        }
 
         return [
             'prompts' => PortPayload::success(
@@ -310,7 +363,7 @@ class PromptRefinerTemplate extends NodeTemplate
             $parts[] = "Also include sound descriptions (voice, sound effects, and/or background music) where appropriate.";
         }
 
-        $parts[] = "Return valid JSON: {\"prompts\": [{\"sceneIndex\": number, \"prompt\": string}]}";
+        $parts[] = 'Populate "prompts" as an array where each entry has sceneIndex and the full prompt string.';
 
         return implode("\n", $parts);
     }
@@ -376,48 +429,4 @@ class PromptRefinerTemplate extends NodeTemplate
         return implode("\n", $parts);
     }
 
-    // ──────────────────────────────────────────────
-    //  Parsing (shared)
-    // ──────────────────────────────────────────────
-
-    private function parsePrompts(mixed $result, array $scenes): array
-    {
-        if (is_string($result)) {
-            // Strip markdown code fences
-            $cleaned = preg_replace('/^```(?:json)?\s*\n?/i', '', trim($result));
-            $cleaned = preg_replace('/\n?```\s*$/i', '', $cleaned);
-
-            $decoded = json_decode(trim($cleaned), true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                return $decoded['prompts'] ?? [$decoded];
-            }
-
-            // Try to find JSON in the response
-            if (preg_match('/\{[\s\S]*\}/u', $result, $matches)) {
-                $decoded = json_decode($matches[0], true);
-                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                    return $decoded['prompts'] ?? [$decoded];
-                }
-            }
-
-            // Fallback: use the raw text as a single prompt
-            return [['sceneIndex' => 0, 'prompt' => $result, 'negativePrompt' => '']];
-        }
-
-        if (is_array($result)) {
-            if (isset($result['prompts'])) {
-                return $result['prompts'];
-            }
-            if (isset($result['beats'])) {
-                return array_map(
-                    fn (int $i, string $beat) => ['sceneIndex' => $i, 'prompt' => $beat, 'negativePrompt' => ''],
-                    array_keys($result['beats']),
-                    $result['beats'],
-                );
-            }
-            return [$result];
-        }
-
-        return [];
-    }
 }

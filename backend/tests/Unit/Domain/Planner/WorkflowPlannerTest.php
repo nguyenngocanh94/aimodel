@@ -195,23 +195,6 @@ final class WorkflowPlannerTest extends TestCase
         $this->assertStringContainsString('ambiguous', $result->plan->assumptions[0]);
     }
 
-    #[Test]
-    public function parser_strips_markdown_fences_and_surrounding_prose(): void
-    {
-        $wrapped = "Sure! Here is your plan:\n\n```json\n"
-            . $this->validPlanJson()
-            . "\n```\n\nHope that helps!";
-
-        Http::fake([
-            'api.fireworks.ai/*' => Http::response($this->chatCompletionBody($wrapped), 200),
-        ]);
-
-        $input = new PlannerInput(brief: 'Fence-stripping English brief.');
-        $result = $this->planner->plan($input);
-
-        $this->assertTrue($result->successful(), 'errors: ' . json_encode($result->validation->errors));
-    }
-
     // ── Helpers ──────────────────────────────────────────────────────────
 
     /**
