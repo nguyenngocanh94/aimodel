@@ -56,6 +56,7 @@ class StoryWriterTemplate extends NodeTemplate
             'productIntegrationStyle' => ['required', 'string', 'in:subtle_background,natural_use,hero_moment,transformation_reveal,comparison_story'],
             'genZAuthenticity' => ['required', 'string', 'in:low,medium,high,ultra'],
             'vietnameseDialect' => ['required', 'string', 'in:northern,central,southern,neutral'],
+            'recallPreviousStory' => ['sometimes', 'boolean'],
         ], $this->humanGateConfigRules());
     }
 
@@ -71,6 +72,7 @@ class StoryWriterTemplate extends NodeTemplate
             'productIntegrationStyle' => 'natural_use',
             'genZAuthenticity' => 'high',
             'vietnameseDialect' => 'neutral',
+            'recallPreviousStory' => true,
         ], $this->humanGateDefaultConfig());
     }
 
@@ -206,13 +208,22 @@ class StoryWriterTemplate extends NodeTemplate
         $seedIdea = $ctx->inputValue('seedIdea');
         $config = $ctx->config;
 
+        // LP-I4: recall the last story arc from this workflow for style continuity.
+        $previousStory = null;
+        if (($config['recallPreviousStory'] ?? true) === true) {
+            $previousStory = $ctx->recall('storyArc:last');
+        }
+
         $result = $this->callTextGeneration(
             $ctx,
             $this->buildSystemPrompt($config),
-            $this->buildUserPrompt($productAnalysis, $trendBrief, $modelRoster, $seedIdea, $config),
+            $this->buildUserPrompt($productAnalysis, $trendBrief, $modelRoster, $seedIdea, $config, $previousStory),
         );
 
         $storyArc = $this->parseStoryArc($result);
+
+        // LP-I4: write-through on every successful execute. 7-day TTL.
+        $ctx->remember('storyArc:last', $storyArc, expires: now()->addDays(7));
 
         return [
             'storyArc' => PortPayload::success(
@@ -225,6 +236,24 @@ class StoryWriterTemplate extends NodeTemplate
                     . ($storyArc['formula'] ?? 'unknown'),
             ),
         ];
+    }
+
+    /**
+     * Extract a compact digest of a prior story arc — title, theme, hook only —
+     * so we keep style continuity without blowing the token budget.
+     */
+    private function digestPreviousStory(array $previous): string
+    {
+        $title = trim((string) ($previous['title'] ?? ''));
+        $theme = trim((string) ($previous['theme'] ?? ''));
+        $hook  = trim((string) ($previous['hook'] ?? ''));
+
+        $parts = [];
+        if ($title !== '') $parts[] = "title: {$title}";
+        if ($theme !== '') $parts[] = "theme: {$theme}";
+        if ($hook !== '')  $parts[] = "hook: {$hook}";
+
+        return implode(' · ', $parts);
     }
 
     private function buildSystemPrompt(array $config): string
@@ -263,8 +292,16 @@ class StoryWriterTemplate extends NodeTemplate
         mixed $modelRoster,
         mixed $seedIdea,
         array $config,
+        ?array $previousStory = null,
     ): string {
         $parts = [];
+
+        if ($previousStory !== null) {
+            $digest = $this->digestPreviousStory($previousStory);
+            if ($digest !== '') {
+                $parts[] = "Previous story for this workflow (for style consistency, do not copy): {$digest}";
+            }
+        }
 
         if ($productAnalysis !== null) {
             $text = is_array($productAnalysis) ? json_encode($productAnalysis) : (string) $productAnalysis;

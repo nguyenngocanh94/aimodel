@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Domain\Nodes\Concerns;
 
 use App\Domain\Nodes\NodeExecutionContext;
+use Closure;
 use Illuminate\Support\Facades\Log;
 use Laravel\Ai\AnonymousAgent;
+use Laravel\Ai\Responses\StructuredAgentResponse;
+use Laravel\Ai\StructuredAnonymousAgent;
 
 trait InteractsWithLlm
 {
@@ -97,31 +100,61 @@ trait InteractsWithLlm
     }
 
     /**
-     * Call laravel/ai for a structured-data round trip.
+     * Call laravel/ai for a structured-data round trip via
+     * {@see StructuredAnonymousAgent}. The gateway enforces the schema, so the
+     * response is already-decoded — no fence-strip, no json_decode ladder.
      *
-     * Interim helper for nodes that used to go through
-     * `Capability::StructuredTransform`. Returns an array for direct
-     * consumption. Until LC2 lands full `HasStructuredOutput` support,
-     * this short-circuits stubs deterministically and otherwise asks the
-     * text LLM to emit JSON and decodes it.
+     * The $schema closure receives an `Illuminate\Contracts\JsonSchema\JsonSchema`
+     * instance and returns `['fieldName' => $s->string(), ...]`.
      *
+     * Stub short-circuit: when provider is "stub" and a `$stubFallback` closure
+     * is supplied, its return value is used verbatim (deterministic test path).
+     * Otherwise stub returns `[]` and callers must tolerate it.
+     *
+     * @param Closure $schema        fn (JsonSchema $s): array<string, Type>
+     * @param ?Closure $stubFallback fn (): array — deterministic stub output
      * @return array<string, mixed>
      */
-    protected function callStructuredTransform(
+    protected function callStructuredText(
         NodeExecutionContext $ctx,
         string $systemPrompt,
         string $prompt,
+        Closure $schema,
+        ?Closure $stubFallback = null,
     ): array {
         $provider = $this->resolveLlmProvider($ctx->config);
 
         if ($provider === 'stub') {
-            return $this->stubStructuredTransform($systemPrompt, $prompt);
+            return $stubFallback !== null ? (array) $stubFallback() : [];
         }
 
-        $raw = $this->callTextGeneration($ctx, $systemPrompt, $prompt);
-        $decoded = json_decode($raw, true);
+        $model = $this->resolveLlmModel($ctx->config, $provider) ?: null;
 
-        return is_array($decoded) ? $decoded : [];
+        $agent = new StructuredAnonymousAgent($systemPrompt, [], [], $schema);
+        $response = $agent->prompt(
+            $prompt,
+            provider: $provider,
+            model: $model,
+        );
+
+        if ($response instanceof StructuredAgentResponse) {
+            $structured = $response->structured ?? [];
+            if ($structured === []) {
+                Log::warning('InteractsWithLlm: structured output missing', [
+                    'template' => static::class,
+                    'provider' => $provider,
+                    'model'    => $model,
+                ]);
+            }
+            return is_array($structured) ? $structured : [];
+        }
+
+        Log::warning('InteractsWithLlm: structured output missing (non-structured response)', [
+            'template' => static::class,
+            'provider' => $provider,
+            'model'    => $model,
+        ]);
+        return [];
     }
 
     /**
@@ -172,36 +205,6 @@ trait InteractsWithLlm
         ];
 
         return json_encode($payloads[$idx], JSON_THROW_ON_ERROR);
-    }
-
-    /**
-     * Deterministic canned structured-transform output for `provider: stub`.
-     * Mirrors legacy StubAdapter shape for StructuredTransform.
-     *
-     * @return array<string, mixed>
-     */
-    private function stubStructuredTransform(string $systemPrompt, string $prompt): array
-    {
-        $seed = hash('sha256', $systemPrompt . '|' . $prompt);
-        $idx = hexdec(substr($seed, 0, 4)) % 2;
-
-        return match ($idx) {
-            0 => [
-                'scenes' => [
-                    ['id' => 'scene-1', 'description' => 'Opening shot establishing context', 'duration' => 3.0],
-                    ['id' => 'scene-2', 'description' => 'Main action sequence', 'duration' => 5.0],
-                    ['id' => 'scene-3', 'description' => 'Closing with call to action', 'duration' => 2.0],
-                ],
-            ],
-            1 => [
-                'scenes' => [
-                    ['id' => 'scene-1', 'description' => 'Wide angle landscape view', 'duration' => 4.0],
-                    ['id' => 'scene-2', 'description' => 'Close-up detail shot', 'duration' => 3.0],
-                    ['id' => 'scene-3', 'description' => 'Dynamic transition sequence', 'duration' => 3.0],
-                    ['id' => 'scene-4', 'description' => 'Final reveal and branding', 'duration' => 2.0],
-                ],
-            ],
-        };
     }
 
     /** Guarded once-per-run deprecation logger. */
