@@ -23,9 +23,10 @@ class TelegramWebhookController extends Controller
 {
     /** Seconds that a buffered session key stays alive in Redis. */
     private const BUFFER_TTL = 120;
-    /** Debounce delay (seconds) for fresh turns — longer to coalesce multi-message briefs. */
-    private const DEBOUNCE_DELAY_FRESH = 30;
-    /** Debounce delay (seconds) for pending-draft turns — shorter so approvals feel snappy. */
+    /** Debounce delay (seconds) for fresh turns. */
+    private const DEBOUNCE_DELAY_FRESH = 5;
+    /** Debounce delay (seconds) for pending-draft turns. Kept as a separate constant
+     *  so the two windows can diverge again without touching call sites. */
     private const DEBOUNCE_DELAY_PENDING_DRAFT = 5;
 
     /**
