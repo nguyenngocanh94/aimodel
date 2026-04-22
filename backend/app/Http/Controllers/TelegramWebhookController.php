@@ -12,6 +12,9 @@ use App\Models\ExecutionRun;
 use App\Models\NodeRunRecord;
 use App\Models\PendingInteraction;
 use App\Models\Workflow;
+use App\Services\TelegramAgent\AgentSessionStore;
+use App\Services\TelegramAgent\SlashCommandRouter;
+use App\Services\TelegramAgent\TelegramAgentFactory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -20,7 +23,20 @@ use Illuminate\Support\Facades\Redis;
 class TelegramWebhookController extends Controller
 {
     private const BUFFER_TTL = 120; // seconds to keep buffer alive
-    private const DEBOUNCE_DELAY = 30; // seconds to wait for more messages
+    private const DEBOUNCE_DELAY_FRESH = 30;  // seconds to wait when no pending draft
+    private const DEBOUNCE_DELAY_DRAFT = 5;   // seconds to wait when pending draft exists
+
+    /**
+     * @param  SlashCommandRouter  $slashRouter   Injected for testability (spy swap).
+     * @param  \Closure(string, string): object|TelegramAgentFactory|null  $agentFactory
+     *         Callable factory — accepts (chatId, botToken), returns object with handle().
+     *         Defaults to TelegramAgentFactory::make(). Overridable in tests.
+     */
+    public function __construct(
+        private readonly SlashCommandRouter $slashRouter,
+        private readonly mixed $agentFactory = null,
+        private readonly ?AgentSessionStore $sessionStore = null,
+    ) {}
 
     public function handle(Request $request, string $botToken): JsonResponse
     {
@@ -136,9 +152,15 @@ class TelegramWebhookController extends Controller
             Redis::set("telegram_batch_stale:{$existingJobId}", '1', 'EX', self::BUFFER_TTL);
         }
 
+        // Debounce window: 5s if a pending draft exists (approval/refinement path),
+        // 30s for fresh compose turns so multi-message bursts coalesce.
+        $store = $this->sessionStore ?? app(AgentSessionStore::class);
+        $hasDraft = $store->readPendingDraft($chatId, $botToken);
+        $debounceDelay = $hasDraft ? self::DEBOUNCE_DELAY_DRAFT : self::DEBOUNCE_DELAY_FRESH;
+
         // Dispatch new delayed job
         $job = ProcessTelegramBatchJob::dispatch($sessionKey, $botToken, $chatId)
-            ->delay(now()->addSeconds(self::DEBOUNCE_DELAY));
+            ->delay(now()->addSeconds($debounceDelay));
 
         // Store job ID so we can cancel it on next message
         // Use a unique ID since Laravel doesn't expose job IDs easily

@@ -53,6 +53,23 @@ final class AgentSessionStore
         Redis::del($this->key($chatId, $botToken));
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Pending-draft accessors (used by debounce window selector)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Return true if a pending plan draft exists for this chat+bot pair.
+     *
+     * Used by the debounce window selector: pending-draft turns get a 5s
+     * debounce window; fresh turns get 30s.
+     */
+    public function readPendingDraft(string $chatId, string $botToken): bool
+    {
+        $session = $this->load($chatId, $botToken);
+
+        return $session->pendingPlan !== null;
+    }
+
     private function key(string $chatId, string $botToken): string
     {
         return self::PREFIX . ":{$chatId}:{$botToken}";
