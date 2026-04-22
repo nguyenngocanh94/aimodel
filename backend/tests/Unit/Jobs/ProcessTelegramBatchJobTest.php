@@ -136,49 +136,100 @@ final class ProcessTelegramBatchJobTest extends TestCase
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Case 3: Stale marker → no-op
+    // Case 3: Superseded batch ID → no-op (FX-05 regression guard)
+    //
+    // Reproduces the bug the reviewer flagged: when message 2 arrives while
+    // message 1's job is still delayed, bufferMessage() overwrites the
+    // "latest batch" pointer. The OLD job must see the mismatch on wake-up
+    // and skip — otherwise it processes prematurely.
     // ─────────────────────────────────────────────────────────────────────────
 
     #[Test]
-    public function stale_marker_causes_no_op(): void
+    public function superseded_batch_id_causes_no_op(): void
     {
         Http::fake();
 
         $session = [
-            'status'  => 'buffering',
-            'texts'   => ['hello'],
-            'images'  => [],
+            'status'   => 'buffering',
+            'texts'    => ['hello'],
+            'images'   => [],
             'messages' => [],
         ];
         Redis::set(self::SESSION_KEY, json_encode($session), 'EX', 120);
 
-        // Set mismatched batch IDs to trigger stale detection.
-        Redis::set("telegram_batch_id:" . self::SESSION_KEY, 'batch_CURRENT');
-        Redis::set(self::JOB_KEY, 'batch_EXPECTED_DIFFERENT');
+        // Latest pointer in Redis — set by the newer message 2's bufferMessage() call.
+        Redis::set(self::JOB_KEY, 'batch_NEW_FROM_MESSAGE_2');
 
         $calls = [];
         $this->app->bind(TelegramAgentFactory::class, function () use (&$calls) {
             return new class($calls) {
                 public function __construct(private array &$calls) {}
-
                 public function make(string $chatId, string $botToken): object
                 {
                     return new class($this->calls) {
                         public function __construct(private array &$calls) {}
-
-                        public function handle(array $update, string $botToken): void
-                        {
-                            $this->calls[] = true;
-                        }
+                        public function handle(array $update, string $botToken): void { $this->calls[] = true; }
                     };
                 }
             };
         });
 
-        $job = new ProcessTelegramBatchJob(self::SESSION_KEY, self::BOT_TOKEN, self::CHAT_ID);
+        // This job was dispatched with an OLD batchId when message 1 arrived.
+        $job = new ProcessTelegramBatchJob(
+            self::SESSION_KEY,
+            self::BOT_TOKEN,
+            self::CHAT_ID,
+            'batch_OLD_FROM_MESSAGE_1',
+        );
         $job->handle();
 
-        $this->assertCount(0, $calls, 'Stale job must not invoke the agent');
+        $this->assertCount(0, $calls, 'Superseded job must not invoke the agent');
+    }
+
+    #[Test]
+    public function current_batch_id_is_processed(): void
+    {
+        Http::fake();
+
+        $session = [
+            'chatId'    => self::CHAT_ID,
+            'botToken'  => self::BOT_TOKEN,
+            'status'    => 'buffering',
+            'texts'     => ['only message'],
+            'images'    => [],
+            'messages'  => [
+                ['chat' => ['id' => (int) self::CHAT_ID], 'from' => [], 'date' => time(), 'message_id' => 1],
+            ],
+            'startedAt' => now()->toIso8601String(),
+        ];
+        Redis::set(self::SESSION_KEY, json_encode($session), 'EX', 120);
+
+        // Latest pointer matches this job's batchId — this IS the current batch.
+        Redis::set(self::JOB_KEY, 'batch_CURRENT');
+
+        $calls = [];
+        $this->app->bind(TelegramAgentFactory::class, function () use (&$calls) {
+            return new class($calls) {
+                public function __construct(private array &$calls) {}
+                public function make(string $chatId, string $botToken): object
+                {
+                    return new class($this->calls) {
+                        public function __construct(private array &$calls) {}
+                        public function handle(array $update, string $botToken): void { $this->calls[] = true; }
+                    };
+                }
+            };
+        });
+
+        $job = new ProcessTelegramBatchJob(
+            self::SESSION_KEY,
+            self::BOT_TOKEN,
+            self::CHAT_ID,
+            'batch_CURRENT',
+        );
+        $job->handle();
+
+        $this->assertCount(1, $calls, 'Current-batch job must invoke the agent exactly once');
     }
 
     // ─────────────────────────────────────────────────────────────────────────

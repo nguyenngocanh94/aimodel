@@ -181,26 +181,25 @@ class TelegramWebhookController extends Controller
 
         $this->saveSession($sessionKey, $session);
 
-        // Cancel any prior delayed job for this chat by stale-marking its batchId.
-        $jobKey        = "telegram_batch_job:{$chatId}:{$botToken}";
-        $existingBatch = Redis::get($jobKey);
-        if ($existingBatch) {
-            Redis::set("telegram_batch_stale:{$existingBatch}", '1', 'EX', self::BUFFER_TTL);
-        }
-
-        // Choose debounce window. Short window when mid-draft (approval/refine),
-        // long window for fresh bursts (coalesce multi-message briefs).
+        // Debounce window: short when mid-draft (approval/refine), long for fresh bursts.
         $hasPendingDraft = app(AgentSessionStore::class)->readPendingDraft($chatId, $botToken);
         $delaySeconds    = $hasPendingDraft
             ? self::DEBOUNCE_DELAY_PENDING_DRAFT
             : self::DEBOUNCE_DELAY_FRESH;
 
-        ProcessTelegramBatchJob::dispatch($sessionKey, $botToken, $chatId)
+        // Generate this message's batch id BEFORE dispatching so the job carries
+        // it through to handle() as an immutable identifier. Each subsequent
+        // bufferMessage() call overwrites the "latest" pointer in Redis —
+        // previously-dispatched jobs compare their own batchId against the
+        // current pointer and no-op if superseded.
+        $batchId = uniqid('batch_', true);
+
+        ProcessTelegramBatchJob::dispatch($sessionKey, $botToken, $chatId, $batchId)
             ->delay(now()->addSeconds($delaySeconds));
 
-        $batchId = uniqid('batch_', true);
+        // Store the latest batchId for this chat/bot so delayed jobs can detect supersession.
+        $jobKey = "telegram_batch_job:{$chatId}:{$botToken}";
         Redis::set($jobKey, $batchId, 'EX', self::BUFFER_TTL);
-        Redis::set("telegram_batch_id:{$sessionKey}", $batchId, 'EX', self::BUFFER_TTL);
 
         Log::info('Telegram message buffered', [
             'chatId'          => $chatId,
@@ -272,10 +271,11 @@ class TelegramWebhookController extends Controller
                     ? HumanResponse::pick(0)
                     : HumanResponse::promptBack('rejected');
                 $this->dispatchResume($runId, $nodeId, $response);
-                $emoji = $isApprove ? "\xE2\x9C\x85" : "\xE2\x9D\x8C";
-                $label = $isApprove ? 'Approved' : 'Rejected';
+                $emoji    = $isApprove ? "\xE2\x9C\x85" : "\xE2\x9D\x8C";
+                $label    = $isApprove ? 'Approved' : 'Rejected';
+                $suffix   = $isApprove ? "\xE2\x80\x94 workflow resuming..." : "\xE2\x80\x94 workflow stopped.";
                 $this->answerCallback($botToken, $callbackId, "{$emoji} {$label}");
-                $this->editMessageDecision($botToken, $chatId, $messageId, $originalText, "{$emoji} **{$label}**");
+                $this->editMessageDecision($botToken, $chatId, $messageId, $originalText, "{$emoji} **{$label}** {$suffix}");
                 return;
             }
 
@@ -567,6 +567,11 @@ class TelegramWebhookController extends Controller
 
     /**
      * Edit a Telegram message to show the decision (remove buttons).
+     *
+     * The $decision string is appended as-is. Approve callers pass
+     * "✅ Approved — workflow resuming..."; reject callers pass
+     * "❌ Rejected — workflow stopped." — do NOT append additional text here
+     * or rejected callbacks render the contradictory "Rejected… workflow resuming".
      */
     private function editMessageDecision(string $botToken, string $chatId, string $messageId, string $originalText, string $decision): void
     {
@@ -574,7 +579,7 @@ class TelegramWebhookController extends Controller
             return;
         }
 
-        $updatedText = $originalText . "\n\n" . $decision . " \xE2\x80\x94 workflow resuming...";
+        $updatedText = $originalText . "\n\n" . $decision;
 
         try {
             \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$botToken}/editMessageText", [

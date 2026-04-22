@@ -24,23 +24,29 @@ class ProcessTelegramBatchJob implements ShouldQueue
         private string $sessionKey,
         private string $botToken,
         private string $chatId,
+        private string $batchId = '',
     ) {}
 
     public function handle(): void
     {
-        // Check if this batch was cancelled (a newer message reset the timer)
-        $currentBatchId = Redis::get("telegram_batch_id:{$this->sessionKey}");
-        $jobKey = "telegram_batch_job:{$this->chatId}:{$this->botToken}";
-        $expectedBatchId = Redis::get($jobKey);
-
-        // If batch IDs don't match, this is a stale job — skip
-        if ($currentBatchId && $expectedBatchId && $currentBatchId !== $expectedBatchId) {
-            Log::info('Skipping stale Telegram batch job', [
-                'chatId' => $this->chatId,
-                'currentBatchId' => $currentBatchId,
-                'expectedBatchId' => $expectedBatchId,
-            ]);
-            return;
+        // Stale-batch detection: this job was dispatched with its own immutable
+        // $batchId at enqueue time. bufferMessage() updates the "latest batch"
+        // pointer in Redis every time a new message arrives. If the current
+        // latest is NOT our batchId, a newer burst superseded us — skip.
+        //
+        // batchId is '' only for legacy/test dispatches that predate FX-05;
+        // fall back to the old (effectively no-op) comparison in that case so
+        // nothing crashes, but real production dispatches always set batchId.
+        if ($this->batchId !== '') {
+            $latestBatchId = Redis::get("telegram_batch_job:{$this->chatId}:{$this->botToken}");
+            if ($latestBatchId !== null && $latestBatchId !== false && $latestBatchId !== $this->batchId) {
+                Log::info('Skipping stale Telegram batch job', [
+                    'chatId'         => $this->chatId,
+                    'myBatchId'      => $this->batchId,
+                    'latestBatchId'  => $latestBatchId,
+                ]);
+                return;
+            }
         }
 
         $session = $this->getSession();
