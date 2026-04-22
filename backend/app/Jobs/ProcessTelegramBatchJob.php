@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Services\TelegramAgent\TelegramAgentFactory;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -17,7 +18,7 @@ class ProcessTelegramBatchJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $timeout = 60;
+    public int $timeout = 120;
 
     public function __construct(
         private string $sessionKey,
@@ -48,57 +49,37 @@ class ProcessTelegramBatchJob implements ShouldQueue
             return;
         }
 
-        // Build summary of what was received
-        $texts = $session['texts'] ?? [];
-        $images = $session['images'] ?? [];
-        $messageCount = count($session['messages'] ?? []);
+        // Flatten buffered burst into a single combined update.
+        $combined = $this->assembleCombinedUpdate($session);
 
-        $summary = "📋 *Đã nhận thông tin:*\n\n";
+        // Clear the intake session immediately so the key doesn't linger.
+        $this->clearSession();
 
-        if (!empty($texts)) {
-            $combinedText = implode("\n", $texts);
-            $summary .= "📝 *Nội dung:*\n" . mb_substr($combinedText, 0, 1000) . "\n\n";
-        }
+        // Call the agent. The finally block sends a fallback reply if the agent
+        // throws before any ReplyTool call has sent something to the user.
+        $replySent = false;
 
-        if (!empty($images)) {
-            $summary .= "🖼 *Hình ảnh:* " . count($images) . " ảnh\n\n";
-        }
-
-        // Extract image URLs from text
-        $allText = implode("\n", $texts);
-        $urlCount = 0;
-        if (preg_match_all('/https?:\/\/[^\s<>"]+\.(?:jpg|jpeg|png|webp|gif)/i', $allText, $urlMatches)) {
-            $urlCount = count($urlMatches[0]);
-            if ($urlCount > 0 && empty($images)) {
-                $summary .= "🔗 *URL hình ảnh:* {$urlCount} link\n\n";
+        try {
+            /** @var TelegramAgentFactory $factory */
+            $factory = app(TelegramAgentFactory::class);
+            $agent   = $factory->make($this->chatId, $this->botToken);
+            $agent->handle($combined, $this->botToken);
+            $replySent = true;
+        } catch (\Throwable $e) {
+            Log::error('TelegramAgent threw during batch job', [
+                'chatId' => $this->chatId,
+                'error'  => $e->getMessage(),
+                'trace'  => $e->getTraceAsString(),
+            ]);
+        } finally {
+            if (! $replySent) {
+                $this->sendFallbackReply();
             }
         }
 
-        $summary .= "📊 *Tổng:* {$messageCount} tin nhắn, " . (count($images) + $urlCount) . " hình ảnh\n\n";
-        $summary .= "Reply *ok* để xác nhận và bắt đầu tạo TVC, hoặc *hủy* để bỏ.";
-
-        // Update session status
-        $session['status'] = 'awaiting_confirmation';
-        $this->saveSession($session);
-
-        // Send summary to Telegram
-        try {
-            Http::post("https://api.telegram.org/bot{$this->botToken}/sendMessage", [
-                'chat_id' => $this->chatId,
-                'text' => mb_substr($summary, 0, 4096),
-                'parse_mode' => 'Markdown',
-            ]);
-        } catch (\Throwable $e) {
-            Log::warning('Failed to send Telegram batch summary', [
-                'chatId' => $this->chatId,
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        Log::info('Telegram batch ready for confirmation', [
-            'chatId' => $this->chatId,
-            'texts' => count($texts),
-            'images' => count($images),
+        Log::info('Telegram batch job finished', [
+            'chatId'   => $this->chatId,
+            'messages' => count($session['messages'] ?? []),
         ]);
     }
 
@@ -171,5 +152,31 @@ class ProcessTelegramBatchJob implements ShouldQueue
     private function saveSession(array $session): void
     {
         Redis::set($this->sessionKey, json_encode($session, JSON_THROW_ON_ERROR), 'EX', 120);
+    }
+
+    private function clearSession(): void
+    {
+        Redis::del($this->sessionKey);
+    }
+
+    /**
+     * Send a generic apology when the agent turn throws before any ReplyTool
+     * call has reached the user. Side effects (DB writes, dispatched jobs) may
+     * have already committed — DO NOT retry the agent turn here.
+     */
+    private function sendFallbackReply(): void
+    {
+        try {
+            Http::post("https://api.telegram.org/bot{$this->botToken}/sendMessage", [
+                'chat_id'    => $this->chatId,
+                'text'       => '⚠️ Xảy ra lỗi trong quá trình xử lý. Vui lòng thử lại sau.',
+                'parse_mode' => 'Markdown',
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('ProcessTelegramBatchJob: failed to send fallback reply', [
+                'chatId' => $this->chatId,
+                'error'  => $e->getMessage(),
+            ]);
+        }
     }
 }
