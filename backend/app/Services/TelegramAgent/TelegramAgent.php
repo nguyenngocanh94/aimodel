@@ -148,13 +148,19 @@ final class TelegramAgent implements Agent, Conversational, HasMiddleware, HasTo
         $this->botToken = $botToken;
         $text           = (string) data_get($message, 'text', data_get($message, 'caption', ''));
 
-        $photo = $update['message']['photo'] ?? $update['channel_post']['photo'] ?? [];
-        if ($this->chatId === '' || ($text === '' && $photo === [])) {
+        $photo    = $update['message']['photo'] ?? $update['channel_post']['photo'] ?? [];
+        $document = $update['message']['document'] ?? $update['channel_post']['document'] ?? null;
+        $hasImageDocument = is_array($document)
+            && is_string($document['mime_type'] ?? null)
+            && str_starts_with($document['mime_type'], 'image/');
+
+        if ($this->chatId === '' || ($text === '' && $photo === [] && !$hasImageDocument)) {
             return;
         }
 
         // ── Slash command path ────────────────────────────────────────────────
-        if ($text[0] === '/') {
+        // Image-only / document-only updates have empty $text, so guard the index access.
+        if ($text !== '' && $text[0] === '/') {
             $reply = $this->slashRouter->route($text, $this->chatId);
 
             if ($reply === '🔄 Session reset. (Storage cleared by caller.)') {

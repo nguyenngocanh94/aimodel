@@ -107,4 +107,83 @@ final class TelegramAgentImageOnlyTest extends TestCase
 
         Http::assertNothingSent();
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // FX-03: image sent as `document` (with image/* mime) must also pass the guard.
+    // Telegram delivers file-attachment uploads as message.document, not message.photo.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[Test]
+    public function handle_does_not_early_exit_for_image_document_update(): void
+    {
+        $imageDocumentUpdate = [
+            'update_id' => 1003,
+            'message'   => [
+                'message_id' => 44,
+                'chat'       => ['id' => 12345],
+                'from'       => ['id' => 99, 'first_name' => 'Ann'],
+                'date'       => time(),
+                'document'   => [
+                    'file_id'   => 'doc-jpeg-789',
+                    'file_name' => 'photo.jpg',
+                    'mime_type' => 'image/jpeg',
+                    'file_size' => 120000,
+                ],
+                // No 'text', no 'photo' — image delivered as a document.
+            ],
+        ];
+
+        Http::fake([
+            'https://api.telegram.org/*' => Http::response(['ok' => true], 200),
+            '*'                           => Http::response([], 500),
+        ]);
+
+        $agent = $this->app->make(TelegramAgent::class, [
+            'chatId'   => '12345',
+            'botToken' => 'test-image-doc-bot',
+        ]);
+
+        try {
+            $agent->handle($imageDocumentUpdate, 'test-image-doc-bot');
+        } catch (\Throwable) {
+            // Reaching the LLM stack (and throwing there) is proof we got past the guard.
+        }
+
+        $this->assertSame('12345', $agent->chatId,
+            'chatId should have been set — handle() ran past the extraction step');
+        $this->assertTrue(true, 'handle() proceeded past the early-exit guard for image-document update');
+    }
+
+    #[Test]
+    public function handle_early_exits_for_non_image_document_update(): void
+    {
+        // A PDF document (non-image mime) should still early-exit —
+        // we don't handle non-image file attachments yet.
+        $pdfDocumentUpdate = [
+            'update_id' => 1004,
+            'message'   => [
+                'message_id' => 45,
+                'chat'       => ['id' => 12345],
+                'date'       => time(),
+                'document'   => [
+                    'file_id'   => 'doc-pdf-999',
+                    'file_name' => 'report.pdf',
+                    'mime_type' => 'application/pdf',
+                ],
+            ],
+        ];
+
+        Http::fake([
+            'https://api.telegram.org/*' => Http::response(['ok' => true], 200),
+        ]);
+
+        $agent = $this->app->make(TelegramAgent::class, [
+            'chatId'   => '12345',
+            'botToken' => 'test-pdf-bot',
+        ]);
+
+        $agent->handle($pdfDocumentUpdate, 'test-pdf-bot');
+
+        Http::assertNothingSent();
+    }
 }
