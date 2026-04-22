@@ -5,19 +5,29 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domain\Nodes\HumanResponse;
+use App\Jobs\ProcessTelegramBatchJob;
 use App\Jobs\ResumeWorkflowJob;
 use App\Jobs\RunWorkflowJob;
 use App\Models\ExecutionRun;
 use App\Models\NodeRunRecord;
 use App\Models\PendingInteraction;
+use App\Services\TelegramAgent\AgentSessionStore;
 use App\Services\TelegramAgent\SlashCommandRouter;
 use App\Services\TelegramAgent\TelegramAgentFactory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 
 class TelegramWebhookController extends Controller
 {
+    /** Seconds that a buffered session key stays alive in Redis. */
+    private const BUFFER_TTL = 120;
+    /** Debounce delay (seconds) for fresh turns — longer to coalesce multi-message briefs. */
+    private const DEBOUNCE_DELAY_FRESH = 30;
+    /** Debounce delay (seconds) for pending-draft turns — shorter so approvals feel snappy. */
+    private const DEBOUNCE_DELAY_PENDING_DRAFT = 5;
+
     /**
      * @param  SlashCommandRouter  $slashRouter  Injected for testability.
      * @param  \Closure(string $chatId, string $botToken): object|null  $agentFactory
@@ -66,23 +76,32 @@ class TelegramWebhookController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        // Priority 2: Free text / image catch-all → TelegramAgent.
-        // The agent is the brain: it interprets intent, picks tools, and replies.
-        // No keyword matching, no hardcoded confirm/reject lists.
-        $this->callAgent($chatId, $botToken, $update);
+        // Priority 2a: Slash commands are deterministic — route to agent
+        // synchronously for an immediate reply (no LLM judgment needed).
+        if ($text !== '' && $text[0] === '/') {
+            $this->callAgent($chatId, $botToken, $update);
+            return response()->json(['ok' => true]);
+        }
+
+        // Priority 2b: Free text / image catch-all → buffer into intake session
+        // and dispatch ProcessTelegramBatchJob. The job is the one that invokes
+        // TelegramAgent::handle() — the controller's job here is purely mechanical
+        // (buffer + schedule). This preserves debounce-coalesced multi-message
+        // bursts and the job's fallback-reply safety.
+        $sessionKey = "telegram_intake:{$chatId}:{$botToken}";
+        $this->bufferMessage($botToken, $chatId, $update, $sessionKey);
 
         return response()->json(['ok' => true]);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Priority 2 — agent dispatch
+    // Priority 2a — synchronous agent dispatch (slash commands)
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Call the TelegramAgent for the given update.
-     *
-     * Uses the injected $agentFactory closure (for test spies) or resolves
-     * TelegramAgentFactory from the container (production path).
+     * Call the TelegramAgent synchronously. Reserved for slash commands —
+     * free text goes through {@see bufferMessage()} so multi-message bursts
+     * coalesce and the job's fallback-reply handler is available.
      */
     private function callAgent(string $chatId, string $botToken, array $update): void
     {
@@ -98,6 +117,111 @@ class TelegramWebhookController extends Controller
                 'error'  => $e->getMessage(),
             ]);
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Priority 2b — intake buffering + debounced job dispatch
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Buffer an inbound message into the intake session and schedule (or
+     * reschedule) the ProcessTelegramBatchJob that will drain the burst
+     * through TelegramAgent::handle().
+     *
+     * Debounce window is 5s when AgentSessionStore has a pending draft for
+     * this chat/bot (so approvals feel snappy), otherwise 30s (so multi-message
+     * briefs coalesce into one agent turn).
+     */
+    private function bufferMessage(string $botToken, string $chatId, array $update, string $sessionKey): void
+    {
+        $session = $this->getSession($sessionKey) ?? [
+            'status'    => 'buffering',
+            'botToken'  => $botToken,
+            'chatId'    => $chatId,
+            'messages'  => [],
+            'images'    => [],
+            'texts'     => [],
+            'startedAt' => now()->toIso8601String(),
+        ];
+
+        $message = $update['message'] ?? [];
+
+        // Text / caption
+        $text = $message['text'] ?? $message['caption'] ?? '';
+        if ($text !== '') {
+            $session['texts'][] = $text;
+        }
+
+        // Photos (Telegram sends multiple sizes — take largest)
+        if (!empty($message['photo'])) {
+            $photos  = $message['photo'];
+            $largest = end($photos);
+            $session['images'][] = [
+                'file_id' => $largest['file_id'] ?? '',
+                'width'   => $largest['width'] ?? 0,
+                'height'  => $largest['height'] ?? 0,
+            ];
+        }
+
+        // Documents with an image mime type
+        if (!empty($message['document'])) {
+            $doc  = $message['document'];
+            $mime = $doc['mime_type'] ?? '';
+            if (is_string($mime) && str_starts_with($mime, 'image/')) {
+                $session['images'][] = [
+                    'file_id'   => $doc['file_id'] ?? '',
+                    'file_name' => $doc['file_name'] ?? '',
+                    'mime_type' => $mime,
+                ];
+            }
+        }
+
+        $session['messages'][] = $message;
+        $session['status']     = 'buffering';
+
+        $this->saveSession($sessionKey, $session);
+
+        // Cancel any prior delayed job for this chat by stale-marking its batchId.
+        $jobKey        = "telegram_batch_job:{$chatId}:{$botToken}";
+        $existingBatch = Redis::get($jobKey);
+        if ($existingBatch) {
+            Redis::set("telegram_batch_stale:{$existingBatch}", '1', 'EX', self::BUFFER_TTL);
+        }
+
+        // Choose debounce window. Short window when mid-draft (approval/refine),
+        // long window for fresh bursts (coalesce multi-message briefs).
+        $hasPendingDraft = app(AgentSessionStore::class)->readPendingDraft($chatId, $botToken);
+        $delaySeconds    = $hasPendingDraft
+            ? self::DEBOUNCE_DELAY_PENDING_DRAFT
+            : self::DEBOUNCE_DELAY_FRESH;
+
+        ProcessTelegramBatchJob::dispatch($sessionKey, $botToken, $chatId)
+            ->delay(now()->addSeconds($delaySeconds));
+
+        $batchId = uniqid('batch_', true);
+        Redis::set($jobKey, $batchId, 'EX', self::BUFFER_TTL);
+        Redis::set("telegram_batch_id:{$sessionKey}", $batchId, 'EX', self::BUFFER_TTL);
+
+        Log::info('Telegram message buffered', [
+            'chatId'          => $chatId,
+            'textCount'       => count($session['texts']),
+            'imageCount'      => count($session['images']),
+            'batchId'         => $batchId,
+            'debounceSeconds' => $delaySeconds,
+            'pendingDraft'    => $hasPendingDraft,
+        ]);
+    }
+
+    private function getSession(string $key): ?array
+    {
+        $raw = Redis::get($key);
+
+        return $raw ? json_decode($raw, true) : null;
+    }
+
+    private function saveSession(string $key, array $session): void
+    {
+        Redis::set($key, json_encode($session, JSON_THROW_ON_ERROR), 'EX', self::BUFFER_TTL);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
