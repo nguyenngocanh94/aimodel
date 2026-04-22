@@ -102,6 +102,66 @@ class ProcessTelegramBatchJob implements ShouldQueue
         ]);
     }
 
+    /**
+     * Flatten buffered session messages into a single synthetic Telegram update
+     * that can be passed directly to TelegramAgent::handle().
+     *
+     * - Texts are joined with double-newline (paragraph break).
+     * - Photos are merged preserving insertion order.
+     * - Burst metadata is preserved in message._intake for provenance.
+     *
+     * @param  array<string, mixed>  $session  The Redis-backed intake session.
+     * @return array<string, mixed>  A Telegram-update-shaped array.
+     */
+    public function assembleCombinedUpdate(array $session): array
+    {
+        $texts  = $session['texts'] ?? [];
+        $images = $session['images'] ?? [];
+        $msgs   = $session['messages'] ?? [];
+
+        // Joined text across all burst messages.
+        $combinedText = implode("\n\n", array_filter(array_map('strval', $texts)));
+
+        // Merge photo arrays in order. Each image stored as ['file_id' => ..., ...].
+        $mergedPhotos = [];
+        foreach ($images as $img) {
+            $fileId = $img['file_id'] ?? null;
+            if ($fileId !== null) {
+                $mergedPhotos[] = $img;
+            }
+        }
+
+        // Preserve first message metadata for chat/from/etc.
+        $firstMsg = $msgs[0] ?? [];
+
+        $message = [
+            'chat'       => $firstMsg['chat'] ?? ['id' => (int) $this->chatId],
+            'from'       => $firstMsg['from'] ?? [],
+            'date'       => $firstMsg['date'] ?? time(),
+            'message_id' => $firstMsg['message_id'] ?? 0,
+            'text'       => $combinedText,
+        ];
+
+        // Only attach photo key when images were collected so image-only updates
+        // pass the TelegramAgent early-exit guard.
+        if ($mergedPhotos !== []) {
+            $message['photo'] = $mergedPhotos;
+        }
+
+        // Burst provenance metadata (non-Telegram, agent-facing only).
+        $message['_intake'] = [
+            'textParts'    => $texts,
+            'imageCount'   => count($mergedPhotos),
+            'messageCount' => count($msgs),
+            'startedAt'    => $session['startedAt'] ?? null,
+        ];
+
+        return [
+            'update_id' => 0,
+            'message'   => $message,
+        ];
+    }
+
     private function getSession(): ?array
     {
         $data = Redis::get($this->sessionKey);
