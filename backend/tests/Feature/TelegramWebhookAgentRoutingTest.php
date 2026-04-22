@@ -196,12 +196,20 @@ final class TelegramWebhookAgentRoutingTest extends TestCase
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Case 4 — free text with NO pending gate routes to agent
+    // Case 4 — free text with NO pending gate is buffered for the agent
+    //
+    // Post-FX-02: the controller no longer invokes the agent synchronously for
+    // free text. It buffers the message into the intake session and dispatches
+    // ProcessTelegramBatchJob, which (after the debounce delay) invokes
+    // TelegramAgent::handle() via TelegramAgentFactory. This test asserts the
+    // job is queued — the job's own tests cover the agent invocation.
     // ─────────────────────────────────────────────────────────────────────────
 
     #[Test]
-    public function free_text_with_no_pending_routes_to_agent(): void
+    public function free_text_with_no_pending_is_buffered_for_agent(): void
     {
+        Queue::fake();
+
         $update = [
             'message' => [
                 'chat' => ['id' => (int) self::CHAT_ID],
@@ -214,9 +222,8 @@ final class TelegramWebhookAgentRoutingTest extends TestCase
         $response = $this->postJson($this->webhookUrl(), $update);
 
         $response->assertOk()->assertJson(['ok' => true]);
-        $this->assertCount(1, $spy->calls, 'Agent must be invoked exactly once for free text with no pending');
-        $this->assertSame($update, $spy->calls[0]['update']);
-        $this->assertSame(self::BOT_TOKEN, $spy->calls[0]['botToken']);
+        $this->assertCount(0, $spy->calls, 'Agent must NOT be invoked synchronously for free text (buffered into job instead)');
+        Queue::assertPushed(\App\Jobs\ProcessTelegramBatchJob::class);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

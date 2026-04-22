@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Services\TelegramAgent\TelegramAgentFactory;
 use App\Services\TelegramAgent\RedisConversationStore;
 use App\Services\TelegramAgent\BehaviorSkills\BehaviorSkillComposer;
 use App\Services\TelegramAgent\Tools\ComposeWorkflowTool;
@@ -35,6 +36,9 @@ class TelegramAgentServiceProvider extends ServiceProvider
         $this->app->singleton(RedisConversationStore::class, RedisConversationStore::class);
 
         $this->app->singleton(BehaviorSkillComposer::class, BehaviorSkillComposer::class);
+
+        // TelegramAgentFactory — thin per-request factory, not a singleton.
+        $this->app->singleton(TelegramAgentFactory::class, TelegramAgentFactory::class);
 
         // Request-scoped context holding per-request Telegram identity.
         // Set by the controller before constructing TelegramAgent.

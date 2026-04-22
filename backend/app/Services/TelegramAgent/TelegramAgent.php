@@ -114,21 +114,21 @@ final class TelegramAgent implements Agent, Conversational, HasMiddleware, HasTo
      */
     protected function getSkillToolOverrides(): array
     {
+        // ComposeWorkflowTool / RefinePlanTool / PersistWorkflowTool are resolved
+        // via the container's closure bindings, which read chatId/botToken from
+        // the request-scoped TelegramAgentContext. TelegramAgentFactory::make()
+        // populates that context before constructing this agent, so plain
+        // `app(...)` resolves tools with the correct per-request identity.
+        //
+        // Do NOT pass [...] parameter overrides here — Laravel's container silently
+        // drops them for closure bindings whose signature doesn't accept the second
+        // $parameters argument.
         return [
             new RunWorkflowTool(chatId: $this->chatId),
             new ReplyTool(botToken: $this->botToken, chatId: $this->chatId),
-            app()->make(ComposeWorkflowTool::class, [
-                'chatId'   => $this->chatId,
-                'botToken' => $this->botToken,
-            ]),
-            app()->make(RefinePlanTool::class, [
-                'chatId'   => $this->chatId,
-                'botToken' => $this->botToken,
-            ]),
-            app()->make(PersistWorkflowTool::class, [
-                'chatId'   => $this->chatId,
-                'botToken' => $this->botToken,
-            ]),
+            app(ComposeWorkflowTool::class),
+            app(RefinePlanTool::class),
+            app(PersistWorkflowTool::class),
         ];
     }
 
@@ -148,12 +148,19 @@ final class TelegramAgent implements Agent, Conversational, HasMiddleware, HasTo
         $this->botToken = $botToken;
         $text           = (string) data_get($message, 'text', data_get($message, 'caption', ''));
 
-        if ($text === '' || $this->chatId === '') {
+        $photo    = $update['message']['photo'] ?? $update['channel_post']['photo'] ?? [];
+        $document = $update['message']['document'] ?? $update['channel_post']['document'] ?? null;
+        $hasImageDocument = is_array($document)
+            && is_string($document['mime_type'] ?? null)
+            && str_starts_with($document['mime_type'], 'image/');
+
+        if ($this->chatId === '' || ($text === '' && $photo === [] && !$hasImageDocument)) {
             return;
         }
 
         // ── Slash command path ────────────────────────────────────────────────
-        if ($text[0] === '/') {
+        // Image-only / document-only updates have empty $text, so guard the index access.
+        if ($text !== '' && $text[0] === '/') {
             $reply = $this->slashRouter->route($text, $this->chatId);
 
             if ($reply === '🔄 Session reset. (Storage cleared by caller.)') {
@@ -171,6 +178,9 @@ final class TelegramAgent implements Agent, Conversational, HasMiddleware, HasTo
         // ── LLM path ─────────────────────────────────────────────────────────
         $this->instructionContextUpdate = $update;
 
+        // For image-only bursts, synthesize a hint so the LLM sees context.
+        $promptText = $text !== '' ? $text : '[Người dùng gửi ' . count($photo) . ' ảnh không có chú thích]';
+
         // Load or create conversation memory keyed on chatId:botToken.
         $conversationUser = $this->makeConversationUser();
         $this->continueLastConversation($conversationUser);
@@ -181,7 +191,7 @@ final class TelegramAgent implements Agent, Conversational, HasMiddleware, HasTo
         $chain = (array) config('ai.failover.text', [config('ai.default')]);
 
         $response = $this->prompt(
-            $text,
+            $promptText,
             provider: $chain,
         );
 
