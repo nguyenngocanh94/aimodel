@@ -148,7 +148,8 @@ final class TelegramAgent implements Agent, Conversational, HasMiddleware, HasTo
         $this->botToken = $botToken;
         $text           = (string) data_get($message, 'text', data_get($message, 'caption', ''));
 
-        if ($text === '' || $this->chatId === '') {
+        $photo = $update['message']['photo'] ?? $update['channel_post']['photo'] ?? [];
+        if ($this->chatId === '' || ($text === '' && $photo === [])) {
             return;
         }
 
@@ -171,6 +172,9 @@ final class TelegramAgent implements Agent, Conversational, HasMiddleware, HasTo
         // ── LLM path ─────────────────────────────────────────────────────────
         $this->instructionContextUpdate = $update;
 
+        // For image-only bursts, synthesize a hint so the LLM sees context.
+        $promptText = $text !== '' ? $text : '[Người dùng gửi ' . count($photo) . ' ảnh không có chú thích]';
+
         // Load or create conversation memory keyed on chatId:botToken.
         $conversationUser = $this->makeConversationUser();
         $this->continueLastConversation($conversationUser);
@@ -181,7 +185,7 @@ final class TelegramAgent implements Agent, Conversational, HasMiddleware, HasTo
         $chain = (array) config('ai.failover.text', [config('ai.default')]);
 
         $response = $this->prompt(
-            $text,
+            $promptText,
             provider: $chain,
         );
 
