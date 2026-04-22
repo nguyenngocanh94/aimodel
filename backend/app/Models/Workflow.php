@@ -21,7 +21,6 @@ class Workflow extends Model
         'schema_version',
         'tags',
         'document',
-        'catalog_embedding',
     ];
 
     protected function casts(): array

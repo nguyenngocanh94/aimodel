@@ -61,7 +61,7 @@ class HumanGateTemplate extends NodeTemplate
         ];
     }
 
-    public function needsHumanLoop(array $config = []): bool
+    public function needsHumanLoop(): bool
     {
         return true;
     }

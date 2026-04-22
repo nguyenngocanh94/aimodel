@@ -7,7 +7,6 @@ namespace Tests\Feature;
 use App\Domain\DataType;
 use App\Domain\Execution\ExecutionPlanner;
 use App\Domain\Execution\InputResolver;
-use App\Domain\Execution\ProposalSender;
 use App\Domain\Execution\RunCache;
 use App\Domain\Execution\RunExecutor;
 use App\Domain\NodeCategory;
@@ -18,6 +17,7 @@ use App\Domain\Nodes\NodeTemplateRegistry;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
+use App\Domain\Providers\ProviderRouter;
 use App\Models\ExecutionRun;
 use App\Models\Workflow;
 use App\Services\ArtifactStoreContract;
@@ -96,16 +96,13 @@ final class RunExecutorTest extends TestCase
             }
         });
 
-        $proposalSender = $this->createMock(ProposalSender::class);
-
         $this->executor = new RunExecutor(
             new ExecutionPlanner(),
             new InputResolver(new RunCache()),
             $this->registry,
             new RunCache(),
+            new ProviderRouter(),
             new LocalArtifactStore(),
-            $proposalSender,
-            new \App\Services\Memory\DatabaseRunMemoryStore(),
         );
 
         $this->workflow = Workflow::create([

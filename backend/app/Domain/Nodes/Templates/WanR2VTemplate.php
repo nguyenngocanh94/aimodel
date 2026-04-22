@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domain\Nodes\Templates;
 
+use App\Domain\Capability;
 use App\Domain\DataType;
 use App\Domain\NodeCategory;
-use App\Domain\Nodes\Concerns\InteractsWithVideo;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
@@ -15,8 +15,6 @@ use App\Domain\Nodes\NodeTemplate;
 
 class WanR2VTemplate extends NodeTemplate
 {
-    use InteractsWithVideo;
-
     public string $type { get => 'wanR2V'; }
     public string $version { get => '1.0.0'; }
     public string $title { get => 'Wan R2V'; }
@@ -40,7 +38,8 @@ class WanR2VTemplate extends NodeTemplate
     public function configRules(): array
     {
         return [
-            'provider' => ['sometimes', 'string'],
+            'provider' => ['required', 'string'],
+            'apiKey' => ['sometimes', 'string'],
             'model' => ['sometimes', 'string'],
             'aspectRatio' => ['sometimes', 'string', 'in:16:9,9:16,1:1,4:3,3:4'],
             'resolution' => ['sometimes', 'string', 'in:720p,1080p'],
@@ -54,6 +53,7 @@ class WanR2VTemplate extends NodeTemplate
     {
         return [
             'provider' => 'stub',
+            'apiKey' => '',
             'model' => 'fal-ai/wan/v2.7/reference-to-video',
             'aspectRatio' => '9:16',
             'resolution' => '1080p',
@@ -72,6 +72,8 @@ class WanR2VTemplate extends NodeTemplate
 
         $referenceVideos = $ctx->inputValue('referenceVideos') ?? [];
         $referenceImages = $ctx->inputValue('referenceImages') ?? [];
+
+        $input = ['prompt' => $prompt];
 
         // Collect all reference URLs into a single array for the adapter
         $referenceUrls = [];
@@ -96,7 +98,15 @@ class WanR2VTemplate extends NodeTemplate
             }
         }
 
-        $result = $this->callReferenceToVideo($ctx, (string) $prompt, $referenceUrls);
+        if ($referenceUrls) {
+            $input['reference_urls'] = $referenceUrls;
+        }
+
+        $result = $ctx->provider(Capability::ReferenceToVideo)->execute(
+            Capability::ReferenceToVideo,
+            $input,
+            $ctx->config,
+        );
 
         $videoData = $result['video'] ?? $result;
         $url = is_array($videoData) ? ($videoData['url'] ?? '') : (string) $videoData;

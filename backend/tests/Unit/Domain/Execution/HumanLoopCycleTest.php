@@ -8,6 +8,7 @@ use App\Domain\Nodes\HumanProposal;
 use App\Domain\Nodes\HumanResponse;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\PortPayload;
+use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -29,6 +30,7 @@ final class HumanLoopCycleTest extends TestCase
             config: [],
             inputs: $inputs,
             runId: 'test-run-1',
+            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
     }

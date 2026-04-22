@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domain\Nodes\Templates;
 
+use App\Domain\Capability;
 use App\Domain\DataType;
 use App\Domain\NodeCategory;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\Templates\ImageGeneratorTemplate;
 use App\Domain\PortPayload;
+use App\Domain\Providers\Adapters\StubAdapter;
+use App\Domain\Providers\ProviderRouter;
 use App\Models\Artifact;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
@@ -83,6 +86,11 @@ final class ImageGeneratorTemplateTest extends TestCase
     #[Test]
     public function execute_single_image_from_prompt(): void
     {
+        $router = $this->createMock(ProviderRouter::class);
+        $router->method('resolve')
+            ->with(Capability::TextToImage, $this->anything())
+            ->willReturn(new StubAdapter());
+
         $artifact = $this->createMock(Artifact::class);
         $artifact->id = 'art-123';
 
@@ -91,11 +99,12 @@ final class ImageGeneratorTemplateTest extends TestCase
 
         $ctx = new NodeExecutionContext(
             nodeId: 'node-5',
-            config: ['image' => ['provider' => 'stub'], 'inputMode' => 'prompt', 'outputMode' => 'single'],
+            config: ['provider' => 'stub', 'inputMode' => 'prompt', 'outputMode' => 'single'],
             inputs: [
                 'prompt' => PortPayload::success('A beautiful sunset', DataType::Prompt),
             ],
             runId: 'run-1',
+            providerRouter: $router,
             artifactStore: $store,
         );
 
@@ -110,6 +119,11 @@ final class ImageGeneratorTemplateTest extends TestCase
     #[Test]
     public function execute_multiple_images_from_scenes(): void
     {
+        $router = $this->createMock(ProviderRouter::class);
+        $router->method('resolve')
+            ->with(Capability::TextToImage, $this->anything())
+            ->willReturn(new StubAdapter());
+
         $artifact = $this->createMock(Artifact::class);
         $artifact->id = 'art-456';
 
@@ -123,11 +137,12 @@ final class ImageGeneratorTemplateTest extends TestCase
 
         $ctx = new NodeExecutionContext(
             nodeId: 'node-6',
-            config: ['image' => ['provider' => 'stub'], 'inputMode' => 'scene', 'outputMode' => 'multiple'],
+            config: ['provider' => 'stub', 'inputMode' => 'scene', 'outputMode' => 'multiple'],
             inputs: [
                 'scenes' => PortPayload::success($scenes, DataType::SceneList),
             ],
             runId: 'run-1',
+            providerRouter: $router,
             artifactStore: $store,
         );
 

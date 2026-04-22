@@ -10,6 +10,7 @@ use App\Domain\Nodes\Exceptions\ReviewPendingException;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\Templates\ReviewCheckpointTemplate;
 use App\Domain\PortPayload;
+use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -55,6 +56,7 @@ final class ReviewCheckpointTemplateTest extends TestCase
                 'data' => PortPayload::success(['key' => 'value'], DataType::Json),
             ],
             runId: 'run-1',
+            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -73,6 +75,7 @@ final class ReviewCheckpointTemplateTest extends TestCase
                 'data' => PortPayload::success('test', DataType::Json),
             ],
             runId: 'run-1',
+            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -96,6 +99,7 @@ final class ReviewCheckpointTemplateTest extends TestCase
                 'data' => PortPayload::success($inputData, DataType::Json),
             ],
             runId: 'run-1',
+            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -119,6 +123,7 @@ final class ReviewCheckpointTemplateTest extends TestCase
                 'data' => PortPayload::success('anything', DataType::Json),
             ],
             runId: 'run-1',
+            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 

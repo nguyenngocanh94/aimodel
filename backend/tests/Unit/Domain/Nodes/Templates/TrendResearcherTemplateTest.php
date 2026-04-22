@@ -10,9 +10,11 @@ use App\Domain\NodeCategory;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\Templates\TrendResearcherTemplate;
 use App\Domain\PortPayload;
+use App\Domain\Providers\Adapters\StubAdapter;
+use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
+use PHPUnit\Framework\TestCase;
 
 final class TrendResearcherTemplateTest extends TestCase
 {
@@ -20,7 +22,6 @@ final class TrendResearcherTemplateTest extends TestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->template = new TrendResearcherTemplate();
     }
 
@@ -70,6 +71,11 @@ final class TrendResearcherTemplateTest extends TestCase
     #[Test]
     public function execute_with_stub_returns_json_trend_brief(): void
     {
+        $router = $this->createMock(ProviderRouter::class);
+        $router->method('resolve')
+            ->with(Capability::TextGeneration, $this->anything())
+            ->willReturn(new StubAdapter());
+
         $ctx = new NodeExecutionContext(
             nodeId: 'node-trend-1',
             config: $this->template->defaultConfig(),
@@ -84,6 +90,7 @@ final class TrendResearcherTemplateTest extends TestCase
                 ),
             ],
             runId: 'run-trend-1',
+            providerRouter: $router,
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -110,40 +117,5 @@ final class TrendResearcherTemplateTest extends TestCase
         $this->assertStringContainsString('trendingHashtags', $systemPrompt);
         $this->assertStringContainsString('contentAngles', $systemPrompt);
         $this->assertStringContainsString('avoidList', $systemPrompt);
-    }
-
-    #[Test]
-    public function planner_guide_exposes_expected_knob_names(): void
-    {
-        $guide = $this->template->plannerGuide();
-        $knobNames = array_map(fn ($k) => $k->name, $guide->knobs);
-
-        $this->assertContains('trend_usage', $knobNames);
-        $this->assertContains('content_angle_focus', $knobNames);
-        $this->assertContains('native_tone', $knobNames);
-    }
-
-    #[Test]
-    public function planner_guide_knobs_have_vibe_mappings_for_all_four_modes(): void
-    {
-        $guide = $this->template->plannerGuide();
-        foreach ($guide->knobs as $knob) {
-            $this->assertArrayHasKey('funny_storytelling', $knob->vibeMapping, "{$knob->name} missing funny_storytelling");
-            $this->assertArrayHasKey('clean_education', $knob->vibeMapping, "{$knob->name} missing clean_education");
-            $this->assertArrayHasKey('aesthetic_mood', $knob->vibeMapping, "{$knob->name} missing aesthetic_mood");
-            $this->assertArrayHasKey('raw_authentic', $knob->vibeMapping, "{$knob->name} missing raw_authentic");
-        }
-    }
-
-    #[Test]
-    public function config_rules_include_new_planner_knobs(): void
-    {
-        $rules = $this->template->configRules();
-        $this->assertArrayHasKey('trend_usage', $rules);
-        $this->assertArrayHasKey('content_angle_focus', $rules);
-
-        $defaults = $this->template->defaultConfig();
-        $this->assertSame('informed', $defaults['trend_usage']);
-        $this->assertSame('vibe_matched', $defaults['content_angle_focus']);
     }
 }

@@ -42,9 +42,7 @@ services:
       - QUEUE_CONNECTION=redis
 
   postgres:
-    # pgvector/pgvector image bundles the `vector` extension on top of
-    # postgres 16 — required by LK-G1 (embedding columns + ivfflat indexes).
-    image: pgvector/pgvector:pg16
+    image: postgres:16-alpine
     environment:
       - POSTGRES_DB=aimodel
       - POSTGRES_USER=aimodel

@@ -10,14 +10,13 @@ use App\Domain\Nodes\HumanResponse;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\NodeTemplate;
 use App\Domain\Nodes\NodeTemplateRegistry;
+use App\Domain\Providers\ProviderRouter;
 use App\Domain\RunTrigger;
 use App\Events\NodeStatusChanged;
-use App\Events\NodeTokenDelta;
 use App\Models\ExecutionRun;
 use App\Models\NodeRunRecord;
 use App\Models\PendingInteraction;
 use App\Services\ArtifactStoreContract;
-use App\Services\Memory\RunMemoryStore;
 
 final class RunExecutor
 {
@@ -26,32 +25,10 @@ final class RunExecutor
         private InputResolver $inputResolver,
         private NodeTemplateRegistry $registry,
         private RunCache $cache,
+        private ProviderRouter $providerRouter,
         private ArtifactStoreContract $artifactStore,
         private ProposalSender $proposalSender,
-        private RunMemoryStore $memory,
     ) {}
-
-    /**
-     * Resolve the workflow slug for a run.
-     *
-     * Prefers a real `slug` column when it exists (pending catalog migration),
-     * falls back to the workflow UUID so memory scope is always deterministic.
-     */
-    private function workflowSlug(ExecutionRun $run): ?string
-    {
-        $workflow = $run->workflow;
-        if ($workflow === null) {
-            return null;
-        }
-
-        /** @var mixed $slug */
-        $slug = $workflow->slug ?? null;
-        if (is_string($slug) && $slug !== '') {
-            return $slug;
-        }
-
-        return (string) $workflow->id;
-    }
 
     public function execute(ExecutionRun $run): void
     {
@@ -136,9 +113,7 @@ final class RunExecutor
                 'started_at' => now(),
             ]);
 
-            $nodeConfig = $node['data']['config'] ?? $node['config'] ?? [];
-
-            if ($template->needsHumanLoop($nodeConfig)) {
+            if ($template->needsHumanLoop()) {
                 $this->executeHumanLoop($run, $node, $template, $document, $nodeMap, $nodeRunRecords, $record);
                 // Node returned awaitingHuman — stop the pipeline
                 // resume() will continue it later
@@ -192,29 +167,13 @@ final class RunExecutor
                 // Execute template
                 $startTime = hrtime(true);
 
-                // LP-C1/C2: build a per-node monotonic token-delta sink that
-                // broadcasts on the run's channel so the run page SSE stream
-                // sees `node.token.delta` frames interleaved with node.status.
-                $seq = 0;
-                $onTokenDelta = function (string $delta, string $messageId, string $nid, string $rid) use (&$seq): void {
-                    broadcast(new NodeTokenDelta(
-                        runId: $rid,
-                        nodeId: $nid,
-                        messageId: $messageId,
-                        delta: $delta,
-                        seq: $seq++,
-                    ));
-                };
-
                 $ctx = new NodeExecutionContext(
                     nodeId: $nodeId,
                     config: $node['data']['config'] ?? $node['config'] ?? [],
                     inputs: $inputs,
                     runId: $run->id,
+                    providerRouter: $this->providerRouter,
                     artifactStore: $this->artifactStore,
-                    memory: $this->memory,
-                    workflowSlug: $this->workflowSlug($run),
-                    onTokenDelta: $onTokenDelta,
                 );
 
                 $outputs = $template->execute($ctx);
@@ -361,10 +320,8 @@ final class RunExecutor
             config: $node['data']['config'] ?? $node['config'] ?? [],
             inputs: $inputs,
             runId: $runId,
+            providerRouter: $this->providerRouter,
             artifactStore: $this->artifactStore,
-            humanProposalState: $pending->node_state ?? [],
-            memory: $this->memory,
-            workflowSlug: $this->workflowSlug($run),
         );
 
         // Mark the old pending interaction as responded
@@ -451,9 +408,8 @@ final class RunExecutor
             config: $node['data']['config'] ?? $node['config'] ?? [],
             inputs: $inputs,
             runId: $run->id,
+            providerRouter: $this->providerRouter,
             artifactStore: $this->artifactStore,
-            memory: $this->memory,
-            workflowSlug: $this->workflowSlug($run),
         );
 
         try {

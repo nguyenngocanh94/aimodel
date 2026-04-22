@@ -33,27 +33,6 @@ export interface NodeStatusData {
   usedCache?: boolean;
 }
 
-/**
- * LP-C4: token-level streaming delta from a live text-gen node.
- *
- * One frame per chunk the LLM emits. `seq` is monotonically increasing per
- * (runId, nodeId) so consumers can order frames defensively; the SSE
- * controller preserves order but Redis pub/sub on a shared channel does
- * not guarantee it under concurrent writers.
- *
- * Consumers typically keep an in-memory buffer keyed by `(nodeId, messageId)`
- * and render `delta` appended to it. When a terminal `node.status` frame
- * with `status === 'success'` arrives for the node, flush the buffer —
- * the authoritative text is then on `outputPayloads`.
- */
-export interface NodeTokenDeltaData {
-  runId: string;
-  nodeId: string;
-  messageId: string;
-  delta: string;
-  seq: number;
-}
-
 export interface RunCompletedData {
   runId: string;
   status: string;
@@ -65,8 +44,6 @@ export interface StreamCallbacks {
   onCatchup: (data: CatchupData) => void;
   onRunStarted: (data: RunStartedData) => void;
   onNodeStatus: (data: NodeStatusData) => void;
-  /** LP-C4: optional — omit to ignore streaming tokens (feature-detect). */
-  onNodeTokenDelta?: (data: NodeTokenDeltaData) => void;
   onRunCompleted: (data: RunCompletedData) => void;
   onError?: (error: Event) => void;
 }
@@ -90,20 +67,11 @@ const INITIAL_BACKOFF_MS = 1_000;
  *
  * @example
  * ```ts
- * const buffers = new Map<string, string>(); // key: `${nodeId}:${messageId}`
  * const { cleanup } = connectToRunStream(runId, {
- *   onCatchup:        (d) => store.applyCatchup(d),
- *   onRunStarted:     (d) => store.setPlannedNodes(d.plannedNodeIds),
- *   onNodeStatus:     (d) => {
- *     if (d.status === 'success') buffers.delete(d.nodeId); // flush
- *     store.updateNode(d);
- *   },
- *   onNodeTokenDelta: (d) => {
- *     const key = `${d.nodeId}:${d.messageId}`;
- *     buffers.set(key, (buffers.get(key) ?? '') + d.delta);
- *     store.setNodePreview(d.nodeId, buffers.get(key)!);
- *   },
- *   onRunCompleted:   (d) => store.finalise(d),
+ *   onCatchup:      (d) => store.applyCatchup(d),
+ *   onRunStarted:   (d) => store.setPlannedNodes(d.plannedNodeIds),
+ *   onNodeStatus:   (d) => store.updateNode(d),
+ *   onRunCompleted: (d) => store.finalise(d),
  * });
  *
  * // later — e.g. on unmount
@@ -165,14 +133,6 @@ export function connectToRunStream(
     eventSource.addEventListener('node.status', (e: MessageEvent) => {
       retryCount = 0;
       callbacks.onNodeStatus(parseEvent<NodeStatusData>(e.data));
-    });
-
-    // LP-C4: streaming tokens — opt-in via onNodeTokenDelta callback.
-    eventSource.addEventListener('node.token.delta', (e: MessageEvent) => {
-      retryCount = 0;
-      if (callbacks.onNodeTokenDelta) {
-        callbacks.onNodeTokenDelta(parseEvent<NodeTokenDeltaData>(e.data));
-      }
     });
 
     eventSource.addEventListener('run.completed', (e: MessageEvent) => {

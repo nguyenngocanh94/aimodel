@@ -13,36 +13,7 @@ This repo builds an **AI Video Workflow Builder** — a browser-based visual pip
 - Data Inspector is the core differentiator
 - DAG-only, max ~15 nodes per workflow
 
-### Telegram Assistant (Laravel `backend/`)
-
-The Telegram-facing **Assistant** routes user messages to catalog workflows via `laravel/ai`. Its instructions are built from composable **BehaviorSkills** in `backend/app/Services/TelegramAgent/BehaviorSkills/` (prompt guardrails, not tools). To change tone or guardrails, edit an existing `*BehaviorSkill` class or add a new one implementing `BehaviorSkill` and list it in `backend/config/telegram_agent.php` under `behavior_skills` (order matters). Tool capsules (progressive-disclosure `Skill`s for the sdk-skills package) live in `resources/skills/` — do not confuse the two.
-
-### WorkflowPlanner (Laravel `backend/app/Domain/Planner/`)
-
-The planner is **agentic** — it exposes three tools on every turn so the LLM can self-correct before committing a final plan:
-
-- `CatalogLookupTool` — semantic search over `workflows` + node-template guides. Prefers pgvector cosine similarity (`whereVectorSimilarTo('catalog_embedding', ...)` backed by VoyageAI `voyage-4` 1024-dim); falls back to case-insensitive LIKE when embeddings are unavailable.
-- `PriorPlanRetrievalTool` — pulls up to 3 past plans from `workflow_plans.brief_embedding` for prior-art reference; same vector+LIKE fallback.
-- `SchemaValidationTool` — wraps `WorkflowPlanValidator` and returns `{valid, errors, warnings, hint}` so the model can validate drafts cheaply. The planner prompt (`WorkflowPlannerPrompt::rulesBlock`) REQUIRES the model to call this tool before emitting final JSON.
-
-Config knobs live in `backend/config/planner.php` (`agentic`, `persist_plans`, similarity thresholds). Successful plans persist to `workflow_plans` via `PastPlan::create`, keyed by SHA-256 `brief_hash`. Embed existing rows with `php artisan embeddings:backfill [--table=workflows|workflow_plans]` once `VOYAGEAI_API_KEY` is set.
-
 ## Tech Stack
-
-### Runtime hooks (laravel/ai polish, 2026-04)
-
-`RunExecutor` streams token-level LLM output on the `run.{id}` channel via
-`node.token.delta` broadcast events — the `/api/runs/{run}/stream` SSE
-controller forwards them verbatim alongside existing `node.status` frames.
-Text-generation resolves through `config('ai.failover.text')` (ordered
-chain) with `RetryPrimary` middleware retrying the primary on 429/overloaded
-with exponential backoff before the vendor failover loop advances. Nodes
-can call `$ctx->recall()` / `$ctx->remember()` to persist cross-run
-key/value state via `App\Services\Memory\RunMemoryStore` (7-day TTL by
-convention; `memory:prune` artisan command runs nightly at 03:15). Frontend
-SSE consumers opt into streaming by supplying an `onNodeTokenDelta`
-callback to `connectToRunStream()` — see `frontend/src/shared/api/sse.ts`
-for the buffering recipe.
 
 - **React** + **Vite** + **TypeScript** (strict mode)
 - **@xyflow/react** (React Flow) for the canvas
@@ -243,10 +214,6 @@ Do not halt all agents for review. Designate 1–2 agents finishing beads for re
 - **shadcn/ui for UI primitives.** Button, Dialog, Tabs, Badge — use shadcn, don't reinvent.
 - **Tailwind for styling.** No CSS modules, no styled-components.
 - **Small, focused commits.** One bead = one commit (or a few).
-
-## Node Schema Authority
-
-**Node schemas are backend-authoritative.** `GET /api/nodes/manifest` is the source of truth for ports, config rules, and defaults. Frontend templates own only `mockExecute`, `buildPreview`, `fixtures`, and visual hints — never re-author `configSchema` or `defaultConfig` in TS. To add a new config field to a node: edit `configRules()` on the PHP template, done. The inspector picks it up automatically via the manifest. See `docs/plans/2026-04-18-node-manifest-alignment.md`.
 
 ## Milestone Order
 

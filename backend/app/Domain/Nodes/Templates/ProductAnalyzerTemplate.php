@@ -4,25 +4,17 @@ declare(strict_types=1);
 
 namespace App\Domain\Nodes\Templates;
 
+use App\Domain\Capability;
 use App\Domain\DataType;
 use App\Domain\NodeCategory;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
-use App\Domain\Nodes\Concerns\InteractsWithLlm;
-use App\Domain\Nodes\GuideKnob;
-use App\Domain\Nodes\GuidePort;
 use App\Domain\Nodes\NodeExecutionContext;
-use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\NodeTemplate;
-use App\Domain\Nodes\VibeImpact;
-use Closure;
-use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 class ProductAnalyzerTemplate extends NodeTemplate
 {
-    use InteractsWithLlm;
-
     public string $type { get => 'productAnalyzer'; }
     public string $version { get => '1.0.0'; }
     public string $title { get => 'Product Analyzer'; }
@@ -49,8 +41,6 @@ class ProductAnalyzerTemplate extends NodeTemplate
             'apiKey' => ['sometimes', 'string'],
             'model' => ['sometimes', 'string'],
             'analysisDepth' => ['sometimes', 'string', 'in:basic,detailed'],
-            // Planner-set creative knobs.
-            'analysis_angle' => ['sometimes', 'string', 'in:neutral,entertainment_ready,education_ready,aesthetic_ready'],
         ];
     }
 
@@ -61,57 +51,7 @@ class ProductAnalyzerTemplate extends NodeTemplate
             'apiKey' => '',
             'model' => 'gpt-4o',
             'analysisDepth' => 'detailed',
-            // Planner-set creative knobs.
-            'analysis_angle' => 'neutral',
         ];
-    }
-
-    public function plannerGuide(): NodeGuide
-    {
-        return new NodeGuide(
-            nodeId: $this->type,
-            purpose: 'Analyze product images and extract features, selling points, target audience, and suggested mood. Tilts the analysis wording toward the downstream vibe.',
-            position: 'early in the pipeline; feeds creative nodes',
-            vibeImpact: VibeImpact::Neutral,
-            humanGate: false,
-            knobs: [
-                new GuideKnob(
-                    name: 'analysis_angle',
-                    type: 'enum',
-                    options: ['neutral', 'entertainment_ready', 'education_ready', 'aesthetic_ready'],
-                    default: 'neutral',
-                    effect: 'Tilts selling-point wording and suggestedMood toward the downstream vibe.',
-                    vibeMapping: [
-                        'funny_storytelling' => 'entertainment_ready',
-                        'clean_education' => 'education_ready',
-                        'aesthetic_mood' => 'aesthetic_ready',
-                        'raw_authentic' => 'neutral',
-                    ],
-                ),
-                new GuideKnob(
-                    name: 'product_emphasis',
-                    type: 'enum',
-                    options: ['subtle', 'balanced', 'hero'],
-                    default: 'balanced',
-                    effect: 'Planner hint: which traits to foreground in the analysis report. Canonical on scriptWriter.',
-                    vibeMapping: [
-                        'funny_storytelling' => 'subtle',
-                        'clean_education' => 'hero',
-                        'aesthetic_mood' => 'subtle',
-                        'raw_authentic' => 'balanced',
-                    ],
-                ),
-            ],
-            readsFrom: [],
-            writesTo: ['storyWriter', 'scriptWriter', 'intentOutcomeSelector'],
-            ports: [
-                GuidePort::input('images', 'imageAssetList', true),
-                GuidePort::input('description', 'text', false),
-                GuidePort::output('analysis', 'json'),
-            ],
-            whenToInclude: 'always when a product is present in the brief',
-            whenToSkip: 'when the workflow is product-agnostic (e.g. seasonal brand-mood content)',
-        );
     }
 
     public function execute(NodeExecutionContext $ctx): array
@@ -144,22 +84,22 @@ class ProductAnalyzerTemplate extends NodeTemplate
             $imageUrls = array_merge($imageUrls, $urlMatches[0]);
         }
 
-        $userPrompt = $this->buildUserPrompt($images, $descText);
+        $input = [
+            'systemPrompt' => $this->buildSystemPrompt($analysisDepth),
+            'prompt' => $this->buildUserPrompt($images, $descText),
+        ];
+
         if (!empty($imageUrls)) {
-            $userPrompt .= "\n\nReference image URLs:\n" . implode("\n", array_unique($imageUrls));
+            $input['imageUrls'] = array_values(array_unique($imageUrls));
         }
 
-        $analysis = $this->callStructuredText(
-            $ctx,
-            $this->buildSystemPrompt($analysisDepth),
-            $userPrompt,
-            $this->analysisSchema(),
-            fn () => $this->fallbackAnalysis(),
+        $result = $ctx->provider(Capability::TextGeneration)->execute(
+            Capability::TextGeneration,
+            $input,
+            $config,
         );
 
-        if ($analysis === [] || !isset($analysis['productType'])) {
-            $analysis = $this->fallbackAnalysis();
-        }
+        $analysis = $this->parseAnalysis($result);
 
         return [
             'analysis' => PortPayload::success(
@@ -176,33 +116,15 @@ class ProductAnalyzerTemplate extends NodeTemplate
     {
         $parts = [
             'You are a product analysis AI with vision capabilities.',
-            'Analyze the provided product images and populate the structured analysis schema.',
+            'Analyze the provided product images and return a structured JSON report.',
             "Analysis depth: {$analysisDepth}.",
-            'Cover productType, productName, colors, materials, style, sellingPoints,',
-            'targetAudience (age/gender/occasion/lifestyle), pricePositioning (budget|mid-range|premium|luxury), and suggestedMood.',
+            'Return valid JSON with these fields:',
+            '{"productType": string, "productName": string, "colors": string[], "materials": string[],',
+            '"style": string, "sellingPoints": string[], "targetAudience": {"age": string, "gender": string, "occasion": string, "lifestyle": string},',
+            '"pricePositioning": "budget"|"mid-range"|"premium"|"luxury", "suggestedMood": string}',
         ];
 
         return implode(' ', $parts);
-    }
-
-    private function analysisSchema(): Closure
-    {
-        return static fn (JsonSchema $s) => [
-            'productType'    => $s->string(),
-            'productName'    => $s->string(),
-            'colors'         => $s->array()->items($s->string()),
-            'materials'      => $s->array()->items($s->string()),
-            'style'          => $s->string(),
-            'sellingPoints'  => $s->array()->items($s->string()),
-            'targetAudience' => $s->object([
-                'age'       => $s->string(),
-                'gender'    => $s->string(),
-                'occasion'  => $s->string(),
-                'lifestyle' => $s->string(),
-            ]),
-            'pricePositioning' => $s->string(),
-            'suggestedMood'    => $s->string(),
-        ];
     }
 
     private function buildUserPrompt(mixed $images, string $description): string
@@ -215,6 +137,43 @@ class ProductAnalyzerTemplate extends NodeTemplate
         }
 
         return $prompt;
+    }
+
+    private function parseAnalysis(mixed $result): array
+    {
+        if (is_string($result)) {
+            // Strip markdown code fences
+            $cleaned = preg_replace('/^```(?:json)?\s*\n?/i', '', trim($result));
+            $cleaned = preg_replace('/\n?```\s*$/i', '', $cleaned);
+
+            $decoded = json_decode(trim($cleaned), true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+
+            // Try to find JSON object in the response
+            if (preg_match('/\{[\s\S]*\}/u', $result, $matches)) {
+                $decoded = json_decode($matches[0], true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    return $decoded;
+                }
+            }
+
+            return $this->fallbackAnalysis();
+        }
+
+        if (is_array($result)) {
+            // The StubAdapter returns script-like arrays for TextGeneration.
+            // Check if the result looks like a product analysis (has productType key).
+            if (isset($result['productType'])) {
+                return $result;
+            }
+
+            // Fallback: the stub returned a script-shaped response, not product analysis.
+            return $this->fallbackAnalysis();
+        }
+
+        return $this->fallbackAnalysis();
     }
 
     private function fallbackAnalysis(): array

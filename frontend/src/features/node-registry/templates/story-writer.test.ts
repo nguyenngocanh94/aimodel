@@ -1,30 +1,16 @@
 /**
- * StoryWriter Node Template Tests - AiModel-624 (NM3 trim: configSchema assertions removed)
- *
- * Config validation is now backend-authoritative (NM1 + manifest).
- * Tests cover registry shape, buildPreview, mockExecute, and fixtures.
+ * StoryWriter Node Template Tests - AiModel-624
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   storyWriterTemplate,
+  StoryWriterConfigSchema,
   type StoryWriterConfig,
   type StoryArcPayload,
 } from './story-writer';
 import type { MockNodeExecutionArgs } from '../node-registry';
 import type { PortPayload } from '@/features/workflows/domain/workflow-types';
-
-// Minimal valid config for use across tests (replaces removed defaultConfig)
-const baseConfig: StoryWriterConfig = {
-  targetDurationSeconds: 30,
-  storyFormula: 'problem_agitation_solution',
-  emotionalTone: 'relatable_humor',
-  productIntegrationStyle: 'natural_use',
-  genZAuthenticity: 'high',
-  includeCasting: true,
-  vietnameseDialect: 'neutral',
-  seedIdea: '',
-};
 
 describe('storyWriterTemplate', () => {
   describe('template metadata', () => {
@@ -60,12 +46,71 @@ describe('storyWriterTemplate', () => {
       expect(modelRoster?.required).toBe(false);
       expect(seedIdea?.required).toBe(false);
     });
+  });
 
-    it('should have no configSchema (NM3 pilot stripped, manifest-driven)', () => {
-      // configSchema is intentionally absent — backend manifest is the source of truth
-      expect(storyWriterTemplate.configSchema).toBeUndefined();
-      // defaultConfig is an empty sentinel ({}); real defaults come from manifest
-      expect(Object.keys(storyWriterTemplate.defaultConfig as object).length).toBe(0);
+  describe('config schema', () => {
+    it('should validate correct config', () => {
+      const validConfig: StoryWriterConfig = {
+        targetDurationSeconds: 30,
+        storyFormula: 'hero_journey',
+        emotionalTone: 'aspirational',
+        productIntegrationStyle: 'natural_use',
+        genZAuthenticity: 'high',
+        includeCasting: true,
+        vietnameseDialect: 'neutral',
+        seedIdea: 'Test idea',
+      };
+
+      const result = StoryWriterConfigSchema.safeParse(validConfig);
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject invalid duration', () => {
+      const invalidConfig = {
+        targetDurationSeconds: 5, // too short
+        storyFormula: 'hero_journey',
+        emotionalTone: 'aspirational',
+        productIntegrationStyle: 'natural_use',
+        genZAuthenticity: 'high',
+        includeCasting: true,
+        vietnameseDialect: 'neutral',
+      };
+
+      const result = StoryWriterConfigSchema.safeParse(invalidConfig);
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject invalid story formula', () => {
+      const invalidConfig = {
+        targetDurationSeconds: 30,
+        storyFormula: 'invalid_formula',
+        emotionalTone: 'aspirational',
+        productIntegrationStyle: 'natural_use',
+        genZAuthenticity: 'high',
+        includeCasting: true,
+        vietnameseDialect: 'neutral',
+      };
+
+      const result = StoryWriterConfigSchema.safeParse(invalidConfig);
+      expect(result.success).toBe(false);
+    });
+
+    it('should apply default values', () => {
+      const result = StoryWriterConfigSchema.safeParse({
+        targetDurationSeconds: 30,
+        storyFormula: 'hero_journey',
+        emotionalTone: 'aspirational',
+        productIntegrationStyle: 'natural_use',
+        genZAuthenticity: 'high',
+        includeCasting: true,
+        vietnameseDialect: 'neutral',
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // seedIdea is optional, so it can be undefined
+        expect(result.data.seedIdea).toBeUndefined();
+      }
     });
   });
 
@@ -74,11 +119,10 @@ describe('storyWriterTemplate', () => {
       expect(storyWriterTemplate.fixtures.length).toBeGreaterThan(0);
     });
 
-    it('should have fixtures with required fields', () => {
+    it('should have valid fixture configs', () => {
       for (const fixture of storyWriterTemplate.fixtures) {
-        expect(fixture.id).toBeDefined();
-        expect(fixture.label).toBeDefined();
-        expect(fixture.config).toBeDefined();
+        const result = StoryWriterConfigSchema.safeParse(fixture.config);
+        expect(result.success).toBe(true);
       }
     });
   });
@@ -86,7 +130,7 @@ describe('storyWriterTemplate', () => {
   describe('buildPreview', () => {
     it('should return idle status when inputs missing', () => {
       const result = storyWriterTemplate.buildPreview({
-        config: baseConfig,
+        config: storyWriterTemplate.defaultConfig,
         inputs: {},
       });
 
@@ -109,7 +153,7 @@ describe('storyWriterTemplate', () => {
       };
 
       const result = storyWriterTemplate.buildPreview({
-        config: baseConfig,
+        config: storyWriterTemplate.defaultConfig,
         inputs,
       });
 
@@ -123,7 +167,7 @@ describe('storyWriterTemplate', () => {
     it('should return error when required inputs missing', async () => {
       const args: MockNodeExecutionArgs<StoryWriterConfig> = {
         nodeId: 'test-node',
-        config: baseConfig,
+        config: storyWriterTemplate.defaultConfig,
         inputs: {},
         signal: new AbortController().signal,
         runId: 'test-run',
@@ -158,7 +202,7 @@ describe('storyWriterTemplate', () => {
 
       const args: MockNodeExecutionArgs<StoryWriterConfig> = {
         nodeId: 'test-node',
-        config: baseConfig,
+        config: storyWriterTemplate.defaultConfig,
         inputs,
         signal: new AbortController().signal,
         runId: 'test-run',
@@ -168,7 +212,7 @@ describe('storyWriterTemplate', () => {
 
       expect(result.storyArc.status).toBe('success');
       expect(result.storyArc.value).toBeDefined();
-
+      
       const storyArc = result.storyArc.value as StoryArcPayload;
       expect(storyArc.shots).toBeDefined();
       expect(storyArc.shots.length).toBeGreaterThan(0);
@@ -193,7 +237,7 @@ describe('storyWriterTemplate', () => {
       };
 
       const config: StoryWriterConfig = {
-        ...baseConfig,
+        ...storyWriterTemplate.defaultConfig,
         includeCasting: true,
       };
 
@@ -207,7 +251,7 @@ describe('storyWriterTemplate', () => {
 
       const result = await storyWriterTemplate.mockExecute(args);
       const storyArc = result.storyArc.value as StoryArcPayload;
-
+      
       expect(storyArc.cast).toBeDefined();
       expect(storyArc.cast.length).toBeGreaterThan(0);
     });
@@ -227,7 +271,7 @@ describe('storyWriterTemplate', () => {
       };
 
       const config: StoryWriterConfig = {
-        ...baseConfig,
+        ...storyWriterTemplate.defaultConfig,
         targetDurationSeconds: 60,
       };
 
@@ -241,7 +285,7 @@ describe('storyWriterTemplate', () => {
 
       const result = await storyWriterTemplate.mockExecute(args);
       const storyArc = result.storyArc.value as StoryArcPayload;
-
+      
       expect(storyArc.targetDuration).toBe(60);
       // Should have more shots for longer duration
       expect(storyArc.shots.length).toBeGreaterThanOrEqual(3);
@@ -253,7 +297,7 @@ describe('storyWriterTemplate', () => {
 
       const args: MockNodeExecutionArgs<StoryWriterConfig> = {
         nodeId: 'test-node',
-        config: baseConfig,
+        config: storyWriterTemplate.defaultConfig,
         inputs: {
           productAnalysis: { value: {}, status: 'success', schemaType: 'json' },
           trendBrief: { value: {}, status: 'success', schemaType: 'json' },
@@ -304,7 +348,7 @@ describe('storyWriterTemplate', () => {
 
       const args1: MockNodeExecutionArgs<StoryWriterConfig> = {
         nodeId: 'test-node',
-        config: baseConfig,
+        config: storyWriterTemplate.defaultConfig,
         inputs: inputs1,
         signal: new AbortController().signal,
         runId: 'test-run',
@@ -312,7 +356,7 @@ describe('storyWriterTemplate', () => {
 
       const args2: MockNodeExecutionArgs<StoryWriterConfig> = {
         nodeId: 'test-node',
-        config: baseConfig,
+        config: storyWriterTemplate.defaultConfig,
         inputs: inputs2,
         signal: new AbortController().signal,
         runId: 'test-run',
@@ -324,7 +368,7 @@ describe('storyWriterTemplate', () => {
       // Different seed ideas should produce different titles
       const storyArc1 = result1.storyArc.value as StoryArcPayload;
       const storyArc2 = result2.storyArc.value as StoryArcPayload;
-
+      
       expect(storyArc1.title).not.toBe(storyArc2.title);
     });
   });
@@ -346,7 +390,7 @@ describe('storyWriterTemplate', () => {
 
       const args: MockNodeExecutionArgs<StoryWriterConfig> = {
         nodeId: 'test-node',
-        config: baseConfig,
+        config: storyWriterTemplate.defaultConfig,
         inputs,
         signal: new AbortController().signal,
         runId: 'test-run',
@@ -372,7 +416,7 @@ describe('storyWriterTemplate', () => {
       };
 
       const ultraConfig: StoryWriterConfig = {
-        ...baseConfig,
+        ...storyWriterTemplate.defaultConfig,
         genZAuthenticity: 'ultra',
       };
 
@@ -397,7 +441,7 @@ describe('storyWriterTemplate', () => {
       };
 
       const lowConfig: StoryWriterConfig = {
-        ...baseConfig,
+        ...storyWriterTemplate.defaultConfig,
         genZAuthenticity: 'low',
       };
 

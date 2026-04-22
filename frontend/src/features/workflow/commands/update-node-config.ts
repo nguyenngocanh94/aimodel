@@ -25,18 +25,16 @@ export function updateNodeConfig(
     return { success: false, errors: ['Template not found'] };
   }
 
-  // Validate with Zod schema when available (pilot templates rely on backend validation)
-  if (template.configSchema) {
-    const parseResult = template.configSchema.safeParse(config);
-    if (!parseResult.success) {
-      const errors = parseResult.error.issues.map(
-        (issue) => `${issue.path.join('.')}: ${issue.message}`,
-      );
-      return { success: false, errors };
-    }
+  // Validate with Zod schema
+  const parseResult = template.configSchema.safeParse(config);
+  if (!parseResult.success) {
+    const errors = parseResult.error.issues.map(
+      (issue) => `${issue.path.join('.')}: ${issue.message}`,
+    );
+    return { success: false, errors };
   }
 
-  const validatedConfig = config;
+  const validatedConfig = parseResult.data;
 
   const recipe = (d: WorkflowDocument): WorkflowDocument => ({
     ...d,

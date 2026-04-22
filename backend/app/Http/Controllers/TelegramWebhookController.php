@@ -11,9 +11,7 @@ use App\Jobs\RunWorkflowJob;
 use App\Models\ExecutionRun;
 use App\Models\NodeRunRecord;
 use App\Models\PendingInteraction;
-use App\Services\TelegramAgent\AgentSessionStore;
-use App\Services\TelegramAgent\SlashCommandRouter;
-use App\Services\TelegramAgent\TelegramAgentFactory;
+use App\Models\Workflow;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -21,23 +19,8 @@ use Illuminate\Support\Facades\Redis;
 
 class TelegramWebhookController extends Controller
 {
-    /** Seconds that a buffered session key stays alive in Redis. */
-    private const BUFFER_TTL = 120;
-    /** Debounce delay (seconds) for fresh turns — longer to coalesce multi-message briefs. */
-    private const DEBOUNCE_DELAY_FRESH = 30;
-    /** Debounce delay (seconds) for pending-draft turns — shorter so approvals feel snappy. */
-    private const DEBOUNCE_DELAY_PENDING_DRAFT = 5;
-
-    /**
-     * @param  SlashCommandRouter  $slashRouter  Injected for testability.
-     * @param  \Closure(string $chatId, string $botToken): object|null  $agentFactory
-     *         Callable factory — accepts (chatId, botToken), returns object with handle().
-     *         Defaults to TelegramAgentFactory::make() via container. Overridable in tests.
-     */
-    public function __construct(
-        private readonly SlashCommandRouter $slashRouter,
-        private readonly mixed $agentFactory = null,
-    ) {}
+    private const BUFFER_TTL = 120; // seconds to keep buffer alive
+    private const DEBOUNCE_DELAY = 30; // seconds to wait for more messages
 
     public function handle(Request $request, string $botToken): JsonResponse
     {
@@ -54,7 +37,7 @@ class TelegramWebhookController extends Controller
         }
 
         $chatId = (string) ($update['message']['chat']['id'] ?? '');
-        $text   = $update['message']['text'] ?? $update['message']['caption'] ?? '';
+        $text = $update['message']['text'] ?? $update['message']['caption'] ?? '';
 
         if (empty($chatId)) {
             return response()->json(['ok' => true]);
@@ -76,146 +59,291 @@ class TelegramWebhookController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        // Priority 2a: Slash commands are deterministic — route to agent
-        // synchronously for an immediate reply (no LLM judgment needed).
-        if ($text !== '' && $text[0] === '/') {
-            $this->callAgent($chatId, $botToken, $update);
+        // Priority 2: Check if this is a confirmation for a pending intake session
+        $sessionKey = "telegram_intake:{$chatId}:{$botToken}";
+        $session = $this->getSession($sessionKey);
+
+        if ($session && ($session['status'] ?? '') === 'awaiting_confirmation') {
+            $this->handleConfirmation($botToken, $chatId, $text, $session, $sessionKey);
             return response()->json(['ok' => true]);
         }
 
-        // Priority 2b: Free text / image catch-all → buffer into intake session
-        // and dispatch ProcessTelegramBatchJob. The job is the one that invokes
-        // TelegramAgent::handle() — the controller's job here is purely mechanical
-        // (buffer + schedule). This preserves debounce-coalesced multi-message
-        // bursts and the job's fallback-reply safety.
-        $sessionKey = "telegram_intake:{$chatId}:{$botToken}";
+        // Priority 3: Buffer this message in an intake session
         $this->bufferMessage($botToken, $chatId, $update, $sessionKey);
 
         return response()->json(['ok' => true]);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Priority 2a — synchronous agent dispatch (slash commands)
-    // ─────────────────────────────────────────────────────────────────────────
-
     /**
-     * Call the TelegramAgent synchronously. Reserved for slash commands —
-     * free text goes through {@see bufferMessage()} so multi-message bursts
-     * coalesce and the job's fallback-reply handler is available.
-     */
-    private function callAgent(string $chatId, string $botToken, array $update): void
-    {
-        try {
-            $factory = $this->agentFactory
-                ?? fn(string $c, string $b) => app(TelegramAgentFactory::class)->make($c, $b);
-
-            $agent = $factory($chatId, $botToken);
-            $agent->handle($update, $botToken);
-        } catch (\Throwable $e) {
-            Log::error('TelegramAgent threw during controller dispatch', [
-                'chatId' => $chatId,
-                'error'  => $e->getMessage(),
-            ]);
-        }
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Priority 2b — intake buffering + debounced job dispatch
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Buffer an inbound message into the intake session and schedule (or
-     * reschedule) the ProcessTelegramBatchJob that will drain the burst
-     * through TelegramAgent::handle().
-     *
-     * Debounce window is 5s when AgentSessionStore has a pending draft for
-     * this chat/bot (so approvals feel snappy), otherwise 30s (so multi-message
-     * briefs coalesce into one agent turn).
+     * Buffer an incoming message and schedule/reset the debounce timer.
      */
     private function bufferMessage(string $botToken, string $chatId, array $update, string $sessionKey): void
     {
         $session = $this->getSession($sessionKey) ?? [
-            'status'    => 'buffering',
-            'botToken'  => $botToken,
-            'chatId'    => $chatId,
-            'messages'  => [],
-            'images'    => [],
-            'texts'     => [],
+            'status' => 'buffering',
+            'botToken' => $botToken,
+            'chatId' => $chatId,
+            'messages' => [],
+            'images' => [],
+            'texts' => [],
             'startedAt' => now()->toIso8601String(),
         ];
 
         $message = $update['message'] ?? [];
 
-        // Text / caption
+        // Extract text
         $text = $message['text'] ?? $message['caption'] ?? '';
         if ($text !== '') {
             $session['texts'][] = $text;
         }
 
-        // Photos (Telegram sends multiple sizes — take largest)
+        // Extract photos (Telegram sends multiple sizes, pick largest)
         if (!empty($message['photo'])) {
-            $photos  = $message['photo'];
-            $largest = end($photos);
+            $photos = $message['photo'];
+            $largest = end($photos); // last = largest resolution
             $session['images'][] = [
-                'file_id' => $largest['file_id'] ?? '',
-                'width'   => $largest['width'] ?? 0,
-                'height'  => $largest['height'] ?? 0,
+                'file_id' => $largest['file_id'],
+                'width' => $largest['width'] ?? 0,
+                'height' => $largest['height'] ?? 0,
             ];
         }
 
-        // Documents with an image mime type
+        // Extract document/file if it's an image
         if (!empty($message['document'])) {
-            $doc  = $message['document'];
+            $doc = $message['document'];
             $mime = $doc['mime_type'] ?? '';
-            if (is_string($mime) && str_starts_with($mime, 'image/')) {
+            if (str_starts_with($mime, 'image/')) {
                 $session['images'][] = [
-                    'file_id'   => $doc['file_id'] ?? '',
+                    'file_id' => $doc['file_id'],
                     'file_name' => $doc['file_name'] ?? '',
                     'mime_type' => $mime,
                 ];
             }
         }
 
+        // Store raw messages for reference
         $session['messages'][] = $message;
-        $session['status']     = 'buffering';
+        $session['status'] = 'buffering';
 
         $this->saveSession($sessionKey, $session);
 
-        // Debounce window: short when mid-draft (approval/refine), long for fresh bursts.
-        $hasPendingDraft = app(AgentSessionStore::class)->readPendingDraft($chatId, $botToken);
-        $delaySeconds    = $hasPendingDraft
-            ? self::DEBOUNCE_DELAY_PENDING_DRAFT
-            : self::DEBOUNCE_DELAY_FRESH;
-
-        // Generate this message's batch id BEFORE dispatching so the job carries
-        // it through to handle() as an immutable identifier. Each subsequent
-        // bufferMessage() call overwrites the "latest" pointer in Redis —
-        // previously-dispatched jobs compare their own batchId against the
-        // current pointer and no-op if superseded.
-        $batchId = uniqid('batch_', true);
-
-        ProcessTelegramBatchJob::dispatch($sessionKey, $botToken, $chatId, $batchId)
-            ->delay(now()->addSeconds($delaySeconds));
-
-        // Store the latest batchId for this chat/bot so delayed jobs can detect supersession.
+        // Schedule (or reschedule) the batch processing job
         $jobKey = "telegram_batch_job:{$chatId}:{$botToken}";
+        $existingJobId = Redis::get($jobKey);
+
+        // Cancel existing delayed job by marking it stale
+        if ($existingJobId) {
+            Redis::set("telegram_batch_stale:{$existingJobId}", '1', 'EX', self::BUFFER_TTL);
+        }
+
+        // Dispatch new delayed job
+        $job = ProcessTelegramBatchJob::dispatch($sessionKey, $botToken, $chatId)
+            ->delay(now()->addSeconds(self::DEBOUNCE_DELAY));
+
+        // Store job ID so we can cancel it on next message
+        // Use a unique ID since Laravel doesn't expose job IDs easily
+        $batchId = uniqid('batch_', true);
         Redis::set($jobKey, $batchId, 'EX', self::BUFFER_TTL);
+        Redis::set("telegram_batch_id:{$sessionKey}", $batchId, 'EX', self::BUFFER_TTL);
 
         Log::info('Telegram message buffered', [
-            'chatId'          => $chatId,
-            'textCount'       => count($session['texts']),
-            'imageCount'      => count($session['images']),
-            'batchId'         => $batchId,
-            'debounceSeconds' => $delaySeconds,
-            'pendingDraft'    => $hasPendingDraft,
+            'chatId' => $chatId,
+            'textCount' => count($session['texts']),
+            'imageCount' => count($session['images']),
+            'batchId' => $batchId,
         ]);
     }
 
+    /**
+     * Handle user's confirmation or rejection of the intake summary.
+     */
+    private function handleConfirmation(string $botToken, string $chatId, string $text, array $session, string $sessionKey): void
+    {
+        $normalizedText = mb_strtolower(trim($text));
+
+        // Simple confirmation detection (LLM can be added later for nuance)
+        $confirmWords = ['ok', 'yes', 'confirmed', 'confirm', 'go', 'proceed', 'oke', 'oki',
+            'đồng ý', 'được', 'ok đi', 'chạy đi', 'làm đi', 'tiếp', 'xác nhận', 'ừ', 'ừm', 'đúng rồi', 'chốt'];
+        $rejectWords = ['no', 'cancel', 'stop', 'không', 'hủy', 'thôi', 'dừng', 'bỏ'];
+
+        $isConfirm = false;
+        $isReject = false;
+
+        foreach ($confirmWords as $word) {
+            if (str_contains($normalizedText, $word)) {
+                $isConfirm = true;
+                break;
+            }
+        }
+
+        if (!$isConfirm) {
+            foreach ($rejectWords as $word) {
+                if (str_contains($normalizedText, $word)) {
+                    $isReject = true;
+                    break;
+                }
+            }
+        }
+
+        if ($isReject) {
+            $this->deleteSession($sessionKey);
+            $this->sendTelegram($botToken, $chatId, "❌ Đã hủy. Gửi lại khi bạn sẵn sàng.");
+            return;
+        }
+
+        if ($isConfirm) {
+            // Trigger the workflow
+            $runId = $this->triggerWorkflow($botToken, $chatId, $session);
+            $this->deleteSession($sessionKey);
+            if ($runId) {
+                $this->sendTelegram($botToken, $chatId, "🚀 Đang xử lý workflow...\n\n🆔 Run ID: `{$runId}`");
+            } else {
+                $this->sendTelegram($botToken, $chatId, "❌ Không tìm thấy workflow phù hợp.");
+            }
+            return;
+        }
+
+        // Not clear — treat as additional info, re-buffer
+        $session['texts'][] = $text;
+        $session['status'] = 'awaiting_confirmation';
+        $this->saveSession($sessionKey, $session);
+
+        $this->sendTelegram($botToken, $chatId, "Mình chưa hiểu. Reply *ok* để xác nhận hoặc *hủy* để bỏ.");
+    }
+
+    /**
+     * Trigger the actual workflow with the collected session data.
+     */
+    public function triggerWorkflow(string $botToken, string $chatId, array $session): ?string
+    {
+        $workflow = $this->findWorkflowByBotToken($botToken);
+
+        if ($workflow === null) {
+            Log::warning('No workflow found for bot token during trigger', [
+                'botToken' => mb_substr($botToken, 0, 8) . '***',
+            ]);
+            return null;
+        }
+
+        // Download images from Telegram to get URLs
+        $imageUrls = [];
+        foreach ($session['images'] ?? [] as $img) {
+            $fileId = $img['file_id'] ?? '';
+            if ($fileId) {
+                $url = $this->getTelegramFileUrl($botToken, $fileId);
+                if ($url) {
+                    $imageUrls[] = $url;
+                }
+            }
+        }
+
+        // Also extract URLs from text
+        $allText = implode("\n", $session['texts'] ?? []);
+        if (preg_match_all('/https?:\/\/[^\s<>"]+\.(?:jpg|jpeg|png|webp|gif)/i', $allText, $urlMatches)) {
+            $imageUrls = array_merge($imageUrls, $urlMatches[0]);
+        }
+
+        // Build combined trigger payload
+        $combinedPayload = [
+            'message' => [
+                'chat' => ['id' => (int) $chatId, 'type' => $session['messages'][0]['chat']['type'] ?? 'group'],
+                'from' => $session['messages'][0]['from'] ?? [],
+                'date' => time(),
+                'text' => $allText,
+                'message_id' => $session['messages'][0]['message_id'] ?? 0,
+            ],
+            '_intake' => [
+                'textParts' => $session['texts'] ?? [],
+                'imageUrls' => array_values(array_unique($imageUrls)),
+                'imageCount' => count($imageUrls),
+                'messageCount' => count($session['messages'] ?? []),
+                'combinedText' => $allText,
+                'startedAt' => $session['startedAt'] ?? now()->toIso8601String(),
+                'confirmedAt' => now()->toIso8601String(),
+            ],
+            'update_id' => 0,
+        ];
+
+        $document = $workflow->document;
+        $document = $this->injectTriggerPayload($document, $combinedPayload, $botToken);
+
+        $documentHash = hash('sha256', json_encode($document, JSON_THROW_ON_ERROR));
+
+        $nodeConfigHashes = [];
+        foreach ($document['nodes'] ?? [] as $node) {
+            $config = $node['data']['config'] ?? $node['config'] ?? [];
+            $nodeConfigHashes[$node['id']] = hash('sha256', json_encode($config, JSON_THROW_ON_ERROR));
+        }
+
+        $run = ExecutionRun::create([
+            'workflow_id' => $workflow->id,
+            'trigger' => 'telegramWebhook',
+            'target_node_id' => null,
+            'status' => 'pending',
+            'document_snapshot' => $document,
+            'document_hash' => $documentHash,
+            'node_config_hashes' => $nodeConfigHashes,
+        ]);
+
+        RunWorkflowJob::dispatch($run->id);
+
+        Log::info('Workflow triggered from Telegram intake', [
+            'runId' => $run->id,
+            'chatId' => $chatId,
+            'textParts' => count($session['texts'] ?? []),
+            'images' => count($imageUrls),
+        ]);
+
+        return $run->id;
+    }
+
+    /**
+     * Get a downloadable URL for a Telegram file.
+     */
+    private function getTelegramFileUrl(string $botToken, string $fileId): ?string
+    {
+        try {
+            $response = \Illuminate\Support\Facades\Http::get(
+                "https://api.telegram.org/bot{$botToken}/getFile",
+                ['file_id' => $fileId]
+            );
+
+            $filePath = $response->json('result.file_path');
+            if ($filePath) {
+                return "https://api.telegram.org/file/bot{$botToken}/{$filePath}";
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to get Telegram file URL', ['fileId' => $fileId, 'error' => $e->getMessage()]);
+        }
+
+        return null;
+    }
+
+    /**
+     * Send a text message via Telegram Bot API.
+     */
+    private function sendTelegram(string $botToken, string $chatId, string $text): void
+    {
+        try {
+            \Illuminate\Support\Facades\Http::post(
+                "https://api.telegram.org/bot{$botToken}/sendMessage",
+                [
+                    'chat_id' => $chatId,
+                    'text' => mb_substr($text, 0, 4096),
+                    'parse_mode' => 'Markdown',
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Failed to send Telegram message', ['chatId' => $chatId, 'error' => $e->getMessage()]);
+        }
+    }
+
+    // ─── Session management (Redis) ───────────────────────────
+
     private function getSession(string $key): ?array
     {
-        $raw = Redis::get($key);
-
-        return $raw ? json_decode($raw, true) : null;
+        $data = Redis::get($key);
+        return $data ? json_decode($data, true) : null;
     }
 
     private function saveSession(string $key, array $session): void
@@ -223,9 +351,140 @@ class TelegramWebhookController extends Controller
         Redis::set($key, json_encode($session, JSON_THROW_ON_ERROR), 'EX', self::BUFFER_TTL);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Priority 0 — callback query
-    // ─────────────────────────────────────────────────────────────────────────
+    private function deleteSession(string $key): void
+    {
+        Redis::del($key);
+    }
+
+    // ─── Existing methods (preserved) ─────────────────────────
+
+    private function parseUpdate(Request $request): array
+    {
+        $update = $request->all();
+
+        if (empty($update)) {
+            $rawBody = $request->getContent();
+            if ($rawBody) {
+                $update = json_decode($rawBody, true) ?? [];
+            }
+        }
+
+        if (empty($update)) {
+            $phpInput = file_get_contents('php://input');
+            if ($phpInput) {
+                $update = json_decode($phpInput, true) ?? [];
+            }
+        }
+
+        if (empty($update)) {
+            $jsonData = $request->json()->all();
+            if (!empty($jsonData)) {
+                $update = $jsonData;
+            }
+        }
+
+        return $update;
+    }
+
+    private function findWorkflowByBotToken(string $botToken): ?Workflow
+    {
+        $workflows = Workflow::all();
+
+        foreach ($workflows as $workflow) {
+            $document = $workflow->document;
+            $nodes = $document['nodes'] ?? [];
+
+            foreach ($nodes as $node) {
+                $config = $node['data']['config'] ?? $node['config'] ?? [];
+                if (($node['type'] ?? '') === 'telegramTrigger'
+                    && ($config['botToken'] ?? '') === $botToken) {
+                    return $workflow;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function tryResumeGate(string $botToken, string $chatId, string $text, array $update): bool
+    {
+        if (empty($chatId)) {
+            return false;
+        }
+
+        $runs = ExecutionRun::where('status', 'awaitingReview')->get();
+
+        foreach ($runs as $run) {
+            $document = $run->document_snapshot ?? [];
+            $nodes = $document['nodes'] ?? [];
+
+            foreach ($nodes as $node) {
+                if (($node['type'] ?? '') !== 'humanGate') {
+                    continue;
+                }
+
+                $config = $node['data']['config'] ?? $node['config'] ?? [];
+                $gateChannel = $config['channel'] ?? 'ui';
+                $gateChatId = $config['chatId'] ?? '';
+
+                if (!in_array($gateChannel, ['telegram', 'any'])) {
+                    continue;
+                }
+                if ($gateChatId !== $chatId) {
+                    continue;
+                }
+
+                $record = NodeRunRecord::where('run_id', $run->id)
+                    ->where('node_id', $node['id'])
+                    ->where('status', 'awaitingReview')
+                    ->first();
+
+                if ($record === null) {
+                    continue;
+                }
+
+                $updatedDoc = $document;
+                foreach ($updatedDoc['nodes'] as &$n) {
+                    if ($n['id'] === $node['id']) {
+                        if (isset($n['data']['config'])) {
+                            $n['data']['config']['_gateResponse'] = $text ?: json_encode($update);
+                        } else {
+                            $n['config']['_gateResponse'] = $text ?: json_encode($update);
+                        }
+                    }
+                }
+
+                $record->update([
+                    'status' => 'success',
+                    'output_payloads' => [
+                        'response' => [
+                            'value' => $text,
+                            'status' => 'success',
+                            'schemaType' => 'json',
+                        ],
+                    ],
+                    'completed_at' => now(),
+                ]);
+
+                $run->update([
+                    'status' => 'pending',
+                    'document_snapshot' => $updatedDoc,
+                ]);
+
+                RunWorkflowJob::dispatch($run->id);
+
+                Log::info('HumanGate resumed via Telegram', [
+                    'runId' => $run->id,
+                    'nodeId' => $node['id'],
+                    'chatId' => $chatId,
+                ]);
+
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /**
      * Handle Telegram inline keyboard callback.
@@ -236,19 +495,19 @@ class TelegramWebhookController extends Controller
      */
     private function handleCallbackQuery(string $botToken, array $callbackQuery): void
     {
-        $data         = $callbackQuery['data'] ?? '';
-        $callbackId   = $callbackQuery['id'] ?? '';
-        $chatId       = (string) ($callbackQuery['message']['chat']['id'] ?? '');
-        $messageId    = (string) ($callbackQuery['message']['message_id'] ?? '');
+        $data = $callbackQuery['data'] ?? '';
+        $callbackId = $callbackQuery['id'] ?? '';
+        $chatId = (string) ($callbackQuery['message']['chat']['id'] ?? '');
+        $messageId = (string) ($callbackQuery['message']['message_id'] ?? '');
         $originalText = $callbackQuery['message']['text'] ?? '';
 
         // Try new PendingInteraction-based routing first
         if (preg_match('/^g:([^:]+):([^:]+):(?:pick:(\d+)|(a|r))$/', $data, $matches)) {
-            $runId  = $matches[1];
+            $runId = $matches[1];
             $nodeId = $matches[2];
 
-            // New format: pick by index (matches[3] may be "0" which is falsy, use isset+!== '')
-            if (isset($matches[3]) && $matches[3] !== '') {
+            // New format: pick by index
+            if (!empty($matches[3])) {
                 $response = HumanResponse::pick((int) $matches[3]);
                 $this->dispatchResume($runId, $nodeId, $response);
                 $this->answerCallback($botToken, $callbackId, "\xE2\x9C\x85 Selection received");
@@ -257,7 +516,7 @@ class TelegramWebhookController extends Controller
             }
 
             // Legacy format: approve/reject
-            $action    = $matches[4] ?? '';
+            $action = $matches[4];
             $isApprove = $action === 'a';
 
             // Check if there's a PendingInteraction for this (new flow)
@@ -271,11 +530,10 @@ class TelegramWebhookController extends Controller
                     ? HumanResponse::pick(0)
                     : HumanResponse::promptBack('rejected');
                 $this->dispatchResume($runId, $nodeId, $response);
-                $emoji    = $isApprove ? "\xE2\x9C\x85" : "\xE2\x9D\x8C";
-                $label    = $isApprove ? 'Approved' : 'Rejected';
-                $suffix   = $isApprove ? "\xE2\x80\x94 workflow resuming..." : "\xE2\x80\x94 workflow stopped.";
+                $emoji = $isApprove ? "\xE2\x9C\x85" : "\xE2\x9D\x8C";
+                $label = $isApprove ? 'Approved' : 'Rejected';
                 $this->answerCallback($botToken, $callbackId, "{$emoji} {$label}");
-                $this->editMessageDecision($botToken, $chatId, $messageId, $originalText, "{$emoji} **{$label}** {$suffix}");
+                $this->editMessageDecision($botToken, $chatId, $messageId, $originalText, "{$emoji} **{$label}**");
                 return;
             }
 
@@ -332,11 +590,11 @@ class TelegramWebhookController extends Controller
             }
 
             $record->update([
-                'status'          => 'success',
+                'status' => 'success',
                 'output_payloads' => [
                     'response' => [
-                        'value'      => $responseText,
-                        'status'     => 'success',
+                        'value' => $responseText,
+                        'status' => 'success',
                         'schemaType' => 'json',
                     ],
                 ],
@@ -344,32 +602,32 @@ class TelegramWebhookController extends Controller
             ]);
 
             $run->update([
-                'status'            => 'pending',
+                'status' => 'pending',
                 'document_snapshot' => $document,
             ]);
 
             RunWorkflowJob::dispatch($run->id);
 
             Log::info('HumanGate approved via inline button (legacy)', [
-                'runId'  => $runId,
+                'runId' => $runId,
                 'nodeId' => $nodeId,
                 'chatId' => $chatId,
             ]);
         } else {
             $record->update([
-                'status'        => 'error',
+                'status' => 'error',
                 'error_message' => 'Rejected by user via Telegram',
-                'completed_at'  => now(),
+                'completed_at' => now(),
             ]);
 
             $run->update([
-                'status'             => 'error',
-                'completed_at'       => now(),
+                'status' => 'error',
+                'completed_at' => now(),
                 'termination_reason' => 'gate_rejected',
             ]);
 
             Log::info('HumanGate rejected via inline button (legacy)', [
-                'runId'  => $runId,
+                'runId' => $runId,
                 'nodeId' => $nodeId,
                 'chatId' => $chatId,
             ]);
@@ -389,9 +647,20 @@ class TelegramWebhookController extends Controller
         );
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Priority 1 / 1b / 1c — pending interaction resume
-    // ─────────────────────────────────────────────────────────────────────────
+    /**
+     * Answer a Telegram callback query (dismisses the loading spinner on the button).
+     */
+    private function answerCallback(string $botToken, string $callbackId, string $text = ''): void
+    {
+        try {
+            \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$botToken}/answerCallbackQuery", [
+                'callback_query_id' => $callbackId,
+                'text' => $text,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to answer callback query', ['error' => $e->getMessage()]);
+        }
+    }
 
     /**
      * Route a reply-to message to its PendingInteraction.
@@ -430,100 +699,13 @@ class TelegramWebhookController extends Controller
         }
 
         // Exactly 1 pending — route to it
-        $pending  = PendingInteraction::forChat($chatId)->waiting()->first();
+        $pending = PendingInteraction::forChat($chatId)->waiting()->first();
         $response = $this->parseTextResponse($text);
         $this->dispatchResume($pending->run_id, $pending->node_id, $response);
 
         $this->sendTelegram($botToken, $chatId, "\xE2\x9C\x85 Response received \xE2\x80\x94 processing...");
         return true;
     }
-
-    /**
-     * Priority 1c: Legacy — check if this is a text response to a suspended HumanGate.
-     */
-    private function tryResumeGate(string $botToken, string $chatId, string $text, array $update): bool
-    {
-        if (empty($chatId)) {
-            return false;
-        }
-
-        $runs = ExecutionRun::where('status', 'awaitingReview')->get();
-
-        foreach ($runs as $run) {
-            $document = $run->document_snapshot ?? [];
-            $nodes    = $document['nodes'] ?? [];
-
-            foreach ($nodes as $node) {
-                if (($node['type'] ?? '') !== 'humanGate') {
-                    continue;
-                }
-
-                $config      = $node['data']['config'] ?? $node['config'] ?? [];
-                $gateChannel = $config['channel'] ?? 'ui';
-                $gateChatId  = $config['chatId'] ?? '';
-
-                if (!in_array($gateChannel, ['telegram', 'any'])) {
-                    continue;
-                }
-                if ($gateChatId !== $chatId) {
-                    continue;
-                }
-
-                $record = NodeRunRecord::where('run_id', $run->id)
-                    ->where('node_id', $node['id'])
-                    ->where('status', 'awaitingReview')
-                    ->first();
-
-                if ($record === null) {
-                    continue;
-                }
-
-                $updatedDoc = $document;
-                foreach ($updatedDoc['nodes'] as &$n) {
-                    if ($n['id'] === $node['id']) {
-                        if (isset($n['data']['config'])) {
-                            $n['data']['config']['_gateResponse'] = $text ?: json_encode($update);
-                        } else {
-                            $n['config']['_gateResponse'] = $text ?: json_encode($update);
-                        }
-                    }
-                }
-
-                $record->update([
-                    'status'          => 'success',
-                    'output_payloads' => [
-                        'response' => [
-                            'value'      => $text,
-                            'status'     => 'success',
-                            'schemaType' => 'json',
-                        ],
-                    ],
-                    'completed_at' => now(),
-                ]);
-
-                $run->update([
-                    'status'            => 'pending',
-                    'document_snapshot' => $updatedDoc,
-                ]);
-
-                RunWorkflowJob::dispatch($run->id);
-
-                Log::info('HumanGate resumed via Telegram', [
-                    'runId'  => $run->id,
-                    'nodeId' => $node['id'],
-                    'chatId' => $chatId,
-                ]);
-
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
 
     /**
      * Parse free-text into a HumanResponse.
@@ -551,27 +733,7 @@ class TelegramWebhookController extends Controller
     }
 
     /**
-     * Answer a Telegram callback query (dismisses the loading spinner on the button).
-     */
-    private function answerCallback(string $botToken, string $callbackId, string $text = ''): void
-    {
-        try {
-            \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$botToken}/answerCallbackQuery", [
-                'callback_query_id' => $callbackId,
-                'text'              => $text,
-            ]);
-        } catch (\Throwable $e) {
-            Log::warning('Failed to answer callback query', ['error' => $e->getMessage()]);
-        }
-    }
-
-    /**
      * Edit a Telegram message to show the decision (remove buttons).
-     *
-     * The $decision string is appended as-is. Approve callers pass
-     * "✅ Approved — workflow resuming..."; reject callers pass
-     * "❌ Rejected — workflow stopped." — do NOT append additional text here
-     * or rejected callbacks render the contradictory "Rejected… workflow resuming".
      */
     private function editMessageDecision(string $botToken, string $chatId, string $messageId, string $originalText, string $decision): void
     {
@@ -579,13 +741,13 @@ class TelegramWebhookController extends Controller
             return;
         }
 
-        $updatedText = $originalText . "\n\n" . $decision;
+        $updatedText = $originalText . "\n\n" . $decision . " \xE2\x80\x94 workflow resuming...";
 
         try {
             \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$botToken}/editMessageText", [
-                'chat_id'    => $chatId,
+                'chat_id' => $chatId,
                 'message_id' => $messageId,
-                'text'       => mb_substr($updatedText, 0, 4096),
+                'text' => mb_substr($updatedText, 0, 4096),
                 'parse_mode' => 'Markdown',
             ]);
         } catch (\Throwable $e) {
@@ -593,54 +755,24 @@ class TelegramWebhookController extends Controller
         }
     }
 
-    /**
-     * Send a plain-text message via Telegram Bot API.
-     */
-    private function sendTelegram(string $botToken, string $chatId, string $text): void
+    private function injectTriggerPayload(array $document, array $update, string $botToken): array
     {
-        try {
-            \Illuminate\Support\Facades\Http::post(
-                "https://api.telegram.org/bot{$botToken}/sendMessage",
-                [
-                    'chat_id'    => $chatId,
-                    'text'       => mb_substr($text, 0, 4096),
-                    'parse_mode' => 'Markdown',
-                ]
-            );
-        } catch (\Throwable $e) {
-            Log::warning('Failed to send Telegram message', ['chatId' => $chatId, 'error' => $e->getMessage()]);
-        }
-    }
+        $nodes = $document['nodes'] ?? [];
 
-    /**
-     * Parse the Telegram update from the incoming request.
-     * Tries multiple sources for robustness.
-     */
-    private function parseUpdate(Request $request): array
-    {
-        $update = $request->all();
-
-        if (empty($update)) {
-            $rawBody = $request->getContent();
-            if ($rawBody) {
-                $update = json_decode($rawBody, true) ?? [];
+        foreach ($nodes as &$node) {
+            $config = $node['data']['config'] ?? $node['config'] ?? [];
+            if (($node['type'] ?? '') === 'telegramTrigger'
+                && ($config['botToken'] ?? '') === $botToken) {
+                if (isset($node['data']['config'])) {
+                    $node['data']['config']['_triggerPayload'] = $update;
+                } else {
+                    $node['config']['_triggerPayload'] = $update;
+                }
             }
         }
 
-        if (empty($update)) {
-            $phpInput = file_get_contents('php://input');
-            if ($phpInput) {
-                $update = json_decode($phpInput, true) ?? [];
-            }
-        }
+        $document['nodes'] = $nodes;
 
-        if (empty($update)) {
-            $jsonData = $request->json()->all();
-            if (!empty($jsonData)) {
-                $update = $jsonData;
-            }
-        }
-
-        return $update;
+        return $document;
     }
 }

@@ -10,9 +10,11 @@ use App\Domain\NodeCategory;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\Templates\PromptRefinerTemplate;
 use App\Domain\PortPayload;
+use App\Domain\Providers\Adapters\StubAdapter;
+use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
+use PHPUnit\Framework\TestCase;
 
 final class PromptRefinerTemplateTest extends TestCase
 {
@@ -20,7 +22,6 @@ final class PromptRefinerTemplateTest extends TestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->template = new PromptRefinerTemplate();
     }
 
@@ -51,6 +52,11 @@ final class PromptRefinerTemplateTest extends TestCase
     #[Test]
     public function execute_returns_prompt_list(): void
     {
+        $router = $this->createMock(ProviderRouter::class);
+        $router->method('resolve')
+            ->with(Capability::TextGeneration, $this->anything())
+            ->willReturn(new StubAdapter());
+
         $scenes = [
             ['id' => 'scene-1', 'description' => 'Opening shot'],
             ['id' => 'scene-2', 'description' => 'Main action'],
@@ -63,6 +69,7 @@ final class PromptRefinerTemplateTest extends TestCase
                 'scenes' => PortPayload::success($scenes, DataType::SceneList),
             ],
             runId: 'run-1',
+            providerRouter: $router,
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -215,6 +222,11 @@ final class PromptRefinerTemplateTest extends TestCase
     #[Test]
     public function execute_wan_mode_returns_prompt_list(): void
     {
+        $router = $this->createMock(ProviderRouter::class);
+        $router->method('resolve')
+            ->with(Capability::TextGeneration, $this->anything())
+            ->willReturn(new StubAdapter());
+
         $ctx = new NodeExecutionContext(
             nodeId: 'node-5',
             config: [
@@ -230,6 +242,7 @@ final class PromptRefinerTemplateTest extends TestCase
                 ),
             ],
             runId: 'run-2',
+            providerRouter: $router,
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -290,42 +303,5 @@ final class PromptRefinerTemplateTest extends TestCase
         $this->assertSame('cinematic, high quality, photorealistic', $defaults['imageStyle']);
         $this->assertSame('16:9', $defaults['aspectRatio']);
         $this->assertSame('standard', $defaults['detailLevel']);
-    }
-
-    #[Test]
-    public function planner_guide_exposes_expected_knob_names(): void
-    {
-        $guide = $this->template->plannerGuide();
-        $knobNames = array_map(fn ($k) => $k->name, $guide->knobs);
-
-        $this->assertContains('visual_polish', $knobNames);
-        $this->assertContains('mood_palette', $knobNames);
-        $this->assertContains('humor_density', $knobNames);
-        $this->assertContains('product_emphasis', $knobNames);
-        $this->assertContains('edit_pace', $knobNames);
-    }
-
-    #[Test]
-    public function planner_guide_knobs_have_vibe_mappings_for_all_four_modes(): void
-    {
-        $guide = $this->template->plannerGuide();
-        foreach ($guide->knobs as $knob) {
-            $this->assertArrayHasKey('funny_storytelling', $knob->vibeMapping, "{$knob->name} missing funny_storytelling");
-            $this->assertArrayHasKey('clean_education', $knob->vibeMapping, "{$knob->name} missing clean_education");
-            $this->assertArrayHasKey('aesthetic_mood', $knob->vibeMapping, "{$knob->name} missing aesthetic_mood");
-            $this->assertArrayHasKey('raw_authentic', $knob->vibeMapping, "{$knob->name} missing raw_authentic");
-        }
-    }
-
-    #[Test]
-    public function config_rules_include_new_planner_knobs(): void
-    {
-        $rules = $this->template->configRules();
-        $this->assertArrayHasKey('visual_polish', $rules);
-        $this->assertArrayHasKey('mood_palette', $rules);
-
-        $defaults = $this->template->defaultConfig();
-        $this->assertSame('natural_clean', $defaults['visual_polish']);
-        $this->assertSame('neutral', $defaults['mood_palette']);
     }
 }

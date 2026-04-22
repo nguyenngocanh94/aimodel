@@ -9,6 +9,7 @@ use App\Domain\NodeCategory;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\Templates\TelegramDeliverTemplate;
 use App\Domain\PortPayload;
+use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -100,6 +101,7 @@ final class TelegramDeliverTemplateTest extends TestCase
                 ),
             ],
             runId: 'run-td-1',
+            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -135,6 +137,7 @@ final class TelegramDeliverTemplateTest extends TestCase
                 'chatId' => PortPayload::success('99999', DataType::Text),
             ],
             runId: 'run-td-2',
+            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -160,6 +163,7 @@ final class TelegramDeliverTemplateTest extends TestCase
                 'content' => PortPayload::success(['data' => 'value'], DataType::Json),
             ],
             runId: 'run-td-3',
+            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -190,6 +194,7 @@ final class TelegramDeliverTemplateTest extends TestCase
                 'content' => PortPayload::success($longContent, DataType::Json),
             ],
             runId: 'run-td-4',
+            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -216,6 +221,7 @@ final class TelegramDeliverTemplateTest extends TestCase
                 'content' => PortPayload::success('Plain text content', DataType::Json),
             ],
             runId: 'run-td-5',
+            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 

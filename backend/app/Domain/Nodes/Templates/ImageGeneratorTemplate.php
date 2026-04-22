@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domain\Nodes\Templates;
 
+use App\Domain\Capability;
 use App\Domain\DataType;
 use App\Domain\NodeCategory;
-use App\Domain\Nodes\Concerns\InteractsWithImage;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
@@ -15,8 +15,6 @@ use App\Domain\Nodes\NodeTemplate;
 
 class ImageGeneratorTemplate extends NodeTemplate
 {
-    use InteractsWithImage;
-
     public string $type { get => 'imageGenerator'; }
     public string $version { get => '1.0.0'; }
     public string $title { get => 'Image Generator'; }
@@ -39,7 +37,8 @@ class ImageGeneratorTemplate extends NodeTemplate
 
     public function configRules(): array
     {
-        return $this->imageConfigRules() + [
+        return [
+            'provider' => ['sometimes', 'string'],
             'inputMode' => ['sometimes', 'string', 'in:prompt,scene'],
             'outputMode' => ['sometimes', 'string', 'in:single,multiple'],
         ];
@@ -47,7 +46,11 @@ class ImageGeneratorTemplate extends NodeTemplate
 
     public function defaultConfig(): array
     {
-        return $this->imageDefaultConfig() + ['inputMode' => 'prompt', 'outputMode' => 'single'];
+        return [
+            'provider' => 'stub',
+            'inputMode' => 'prompt',
+            'outputMode' => 'single',
+        ];
     }
 
     public function activePorts(array $config): PortSchema
@@ -73,6 +76,8 @@ class ImageGeneratorTemplate extends NodeTemplate
         $inputMode = $ctx->config['inputMode'] ?? 'prompt';
         $outputMode = $ctx->config['outputMode'] ?? 'single';
 
+        $provider = $ctx->provider(Capability::TextToImage);
+
         if ($outputMode === 'multiple') {
             $items = $inputMode === 'scene'
                 ? ($ctx->inputValue('scenes') ?? [])
@@ -81,7 +86,11 @@ class ImageGeneratorTemplate extends NodeTemplate
             $images = [];
             foreach ($items as $i => $item) {
                 $promptText = is_string($item) ? $item : ($item['prompt'] ?? $item['description'] ?? json_encode($item));
-                $binary = $this->callImageGeneration($ctx, (string) $promptText);
+                $binary = $provider->execute(
+                    Capability::TextToImage,
+                    ['prompt' => $promptText],
+                    $ctx->config,
+                );
 
                 $artifact = $ctx->storeArtifact(
                     "image-{$i}.png",
@@ -107,13 +116,15 @@ class ImageGeneratorTemplate extends NodeTemplate
         }
 
         // Single image mode
-        $rawPrompt = $inputMode === 'scene'
+        $promptText = $inputMode === 'scene'
             ? json_encode($ctx->inputValue('scenes') ?? [])
             : ($ctx->inputValue('prompt') ?? '');
 
-        $promptText = is_string($rawPrompt) ? $rawPrompt : (string) json_encode($rawPrompt);
-
-        $binary = $this->callImageGeneration($ctx, $promptText);
+        $binary = $provider->execute(
+            Capability::TextToImage,
+            ['prompt' => $promptText],
+            $ctx->config,
+        );
 
         $artifact = $ctx->storeArtifact('image.png', $binary, 'image/png');
 
