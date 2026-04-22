@@ -20,7 +20,7 @@ use Tests\TestCase;
  * This replaces the earlier weak unit test that only exercised readPendingDraft().
  * Here we verify end-to-end:
  *  1. A free-text webhook hit queues ProcessTelegramBatchJob with the correct delay.
- *  2. Fresh turn (no pending draft) → 30s delay.
+ *  2. Fresh turn (no pending draft) → 5s delay.
  *  3. Pending draft present → 5s delay.
  *  4. Running the queued job assembles the combined update and invokes the agent
  *     via TelegramAgentFactory, with the joined burst text.
@@ -81,7 +81,7 @@ final class TelegramWebhookBufferDispatchTest extends TestCase
     // ─────────────────────────────────────────────────────────────────────────
 
     #[Test]
-    public function free_text_without_pending_draft_queues_job_with_30s_delay(): void
+    public function free_text_without_pending_draft_queues_job_with_5s_delay(): void
     {
         Queue::fake();
 
@@ -92,9 +92,9 @@ final class TelegramWebhookBufferDispatchTest extends TestCase
             $delay = $job->delay;
             if ($delay instanceof \DateTimeInterface) {
                 $secondsFromNow = $delay->getTimestamp() - time();
-                return $secondsFromNow >= 28 && $secondsFromNow <= 32;
+                return $secondsFromNow >= 3 && $secondsFromNow <= 7;
             }
-            return $delay === 30;
+            return $delay === 5;
         });
     }
 
