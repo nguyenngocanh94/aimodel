@@ -29,6 +29,21 @@ Config knobs live in `backend/config/planner.php` (`agentic`, `persist_plans`, s
 
 ## Tech Stack
 
+### Runtime hooks (laravel/ai polish, 2026-04)
+
+`RunExecutor` streams token-level LLM output on the `run.{id}` channel via
+`node.token.delta` broadcast events — the `/api/runs/{run}/stream` SSE
+controller forwards them verbatim alongside existing `node.status` frames.
+Text-generation resolves through `config('ai.failover.text')` (ordered
+chain) with `RetryPrimary` middleware retrying the primary on 429/overloaded
+with exponential backoff before the vendor failover loop advances. Nodes
+can call `$ctx->recall()` / `$ctx->remember()` to persist cross-run
+key/value state via `App\Services\Memory\RunMemoryStore` (7-day TTL by
+convention; `memory:prune` artisan command runs nightly at 03:15). Frontend
+SSE consumers opt into streaming by supplying an `onNodeTokenDelta`
+callback to `connectToRunStream()` — see `frontend/src/shared/api/sse.ts`
+for the buffering recipe.
+
 - **React** + **Vite** + **TypeScript** (strict mode)
 - **@xyflow/react** (React Flow) for the canvas
 - **Tailwind CSS** + **shadcn/ui** for styling

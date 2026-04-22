@@ -13,6 +13,7 @@ use App\Domain\Nodes\Templates\StoryWriterTemplate;
 use App\Domain\Nodes\VibeImpact;
 use App\Domain\PortPayload;
 use App\Services\ArtifactStoreContract;
+use App\Services\Memory\RunMemoryStore;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -208,6 +209,101 @@ final class StoryWriterTemplateTest extends TestCase
         // Newly added shared planner hints.
         $this->assertContains('native_tone', $knobNames);
         $this->assertContains('trend_usage', $knobNames);
+    }
+
+    // ─── LP-I4: cross-run memory recall ────────────────────────────────────
+
+    #[Test]
+    public function execute_writes_story_arc_last_into_memory(): void
+    {
+        $store = $this->createMock(RunMemoryStore::class);
+        $store->expects($this->once())
+            ->method('put')
+            ->with(
+                'workflow:demo',
+                'storyArc:last',
+                $this->callback(fn ($v) => is_array($v)),
+                $this->callback(fn ($v) => is_array($v)),
+                $this->isInstanceOf(\DateTimeInterface::class),
+            );
+        // recall is called once before execute; test path: no previous.
+        $store->expects($this->once())
+            ->method('get')
+            ->with('workflow:demo', 'storyArc:last')
+            ->willReturn(null);
+
+        $ctx = new NodeExecutionContext(
+            nodeId: 'node-story-memory-1',
+            config: $this->template->defaultConfig(),
+            inputs: [],
+            runId: 'run-mem-1',
+            artifactStore: $this->createMock(ArtifactStoreContract::class),
+            memory: $store,
+            workflowSlug: 'demo',
+        );
+
+        $this->template->execute($ctx);
+    }
+
+    #[Test]
+    public function build_user_prompt_without_previous_story_omits_digest(): void
+    {
+        $reflection = new \ReflectionMethod($this->template, 'buildUserPrompt');
+        $prompt = $reflection->invoke(
+            $this->template,
+            null,
+            null,
+            null,
+            'Morning routine transformation',
+            $this->template->defaultConfig(),
+            null, // no previous story
+        );
+
+        $this->assertStringNotContainsString('Previous story for this workflow', $prompt);
+    }
+
+    #[Test]
+    public function build_user_prompt_with_previous_story_includes_digest(): void
+    {
+        $reflection = new \ReflectionMethod($this->template, 'buildUserPrompt');
+        $prompt = $reflection->invoke(
+            $this->template,
+            null,
+            null,
+            null,
+            'Morning routine transformation',
+            $this->template->defaultConfig(),
+            ['title' => 'Glow Up', 'theme' => 'self-love', 'hook' => 'POV you glow differently'],
+        );
+
+        $this->assertStringContainsString('Previous story for this workflow', $prompt);
+        $this->assertStringContainsString('Glow Up', $prompt);
+        $this->assertStringContainsString('self-love', $prompt);
+        $this->assertStringContainsString('POV you glow differently', $prompt);
+    }
+
+    #[Test]
+    public function recall_previous_story_config_knob_false_skips_recall(): void
+    {
+        $store = $this->createMock(RunMemoryStore::class);
+        // When recallPreviousStory is false, get() MUST NOT be called, but put() still is.
+        $store->expects($this->never())->method('get');
+        $store->expects($this->once())->method('put');
+
+        $config = $this->template->defaultConfig();
+        $config['recallPreviousStory'] = false;
+
+        $ctx = new NodeExecutionContext(
+            nodeId: 'node-story-mem-opt-out',
+            config: $config,
+            inputs: [],
+            runId: 'run-mem-2',
+            artifactStore: $this->createMock(ArtifactStoreContract::class),
+            memory: $store,
+            workflowSlug: 'demo',
+        );
+
+        $this->template->execute($ctx);
     }
 
     #[Test]
