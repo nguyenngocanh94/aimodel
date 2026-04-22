@@ -87,14 +87,19 @@ describe('Node Registry Module - AiModel-9wx.15', () => {
 
     it('should return templates with correct structure', () => {
       const templates = getAllTemplates();
+      // NM3 pilot templates (storyWriter, humanGate, userPrompt) omit configSchema
+      // intentionally — backend manifest is the source of truth for those.
+      const pilotTypes = new Set(['storyWriter', 'humanGate', 'userPrompt']);
       templates.forEach((template) => {
         expect(template.type).toBeDefined();
         expect(template.title).toBeDefined();
         expect(template.category).toBeDefined();
         expect(template.inputs).toBeDefined();
         expect(template.outputs).toBeDefined();
-        expect(template.configSchema).toBeDefined();
         expect(template.buildPreview).toBeDefined();
+        if (!pilotTypes.has(template.type)) {
+          expect(template.configSchema).toBeDefined();
+        }
       });
     });
   });

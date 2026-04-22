@@ -4,17 +4,21 @@ declare(strict_types=1);
 
 namespace App\Domain\Nodes\Templates;
 
-use App\Domain\Capability;
 use App\Domain\DataType;
 use App\Domain\NodeCategory;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
+use App\Domain\Nodes\Concerns\InteractsWithLlm;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\NodeTemplate;
+use Closure;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 class TtsVoiceoverPlannerTemplate extends NodeTemplate
 {
+    use InteractsWithLlm;
+
     public string $type { get => 'ttsVoiceoverPlanner'; }
     public string $version { get => '1.0.0'; }
     public string $title { get => 'TTS Voiceover Planner'; }
@@ -35,30 +39,37 @@ class TtsVoiceoverPlannerTemplate extends NodeTemplate
 
     public function configRules(): array
     {
-        return [
-            'provider' => ['sometimes', 'string'],
-        ];
+        return $this->llmConfigRules();
     }
 
     public function defaultConfig(): array
     {
-        return [
-            'provider' => 'stub',
-        ];
+        return ['llm' => ['provider' => 'stub', 'model' => '']];
     }
 
     public function execute(NodeExecutionContext $ctx): array
     {
         $scenes = $ctx->inputValue('scenes');
-        $config = $ctx->config;
 
-        $result = $ctx->provider(Capability::TextGeneration)->execute(
-            Capability::TextGeneration,
-            ['scenes' => $scenes],
-            $config,
+        $result = $this->callStructuredText(
+            $ctx,
+            'You plan a voice-over timeline for a list of scenes. Populate "segments" as an array of {sceneId, text, voice, durationSec} entries.',
+            'Scenes: ' . json_encode($scenes, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            static fn (JsonSchema $s) => [
+                'segments' => $s->array()->items($s->object([
+                    'sceneId'     => $s->string(),
+                    'text'        => $s->string(),
+                    'voice'       => $s->string(),
+                    'durationSec' => $s->number(),
+                ])),
+            ],
+            fn () => ['segments' => [
+                ['sceneId' => 'scene-1', 'text' => 'Opening line.', 'voice' => 'narrator', 'durationSec' => 3.0],
+                ['sceneId' => 'scene-2', 'text' => 'Closing line.', 'voice' => 'narrator', 'durationSec' => 2.0],
+            ]],
         );
 
-        $audioPlan = is_array($result) ? $result : ['segments' => []];
+        $audioPlan = !empty($result) ? $result : ['segments' => []];
 
         return [
             'audioPlan' => PortPayload::success(

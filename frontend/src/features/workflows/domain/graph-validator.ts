@@ -349,20 +349,23 @@ function validateNodeLevel(ctx: ValidationContext): ValidationIssue[] {
       continue;
     }
 
-    // 16.2.1 - Config must satisfy node's Zod schema
-    const configResult = template.configSchema.safeParse(node.config);
-    if (!configResult.success) {
-      const errorMessages = configResult.error.errors.map((e) => e.message).join(', ');
-      issues.push(
-        createIssue(
-          ctx,
-          'error',
-          'config',
-          'configInvalid',
-          `Invalid configuration for "${node.label}": ${errorMessages}`,
-          { nodeId: node.id, suggestion: 'Check the node configuration panel' },
-        ),
-      );
+    // 16.2.1 - Config must satisfy node's Zod schema when available
+    // Pilot templates (NM3+) rely on backend validation; configSchema may be absent.
+    if (template.configSchema) {
+      const configResult = template.configSchema.safeParse(node.config);
+      if (!configResult.success) {
+        const errorMessages = configResult.error.errors.map((e) => e.message).join(', ');
+        issues.push(
+          createIssue(
+            ctx,
+            'error',
+            'config',
+            'configInvalid',
+            `Invalid configuration for "${node.label}": ${errorMessages}`,
+            { nodeId: node.id, suggestion: 'Check the node configuration panel' },
+          ),
+        );
+      }
     }
 
     // 16.2.2 - Required inputs must be connected

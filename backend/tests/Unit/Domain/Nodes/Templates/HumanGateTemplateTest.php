@@ -12,7 +12,6 @@ use App\Domain\Nodes\HumanResponse;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\Templates\HumanGateTemplate;
 use App\Domain\PortPayload;
-use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -79,7 +78,6 @@ final class HumanGateTemplateTest extends TestCase
                 'data' => PortPayload::success(['question' => 'Pick one'], DataType::Json),
             ],
             runId: 'run-1',
-            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -108,7 +106,6 @@ final class HumanGateTemplateTest extends TestCase
                 'data' => PortPayload::success(['question' => 'Pick one'], DataType::Json),
             ],
             runId: 'run-1',
-            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -165,7 +162,6 @@ final class HumanGateTemplateTest extends TestCase
                 'data' => PortPayload::success(['item' => 'the script'], DataType::Json),
             ],
             runId: 'run-1',
-            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -188,7 +184,6 @@ final class HumanGateTemplateTest extends TestCase
                 'data' => PortPayload::success(['question' => 'Pick one'], DataType::Json),
             ],
             runId: 'run-1',
-            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -206,7 +201,6 @@ final class HumanGateTemplateTest extends TestCase
             config: $this->template->defaultConfig(),
             inputs: [],
             runId: 'run-1',
-            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -225,7 +219,6 @@ final class HumanGateTemplateTest extends TestCase
                 'data' => PortPayload::success(['question' => 'Pick one'], DataType::Json),
             ],
             runId: 'run-1',
-            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -248,7 +241,6 @@ final class HumanGateTemplateTest extends TestCase
                 'data' => PortPayload::success(['draft' => 'text'], DataType::Json),
             ],
             runId: 'run-1',
-            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -270,7 +262,6 @@ final class HumanGateTemplateTest extends TestCase
                 'data' => PortPayload::success(['draft' => 'text'], DataType::Json),
             ],
             runId: 'run-1',
-            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 

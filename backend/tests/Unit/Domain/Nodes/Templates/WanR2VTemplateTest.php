@@ -4,15 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domain\Nodes\Templates;
 
-use App\Domain\Capability;
 use App\Domain\DataType;
 use App\Domain\NodeCategory;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\Templates\WanR2VTemplate;
 use App\Domain\PortPayload;
-use App\Domain\Providers\Adapters\StubAdapter;
-use App\Domain\Providers\ProviderRouter;
-use App\Models\Artifact;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -61,11 +57,6 @@ final class WanR2VTemplateTest extends TestCase
     #[Test]
     public function execute_with_stub_returns_video_asset(): void
     {
-        $router = $this->createMock(ProviderRouter::class);
-        $router->method('resolve')
-            ->with(Capability::ReferenceToVideo, $this->anything())
-            ->willReturn(new StubAdapter());
-
         $store = $this->createMock(ArtifactStoreContract::class);
 
         $ctx = new NodeExecutionContext(
@@ -82,7 +73,6 @@ final class WanR2VTemplateTest extends TestCase
                 ),
             ],
             runId: 'run-r2v-1',
-            providerRouter: $router,
             artifactStore: $store,
         );
 

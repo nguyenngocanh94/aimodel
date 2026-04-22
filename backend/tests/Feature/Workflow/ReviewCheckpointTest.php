@@ -17,7 +17,6 @@ use App\Domain\Nodes\Templates\ReviewCheckpointTemplate;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
-use App\Domain\Providers\ProviderRouter;
 use App\Models\ExecutionRun;
 use App\Models\NodeRunRecord;
 use App\Models\Workflow;
@@ -74,8 +73,9 @@ final class ReviewCheckpointTest extends TestCase
             new InputResolver(new RunCache()),
             $this->registry,
             new RunCache(),
-            new ProviderRouter(),
             new LocalArtifactStore(),
+            app(\App\Domain\Execution\ProposalSender::class),
+            new \App\Services\Memory\DatabaseRunMemoryStore(),
         );
 
         $this->workflow = Workflow::create([

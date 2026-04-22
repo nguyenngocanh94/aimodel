@@ -9,7 +9,6 @@ use App\Domain\NodeCategory;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\Templates\TelegramTriggerTemplate;
 use App\Domain\PortPayload;
-use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -82,7 +81,6 @@ final class TelegramTriggerTemplateTest extends TestCase
             config: $this->template->defaultConfig(),
             inputs: [],
             runId: 'run-1',
-            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -121,7 +119,6 @@ final class TelegramTriggerTemplateTest extends TestCase
             config: $config,
             inputs: [],
             runId: 'run-2',
-            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -174,7 +171,6 @@ final class TelegramTriggerTemplateTest extends TestCase
             config: $config,
             inputs: [],
             runId: 'run-3',
-            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -216,7 +212,6 @@ final class TelegramTriggerTemplateTest extends TestCase
             config: $config,
             inputs: [],
             runId: 'run-4',
-            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 

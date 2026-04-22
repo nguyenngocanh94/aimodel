@@ -1,10 +1,25 @@
+/**
+ * humanGate Node Template Tests (NM3 trim: configSchema/defaultConfig assertions removed)
+ *
+ * Config validation is now backend-authoritative (NM1 + manifest).
+ * Tests cover registry shape, buildPreview, mockExecute, and fixtures.
+ */
+
 import { describe, it, expect } from 'vitest';
 import {
   humanGateTemplate,
-  HumanGateConfigSchema,
   type HumanGateConfig,
 } from './human-gate';
 import type { PortPayload } from '@/features/workflows/domain/workflow-types';
+
+// Minimal valid config (replaces removed defaultConfig)
+const baseConfig: HumanGateConfig = {
+  messageTemplate: '',
+  channel: 'ui',
+  timeoutSeconds: 0,
+  autoFallbackResponse: null,
+  options: null,
+};
 
 describe('humanGate Node Template', () => {
   const sampleData: PortPayload = {
@@ -36,57 +51,17 @@ describe('humanGate Node Template', () => {
     expect(humanGateTemplate.outputs[0].dataType).toBe('json');
   });
 
-  it('should have expected default config', () => {
-    const cfg = humanGateTemplate.defaultConfig;
-    expect(cfg.messageTemplate).toBe('');
-    expect(cfg.channel).toBe('ui');
-    expect(cfg.timeoutSeconds).toBe(0);
-    expect(cfg.autoFallbackResponse).toBeNull();
-    expect(cfg.options).toBeNull();
-  });
-
-  it('should validate config with schema', () => {
-    const cfg: HumanGateConfig = HumanGateConfigSchema.parse({
-      messageTemplate: 'Choose: {{question}}',
-      channel: 'telegram',
-      timeoutSeconds: 3600,
-      autoFallbackResponse: '{"choice":"A"}',
-      options: ['A', 'B'],
-    });
-    expect(cfg.channel).toBe('telegram');
-    expect(cfg.timeoutSeconds).toBe(3600);
-    expect(cfg.options).toEqual(['A', 'B']);
-  });
-
-  it('should reject invalid channel in config', () => {
-    expect(() =>
-      HumanGateConfigSchema.parse({
-        ...humanGateTemplate.defaultConfig,
-        channel: 'invalid',
-      }),
-    ).toThrow();
-  });
-
-  it('should reject timeoutSeconds out of range', () => {
-    expect(() =>
-      HumanGateConfigSchema.parse({
-        ...humanGateTemplate.defaultConfig,
-        timeoutSeconds: -1,
-      }),
-    ).toThrow();
-
-    expect(() =>
-      HumanGateConfigSchema.parse({
-        ...humanGateTemplate.defaultConfig,
-        timeoutSeconds: 100000,
-      }),
-    ).toThrow();
+  it('should have no configSchema (NM3 pilot stripped, manifest-driven)', () => {
+    // configSchema is intentionally absent — backend manifest is the source of truth
+    expect(humanGateTemplate.configSchema).toBeUndefined();
+    // defaultConfig is an empty sentinel ({}); real defaults come from manifest
+    expect(Object.keys(humanGateTemplate.defaultConfig as object).length).toBe(0);
   });
 
   describe('buildPreview', () => {
     it('should return idle response when no input data', () => {
       const out = humanGateTemplate.buildPreview({
-        config: humanGateTemplate.defaultConfig,
+        config: baseConfig,
         inputs: {},
       });
       expect(out.response.status).toBe('idle');
@@ -96,7 +71,7 @@ describe('humanGate Node Template', () => {
     it('should return idle with gate paused message when data provided', () => {
       const out = humanGateTemplate.buildPreview({
         config: {
-          ...humanGateTemplate.defaultConfig,
+          ...baseConfig,
           messageTemplate: 'Review: {{question}}',
         },
         inputs: { data: sampleData },
@@ -109,7 +84,7 @@ describe('humanGate Node Template', () => {
     it('should show channel in preview when no message template', () => {
       const out = humanGateTemplate.buildPreview({
         config: {
-          ...humanGateTemplate.defaultConfig,
+          ...baseConfig,
           channel: 'telegram',
         },
         inputs: { data: sampleData },
@@ -122,7 +97,7 @@ describe('humanGate Node Template', () => {
     it('should return success response with mock data', async () => {
       const out = await humanGateTemplate.mockExecute!({
         nodeId: 'n1',
-        config: humanGateTemplate.defaultConfig,
+        config: baseConfig,
         inputs: { data: sampleData },
         signal: new AbortController().signal,
         runId: 'run-a',
@@ -138,7 +113,7 @@ describe('humanGate Node Template', () => {
       const out = await humanGateTemplate.mockExecute!({
         nodeId: 'n1',
         config: {
-          ...humanGateTemplate.defaultConfig,
+          ...baseConfig,
           options: ['X', 'Y', 'Z'],
         },
         inputs: { data: sampleData },
@@ -154,7 +129,7 @@ describe('humanGate Node Template', () => {
       const out = await humanGateTemplate.mockExecute!({
         nodeId: 'n1',
         config: {
-          ...humanGateTemplate.defaultConfig,
+          ...baseConfig,
           autoFallbackResponse: '{"selected":"B"}',
         },
         inputs: { data: sampleData },
@@ -169,7 +144,7 @@ describe('humanGate Node Template', () => {
     it('should error when required data input missing', async () => {
       const out = await humanGateTemplate.mockExecute!({
         nodeId: 'n1',
-        config: humanGateTemplate.defaultConfig,
+        config: baseConfig,
         inputs: {},
         signal: new AbortController().signal,
         runId: 'run-a',
@@ -182,7 +157,7 @@ describe('humanGate Node Template', () => {
       const controller = new AbortController();
       const promise = humanGateTemplate.mockExecute!({
         nodeId: 'n1',
-        config: humanGateTemplate.defaultConfig,
+        config: baseConfig,
         inputs: { data: sampleData },
         signal: controller.signal,
         runId: 'run-a',
@@ -199,8 +174,7 @@ describe('humanGate Node Template', () => {
 
     it('fixtures should produce valid preview outputs', () => {
       humanGateTemplate.fixtures.forEach((f) => {
-        const merged = { ...humanGateTemplate.defaultConfig, ...f.config };
-        expect(() => HumanGateConfigSchema.parse(merged)).not.toThrow();
+        const merged = { ...baseConfig, ...f.config };
         const result = humanGateTemplate.buildPreview({
           config: merged,
           inputs: f.previewInputs || {},

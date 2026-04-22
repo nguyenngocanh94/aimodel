@@ -9,7 +9,6 @@ use App\Domain\NodeCategory;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\Templates\UserPromptTemplate;
 use App\Domain\PortPayload;
-use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -51,7 +50,6 @@ final class UserPromptTemplateTest extends TestCase
             config: ['prompt' => 'Create a video about cats'],
             inputs: [],
             runId: 'run-1',
-            providerRouter: $this->createMock(ProviderRouter::class),
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
