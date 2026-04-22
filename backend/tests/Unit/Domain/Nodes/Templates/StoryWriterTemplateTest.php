@@ -12,11 +12,10 @@ use App\Domain\Nodes\NodeGuide;
 use App\Domain\Nodes\Templates\StoryWriterTemplate;
 use App\Domain\Nodes\VibeImpact;
 use App\Domain\PortPayload;
-use App\Domain\Providers\Adapters\StubAdapter;
-use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
+use App\Services\Memory\RunMemoryStore;
 use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 final class StoryWriterTemplateTest extends TestCase
 {
@@ -24,6 +23,7 @@ final class StoryWriterTemplateTest extends TestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
         $this->template = new StoryWriterTemplate();
     }
 
@@ -79,11 +79,6 @@ final class StoryWriterTemplateTest extends TestCase
     #[Test]
     public function execute_with_stub_returns_json_story_arc(): void
     {
-        $router = $this->createMock(ProviderRouter::class);
-        $router->method('resolve')
-            ->with(Capability::TextGeneration, $this->anything())
-            ->willReturn(new StubAdapter());
-
         $ctx = new NodeExecutionContext(
             nodeId: 'node-story-1',
             config: $this->template->defaultConfig(),
@@ -102,7 +97,6 @@ final class StoryWriterTemplateTest extends TestCase
                 ),
             ],
             runId: 'run-story-1',
-            providerRouter: $router,
             artifactStore: $this->createMock(ArtifactStoreContract::class),
         );
 
@@ -199,5 +193,140 @@ final class StoryWriterTemplateTest extends TestCase
 
         $this->assertStringContainsString('funny_storytelling', $guide->whenToInclude);
         $this->assertStringContainsString('raw_authentic', $guide->whenToInclude);
+    }
+
+    #[Test]
+    public function planner_guide_exposes_expected_knob_names(): void
+    {
+        $guide = $this->template->plannerGuide();
+        $knobNames = array_map(fn ($k) => $k->name, $guide->knobs);
+
+        // Existing knobs.
+        $this->assertContains('story_tension_curve', $knobNames);
+        $this->assertContains('product_appearance_moment', $knobNames);
+        $this->assertContains('humor_density', $knobNames);
+        $this->assertContains('ending_type_preference', $knobNames);
+        // Newly added shared planner hints.
+        $this->assertContains('native_tone', $knobNames);
+        $this->assertContains('trend_usage', $knobNames);
+    }
+
+    // ─── LP-I4: cross-run memory recall ────────────────────────────────────
+
+    #[Test]
+    public function execute_writes_story_arc_last_into_memory(): void
+    {
+        $store = $this->createMock(RunMemoryStore::class);
+        $store->expects($this->once())
+            ->method('put')
+            ->with(
+                'workflow:demo',
+                'storyArc:last',
+                $this->callback(fn ($v) => is_array($v)),
+                $this->callback(fn ($v) => is_array($v)),
+                $this->isInstanceOf(\DateTimeInterface::class),
+            );
+        // recall is called once before execute; test path: no previous.
+        $store->expects($this->once())
+            ->method('get')
+            ->with('workflow:demo', 'storyArc:last')
+            ->willReturn(null);
+
+        $ctx = new NodeExecutionContext(
+            nodeId: 'node-story-memory-1',
+            config: $this->template->defaultConfig(),
+            inputs: [],
+            runId: 'run-mem-1',
+            artifactStore: $this->createMock(ArtifactStoreContract::class),
+            memory: $store,
+            workflowSlug: 'demo',
+        );
+
+        $this->template->execute($ctx);
+    }
+
+    #[Test]
+    public function build_user_prompt_without_previous_story_omits_digest(): void
+    {
+        $reflection = new \ReflectionMethod($this->template, 'buildUserPrompt');
+        $prompt = $reflection->invoke(
+            $this->template,
+            null,
+            null,
+            null,
+            'Morning routine transformation',
+            $this->template->defaultConfig(),
+            null, // no previous story
+        );
+
+        $this->assertStringNotContainsString('Previous story for this workflow', $prompt);
+    }
+
+    #[Test]
+    public function build_user_prompt_with_previous_story_includes_digest(): void
+    {
+        $reflection = new \ReflectionMethod($this->template, 'buildUserPrompt');
+        $prompt = $reflection->invoke(
+            $this->template,
+            null,
+            null,
+            null,
+            'Morning routine transformation',
+            $this->template->defaultConfig(),
+            ['title' => 'Glow Up', 'theme' => 'self-love', 'hook' => 'POV you glow differently'],
+        );
+
+        $this->assertStringContainsString('Previous story for this workflow', $prompt);
+        $this->assertStringContainsString('Glow Up', $prompt);
+        $this->assertStringContainsString('self-love', $prompt);
+        $this->assertStringContainsString('POV you glow differently', $prompt);
+    }
+
+    #[Test]
+    public function recall_previous_story_config_knob_false_skips_recall(): void
+    {
+        $store = $this->createMock(RunMemoryStore::class);
+        // When recallPreviousStory is false, get() MUST NOT be called, but put() still is.
+        $store->expects($this->never())->method('get');
+        $store->expects($this->once())->method('put');
+
+        $config = $this->template->defaultConfig();
+        $config['recallPreviousStory'] = false;
+
+        $ctx = new NodeExecutionContext(
+            nodeId: 'node-story-mem-opt-out',
+            config: $config,
+            inputs: [],
+            runId: 'run-mem-2',
+            artifactStore: $this->createMock(ArtifactStoreContract::class),
+            memory: $store,
+            workflowSlug: 'demo',
+        );
+
+        $this->template->execute($ctx);
+    }
+
+    #[Test]
+    public function planner_guide_knobs_have_vibe_mappings_for_all_four_modes(): void
+    {
+        $guide = $this->template->plannerGuide();
+        $expectVibeMapped = [
+            'story_tension_curve',
+            'product_appearance_moment',
+            'humor_density',
+            'ending_type_preference',
+            'native_tone',
+            'trend_usage',
+        ];
+
+        foreach ($guide->knobs as $knob) {
+            if (!in_array($knob->name, $expectVibeMapped, true)) {
+                continue;
+            }
+            $this->assertArrayHasKey('funny_storytelling', $knob->vibeMapping, "{$knob->name} missing funny_storytelling");
+            $this->assertArrayHasKey('clean_education', $knob->vibeMapping, "{$knob->name} missing clean_education");
+            $this->assertArrayHasKey('aesthetic_mood', $knob->vibeMapping, "{$knob->name} missing aesthetic_mood");
+            $this->assertArrayHasKey('raw_authentic', $knob->vibeMapping, "{$knob->name} missing raw_authentic");
+        }
     }
 }

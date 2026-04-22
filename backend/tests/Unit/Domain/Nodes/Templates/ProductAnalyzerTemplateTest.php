@@ -10,11 +10,9 @@ use App\Domain\NodeCategory;
 use App\Domain\Nodes\NodeExecutionContext;
 use App\Domain\Nodes\Templates\ProductAnalyzerTemplate;
 use App\Domain\PortPayload;
-use App\Domain\Providers\Adapters\StubAdapter;
-use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 final class ProductAnalyzerTemplateTest extends TestCase
 {
@@ -22,6 +20,7 @@ final class ProductAnalyzerTemplateTest extends TestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
         $this->template = new ProductAnalyzerTemplate();
     }
 
@@ -70,11 +69,6 @@ final class ProductAnalyzerTemplateTest extends TestCase
     #[Test]
     public function execute_with_stub_returns_json_analysis(): void
     {
-        $router = $this->createMock(ProviderRouter::class);
-        $router->method('resolve')
-            ->with(Capability::TextGeneration, $this->anything())
-            ->willReturn(new StubAdapter());
-
         $store = $this->createMock(ArtifactStoreContract::class);
 
         $ctx = new NodeExecutionContext(
@@ -90,7 +84,6 @@ final class ProductAnalyzerTemplateTest extends TestCase
                 ),
             ],
             runId: 'run-pa-1',
-            providerRouter: $router,
             artifactStore: $store,
         );
 
@@ -112,5 +105,37 @@ final class ProductAnalyzerTemplateTest extends TestCase
         $this->assertArrayHasKey('targetAudience', $analysis);
         $this->assertArrayHasKey('pricePositioning', $analysis);
         $this->assertArrayHasKey('suggestedMood', $analysis);
+    }
+
+    #[Test]
+    public function planner_guide_exposes_expected_knob_names(): void
+    {
+        $guide = $this->template->plannerGuide();
+        $knobNames = array_map(fn ($k) => $k->name, $guide->knobs);
+
+        $this->assertContains('analysis_angle', $knobNames);
+        $this->assertContains('product_emphasis', $knobNames);
+    }
+
+    #[Test]
+    public function planner_guide_knobs_have_vibe_mappings_for_all_four_modes(): void
+    {
+        $guide = $this->template->plannerGuide();
+        foreach ($guide->knobs as $knob) {
+            $this->assertArrayHasKey('funny_storytelling', $knob->vibeMapping, "{$knob->name} missing funny_storytelling");
+            $this->assertArrayHasKey('clean_education', $knob->vibeMapping, "{$knob->name} missing clean_education");
+            $this->assertArrayHasKey('aesthetic_mood', $knob->vibeMapping, "{$knob->name} missing aesthetic_mood");
+            $this->assertArrayHasKey('raw_authentic', $knob->vibeMapping, "{$knob->name} missing raw_authentic");
+        }
+    }
+
+    #[Test]
+    public function config_rules_include_new_planner_knobs(): void
+    {
+        $rules = $this->template->configRules();
+        $this->assertArrayHasKey('analysis_angle', $rules);
+
+        $defaults = $this->template->defaultConfig();
+        $this->assertSame('neutral', $defaults['analysis_angle']);
     }
 }

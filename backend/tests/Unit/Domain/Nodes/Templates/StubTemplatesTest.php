@@ -14,11 +14,9 @@ use App\Domain\Nodes\Templates\SubtitleFormatterTemplate;
 use App\Domain\Nodes\Templates\TtsVoiceoverPlannerTemplate;
 use App\Domain\Nodes\Templates\VideoComposerTemplate;
 use App\Domain\PortPayload;
-use App\Domain\Providers\Adapters\StubAdapter;
-use App\Domain\Providers\ProviderRouter;
 use App\Services\ArtifactStoreContract;
 use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 final class StubTemplatesTest extends TestCase
 {
@@ -351,18 +349,11 @@ final class StubTemplatesTest extends TestCase
      */
     private function makeContext(string $nodeId, array $config, array $inputs): NodeExecutionContext
     {
-        $stubAdapter = new StubAdapter();
-
-        $router = $this->createMock(ProviderRouter::class);
-        $router->method('resolve')
-            ->willReturn($stubAdapter);
-
         return new NodeExecutionContext(
             nodeId: $nodeId,
             config: $config,
             inputs: $inputs,
             runId: 'run-test',
-            providerRouter: $router,
             artifactStore: $this->createStub(ArtifactStoreContract::class),
         );
     }

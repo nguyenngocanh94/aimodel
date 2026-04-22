@@ -10,7 +10,6 @@
  * Works with Diverge node for multi-LLM compete pattern.
  */
 
-import { z } from 'zod';
 import type { NodeTemplate, NodeFixture, MockNodeExecutionArgs } from '../node-registry';
 import type { PortDefinition, PortPayload } from '@/features/workflows/domain/workflow-types';
 
@@ -55,46 +54,21 @@ export interface StoryArcPayload {
 }
 
 // ============================================================
-// Configuration Schema
+// Configuration Type
+// Backend manifest is the authoritative source for config schema and defaults (NM3+).
+// The type alias is kept for use in buildPreview and mockExecute signatures.
 // ============================================================
 
-export const StoryWriterConfigSchema = z.object({
-  targetDurationSeconds: z.number().int().min(15).max(120)
-    .describe('Target TVC duration in seconds (15-120s)'),
-  storyFormula: z.enum([
-    'hero_journey',
-    'problem_agitation_solution',
-    'before_after_transformation',
-    'day_in_life',
-    'social_proof_story',
-    'emotional_hook',
-  ]).describe('Story formula/framework to use'),
-  emotionalTone: z.enum([
-    'aspirational',
-    'relatable_humor',
-    'nostalgic',
-    'empowering',
-    'fomo_urgency',
-    'warm_family',
-  ]).describe('Primary emotional tone for the story'),
-  productIntegrationStyle: z.enum([
-    'subtle_background',
-    'natural_use',
-    'hero_moment',
-    'transformation_reveal',
-    'comparison_story',
-  ]).describe('How the product appears in the story'),
-  genZAuthenticity: z.enum(['low', 'medium', 'high', 'ultra'])
-    .describe('Level of GenZ authenticity (slang, references, style)'),
-  includeCasting: z.boolean()
-    .describe('Whether to include model/casting recommendations'),
-  vietnameseDialect: z.enum(['northern', 'central', 'southern', 'neutral'])
-    .describe('Vietnamese dialect preference for dialogue'),
-  seedIdea: z.string().max(500).optional()
-    .describe('Optional seed idea or direction from user'),
-});
-
-export type StoryWriterConfig = z.infer<typeof StoryWriterConfigSchema>;
+export type StoryWriterConfig = {
+  readonly targetDurationSeconds: number;
+  readonly storyFormula: 'hero_journey' | 'problem_agitation_solution' | 'before_after_transformation' | 'day_in_life' | 'social_proof_story' | 'emotional_hook';
+  readonly emotionalTone: 'aspirational' | 'relatable_humor' | 'nostalgic' | 'empowering' | 'fomo_urgency' | 'warm_family';
+  readonly productIntegrationStyle: 'subtle_background' | 'natural_use' | 'hero_moment' | 'transformation_reveal' | 'comparison_story';
+  readonly genZAuthenticity: 'low' | 'medium' | 'high' | 'ultra';
+  readonly includeCasting: boolean;
+  readonly vietnameseDialect: 'northern' | 'central' | 'southern' | 'neutral';
+  readonly seedIdea?: string;
+};
 
 // ============================================================
 // Port Definitions
@@ -150,21 +124,6 @@ const outputs: readonly PortDefinition[] = [
     description: 'Complete story arc with multi-shot breakdown, cast selection, formula, tone and sound direction',
   },
 ];
-
-// ============================================================
-// Default Configuration
-// ============================================================
-
-const defaultConfig: StoryWriterConfig = {
-  targetDurationSeconds: 30,
-  storyFormula: 'problem_agitation_solution',
-  emotionalTone: 'relatable_humor',
-  productIntegrationStyle: 'natural_use',
-  genZAuthenticity: 'high',
-  includeCasting: true,
-  vietnameseDialect: 'neutral',
-  seedIdea: '',
-};
 
 // ============================================================
 // Deterministic Helpers
@@ -596,6 +555,9 @@ const fixtures: readonly NodeFixture<StoryWriterConfig>[] = [
  * Outputs complete story arc with shots, casting, formula, and localization.
  * Works with Diverge node for multi-LLM compete pattern.
  */
+// configSchema is intentionally omitted (NM3 pilot strip) — backend manifest is
+// the authoritative source. defaultConfig is an empty sentinel; actual defaults
+// come from manifestEntry.defaultConfig at runtime via useResolvedNodeTemplate.
 export const storyWriterTemplate: NodeTemplate<StoryWriterConfig> = {
   type: 'storyWriter',
   templateVersion: '1.0.0',
@@ -604,8 +566,7 @@ export const storyWriterTemplate: NodeTemplate<StoryWriterConfig> = {
   description: 'Creates Vietnamese GenZ story-driven TVC scripts from product analysis and trend brief. Outputs multi-shot story arcs with cast selection, formula, tone and sound direction. Works with Diverge for multi-LLM compete pattern.',
   inputs,
   outputs,
-  defaultConfig,
-  configSchema: StoryWriterConfigSchema,
+  defaultConfig: {} as unknown as StoryWriterConfig,
   fixtures,
   executable: true,
   buildPreview,

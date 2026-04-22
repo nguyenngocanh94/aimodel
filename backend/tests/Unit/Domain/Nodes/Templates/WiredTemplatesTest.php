@@ -11,10 +11,9 @@ use App\Domain\Nodes\Templates\PromptRefinerTemplate;
 use App\Domain\Nodes\Templates\SceneSplitterTemplate;
 use App\Domain\Nodes\Templates\ScriptWriterTemplate;
 use App\Domain\PortPayload;
-use App\Domain\Providers\ProviderRouter;
 use App\Models\Artifact;
 use App\Services\ArtifactStoreContract;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 class WiredTemplatesTest extends TestCase
 {
@@ -49,7 +48,6 @@ class WiredTemplatesTest extends TestCase
             config: $config,
             inputs: $inputs,
             runId: 'run-test',
-            providerRouter: new ProviderRouter(),
             artifactStore: $artifactStore,
         );
     }
@@ -161,6 +159,7 @@ class WiredTemplatesTest extends TestCase
         $config = array_merge($template->defaultConfig(), [
             'inputMode' => 'prompt',
             'outputMode' => 'single',
+            'image' => ['provider' => 'stub', 'model' => '', 'size' => ''],
         ]);
         $ctx = $this->makeContext($config, [
             'prompt' => PortPayload::success('A beautiful sunset', DataType::Prompt),
@@ -179,6 +178,7 @@ class WiredTemplatesTest extends TestCase
         $config = array_merge($template->defaultConfig(), [
             'inputMode' => 'scene',
             'outputMode' => 'multiple',
+            'image' => ['provider' => 'stub', 'model' => '', 'size' => ''],
         ]);
         $ctx = $this->makeContext($config, [
             'scenes' => PortPayload::success(

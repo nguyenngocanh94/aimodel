@@ -19,28 +19,22 @@
  * In mock mode, simulates a response after a short delay.
  */
 
-import { z } from 'zod';
 import type { NodeTemplate, NodeFixture, MockNodeExecutionArgs } from '../node-registry';
 import type { PortDefinition, PortPayload } from '@/features/workflows/domain/workflow-types';
 
 // ============================================================
-// Configuration Schema
+// Configuration Type
+// Backend manifest is the authoritative source for config schema and defaults (NM3+).
+// The type alias is kept for use in buildPreview and mockExecute signatures.
 // ============================================================
 
-export const HumanGateConfigSchema = z.object({
-  messageTemplate: z.string().max(2000)
-    .describe('Template for the message to send, supports {{variable}} placeholders'),
-  channel: z.enum(['ui', 'telegram', 'mcp', 'any'])
-    .describe('Which channel to notify'),
-  timeoutSeconds: z.number().int().min(0).max(86400)
-    .describe('How long to wait before auto-fallback. 0 = wait forever'),
-  autoFallbackResponse: z.string().nullable()
-    .describe('JSON response to use if timeout is reached'),
-  options: z.array(z.string()).nullable()
-    .describe('Predefined options to present (e.g., ["A", "B", "C", "D"])'),
-});
-
-export type HumanGateConfig = z.infer<typeof HumanGateConfigSchema>;
+export type HumanGateConfig = {
+  readonly messageTemplate: string;
+  readonly channel: 'ui' | 'telegram' | 'mcp' | 'any';
+  readonly timeoutSeconds: number;
+  readonly autoFallbackResponse: string | null;
+  readonly options: readonly string[] | null;
+};
 
 // ============================================================
 // Port Definitions
@@ -69,18 +63,6 @@ const outputs: readonly PortDefinition[] = [
     description: 'The response from the human or AI',
   },
 ];
-
-// ============================================================
-// Default Configuration
-// ============================================================
-
-const defaultConfig: HumanGateConfig = {
-  messageTemplate: '',
-  channel: 'ui',
-  timeoutSeconds: 0,
-  autoFallbackResponse: null,
-  options: null,
-};
 
 // ============================================================
 // Helper: Render Message Template
@@ -252,6 +234,9 @@ const fixtures: readonly NodeFixture<HumanGateConfig>[] = [
  * Executable: pauses workflow execution and waits for an external response.
  * In mock mode, auto-responds with the first option or a default response.
  */
+// configSchema is intentionally omitted (NM3 pilot strip) — backend manifest is
+// the authoritative source. defaultConfig is an empty sentinel; actual defaults
+// come from manifestEntry.defaultConfig at runtime via useResolvedNodeTemplate.
 export const humanGateTemplate: NodeTemplate<HumanGateConfig> = {
   type: 'humanGate',
   templateVersion: '1.0.0',
@@ -260,8 +245,7 @@ export const humanGateTemplate: NodeTemplate<HumanGateConfig> = {
   description: 'Pauses workflow execution, sends data to an external channel, and waits for a human or AI response before resuming. Supports UI, Telegram, MCP, and any channel. In mock execution mode, auto-responds with the first option or a default response.',
   inputs,
   outputs,
-  defaultConfig,
-  configSchema: HumanGateConfigSchema,
+  defaultConfig: {} as unknown as HumanGateConfig,
   fixtures,
   executable: true,
   buildPreview,

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domain\Nodes\Templates;
 
-use App\Domain\Capability;
 use App\Domain\DataType;
 use App\Domain\NodeCategory;
+use App\Domain\Nodes\Concerns\InteractsWithVideo;
 use App\Domain\PortDefinition;
 use App\Domain\PortPayload;
 use App\Domain\PortSchema;
@@ -15,6 +15,8 @@ use App\Domain\Nodes\NodeTemplate;
 
 class VideoComposerTemplate extends NodeTemplate
 {
+    use InteractsWithVideo;
+
     public string $type { get => 'videoComposer'; }
     public string $version { get => '1.0.0'; }
     public string $title { get => 'Video Composer'; }
@@ -37,30 +39,21 @@ class VideoComposerTemplate extends NodeTemplate
     public function configRules(): array
     {
         return [
-            'provider' => ['sometimes', 'string'],
+            'video' => ['sometimes', 'array'],
+            'video.provider' => ['sometimes', 'string'],
         ];
     }
 
     public function defaultConfig(): array
     {
-        return [
-            'provider' => 'stub',
-        ];
+        return ['video' => ['provider' => 'stub']];
     }
 
     public function execute(NodeExecutionContext $ctx): array
     {
         $frames = $ctx->inputValue('frames');
         $audio = $ctx->inputValue('audio');
-        $config = $ctx->config;
-
-        $result = $ctx->provider(Capability::MediaComposition)->execute(
-            Capability::MediaComposition,
-            ['frames' => $frames, 'audio' => $audio],
-            $config,
-        );
-
-        $video = is_array($result) ? $result : [];
+        $video = $this->callMediaComposition($ctx, is_array($frames) ? $frames : [], $audio);
 
         return [
             'video' => PortPayload::success(
