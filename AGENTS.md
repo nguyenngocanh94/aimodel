@@ -17,6 +17,16 @@ This repo builds an **AI Video Workflow Builder** — a browser-based visual pip
 
 The Telegram-facing **Assistant** routes user messages to catalog workflows via `laravel/ai`. Its instructions are built from composable **BehaviorSkills** in `backend/app/Services/TelegramAgent/BehaviorSkills/` (prompt guardrails, not tools). To change tone or guardrails, edit an existing `*BehaviorSkill` class or add a new one implementing `BehaviorSkill` and list it in `backend/config/telegram_agent.php` under `behavior_skills` (order matters). Tool capsules (progressive-disclosure `Skill`s for the sdk-skills package) live in `resources/skills/` — do not confuse the two.
 
+### WorkflowPlanner (Laravel `backend/app/Domain/Planner/`)
+
+The planner is **agentic** — it exposes three tools on every turn so the LLM can self-correct before committing a final plan:
+
+- `CatalogLookupTool` — semantic search over `workflows` + node-template guides. Prefers pgvector cosine similarity (`whereVectorSimilarTo('catalog_embedding', ...)` backed by VoyageAI `voyage-4` 1024-dim); falls back to case-insensitive LIKE when embeddings are unavailable.
+- `PriorPlanRetrievalTool` — pulls up to 3 past plans from `workflow_plans.brief_embedding` for prior-art reference; same vector+LIKE fallback.
+- `SchemaValidationTool` — wraps `WorkflowPlanValidator` and returns `{valid, errors, warnings, hint}` so the model can validate drafts cheaply. The planner prompt (`WorkflowPlannerPrompt::rulesBlock`) REQUIRES the model to call this tool before emitting final JSON.
+
+Config knobs live in `backend/config/planner.php` (`agentic`, `persist_plans`, similarity thresholds). Successful plans persist to `workflow_plans` via `PastPlan::create`, keyed by SHA-256 `brief_hash`. Embed existing rows with `php artisan embeddings:backfill [--table=workflows|workflow_plans]` once `VOYAGEAI_API_KEY` is set.
+
 ## Tech Stack
 
 - **React** + **Vite** + **TypeScript** (strict mode)
