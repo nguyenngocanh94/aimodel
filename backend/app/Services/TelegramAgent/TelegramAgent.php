@@ -114,21 +114,21 @@ final class TelegramAgent implements Agent, Conversational, HasMiddleware, HasTo
      */
     protected function getSkillToolOverrides(): array
     {
+        // ComposeWorkflowTool / RefinePlanTool / PersistWorkflowTool are resolved
+        // via the container's closure bindings, which read chatId/botToken from
+        // the request-scoped TelegramAgentContext. TelegramAgentFactory::make()
+        // populates that context before constructing this agent, so plain
+        // `app(...)` resolves tools with the correct per-request identity.
+        //
+        // Do NOT pass [...] parameter overrides here — Laravel's container silently
+        // drops them for closure bindings whose signature doesn't accept the second
+        // $parameters argument.
         return [
             new RunWorkflowTool(chatId: $this->chatId),
             new ReplyTool(botToken: $this->botToken, chatId: $this->chatId),
-            app()->make(ComposeWorkflowTool::class, [
-                'chatId'   => $this->chatId,
-                'botToken' => $this->botToken,
-            ]),
-            app()->make(RefinePlanTool::class, [
-                'chatId'   => $this->chatId,
-                'botToken' => $this->botToken,
-            ]),
-            app()->make(PersistWorkflowTool::class, [
-                'chatId'   => $this->chatId,
-                'botToken' => $this->botToken,
-            ]),
+            app(ComposeWorkflowTool::class),
+            app(RefinePlanTool::class),
+            app(PersistWorkflowTool::class),
         ];
     }
 
