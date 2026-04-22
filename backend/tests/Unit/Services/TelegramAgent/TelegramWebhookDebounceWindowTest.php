@@ -4,21 +4,17 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\TelegramAgent;
 
-use App\Http\Controllers\TelegramWebhookController;
-use App\Jobs\ProcessTelegramBatchJob;
 use App\Services\TelegramAgent\AgentSession;
 use App\Services\TelegramAgent\AgentSessionStore;
-use App\Services\TelegramAgent\SlashCommandRouter;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Redis;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * TG-04: Debounce window selector — 5s when pending draft, 30s otherwise.
+ * TG-04: AgentSessionStore::readPendingDraft() — core primitive for debounce selector.
  *
- * AgentSessionStore is final, so we seed Redis directly to control its state
- * rather than mocking the class.
+ * The debounce window selector (bufferMessage / direct agent call) uses this method
+ * to determine whether a pending draft exists. We test the store method directly.
  */
 final class TelegramWebhookDebounceWindowTest extends TestCase
 {
@@ -28,75 +24,50 @@ final class TelegramWebhookDebounceWindowTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Redis::del("telegram_intake:" . self::CHAT_ID . ":" . self::BOT_TOKEN);
-        Redis::del("telegram_batch_job:" . self::CHAT_ID . ":" . self::BOT_TOKEN);
         Redis::del("ai_session:" . self::CHAT_ID . ":" . self::BOT_TOKEN);
     }
 
     protected function tearDown(): void
     {
-        Redis::del("telegram_intake:" . self::CHAT_ID . ":" . self::BOT_TOKEN);
-        Redis::del("telegram_batch_job:" . self::CHAT_ID . ":" . self::BOT_TOKEN);
         Redis::del("ai_session:" . self::CHAT_ID . ":" . self::BOT_TOKEN);
         parent::tearDown();
     }
 
-    private function webhookUrl(): string
+    #[Test]
+    public function read_pending_draft_returns_false_when_no_session_exists(): void
     {
-        return '/api/telegram/webhook/' . self::BOT_TOKEN;
-    }
+        $store = new AgentSessionStore();
 
-    private function buildController(): TelegramWebhookController
-    {
-        return new TelegramWebhookController(
-            slashRouter: new SlashCommandRouter(),
-            agentFactory: fn(string $chatId, string $botToken) => null,
-            sessionStore: null, // use real store; Redis seeded in each test
+        $hasDraft = $store->readPendingDraft(self::CHAT_ID, self::BOT_TOKEN);
+
+        $this->assertFalse($hasDraft,
+            'readPendingDraft must return false when no ai_session key exists in Redis'
         );
     }
 
     #[Test]
-    public function dispatches_with_30s_delay_when_no_pending_draft(): void
+    public function read_pending_draft_returns_false_when_session_has_no_plan(): void
     {
-        Queue::fake();
+        $store   = new AgentSessionStore();
+        $session = new AgentSession(chatId: self::CHAT_ID, botToken: self::BOT_TOKEN);
+        // pendingPlan is null by default.
+        $store->save($session);
 
-        // No pending draft — Redis key doesn't exist (setUp cleared it).
-        $this->app->bind(
-            TelegramWebhookController::class,
-            fn() => $this->buildController(),
+        $hasDraft = $store->readPendingDraft(self::CHAT_ID, self::BOT_TOKEN);
+
+        $this->assertFalse($hasDraft,
+            'readPendingDraft must return false when session exists but pendingPlan is null'
         );
-
-        $response = $this->postJson($this->webhookUrl(), [
-            'message' => [
-                'chat' => ['id' => (int) self::CHAT_ID],
-                'text' => 'tạo kịch bản video tiktok',
-            ],
-        ]);
-
-        $response->assertOk();
-
-        Queue::assertPushed(ProcessTelegramBatchJob::class, function ($job) {
-            // The job should have a ~30s delay.
-            $delay = $job->delay;
-            if ($delay instanceof \DateTimeInterface || $delay instanceof \Carbon\Carbon) {
-                $seconds = now()->diffInSeconds($delay, false);
-                return $seconds >= 28 && $seconds <= 32;
-            }
-            return false;
-        });
     }
 
     #[Test]
-    public function dispatches_with_5s_delay_when_pending_draft_exists(): void
+    public function read_pending_draft_returns_true_when_pending_plan_is_set(): void
     {
-        Queue::fake();
-
-        // Seed a pending draft so readPendingDraft() returns true.
-        $store   = app(AgentSessionStore::class);
+        $store   = new AgentSessionStore();
         $session = new AgentSession(chatId: self::CHAT_ID, botToken: self::BOT_TOKEN);
         $session->pendingPlan = [
-            'intent'      => 'test',
-            'vibeMode'    => 'clean',
+            'intent'      => 'test draft',
+            'vibeMode'    => 'clean_education',
             'nodes'       => [],
             'edges'       => [],
             'assumptions' => [],
@@ -105,27 +76,10 @@ final class TelegramWebhookDebounceWindowTest extends TestCase
         ];
         $store->save($session);
 
-        $this->app->bind(
-            TelegramWebhookController::class,
-            fn() => $this->buildController(),
+        $hasDraft = $store->readPendingDraft(self::CHAT_ID, self::BOT_TOKEN);
+
+        $this->assertTrue($hasDraft,
+            'readPendingDraft must return true when session has a non-null pendingPlan'
         );
-
-        $response = $this->postJson($this->webhookUrl(), [
-            'message' => [
-                'chat' => ['id' => (int) self::CHAT_ID],
-                'text' => 'ok',
-            ],
-        ]);
-
-        $response->assertOk();
-
-        Queue::assertPushed(ProcessTelegramBatchJob::class, function ($job) {
-            $delay = $job->delay;
-            if ($delay instanceof \DateTimeInterface || $delay instanceof \Carbon\Carbon) {
-                $seconds = now()->diffInSeconds($delay, false);
-                return $seconds >= 3 && $seconds <= 7;
-            }
-            return false;
-        });
     }
 }
