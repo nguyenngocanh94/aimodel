@@ -18,7 +18,12 @@ class ProcessTelegramBatchJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $timeout = 120;
+    /**
+     * Compose/plan turns can trigger multiple LLM round-trips in one queued job:
+     * agent routing + planner/refiner tool call(s). 120s can be exhausted by
+     * two 60s upstream calls plus middleware overhead, causing worker timeout.
+     */
+    public int $timeout = 300;
 
     public function __construct(
         private string $sessionKey,
@@ -29,64 +34,107 @@ class ProcessTelegramBatchJob implements ShouldQueue
 
     public function handle(): void
     {
-        // Stale-batch detection: this job was dispatched with its own immutable
-        // $batchId at enqueue time. bufferMessage() updates the "latest batch"
-        // pointer in Redis every time a new message arrives. If the current
-        // latest is NOT our batchId, a newer burst superseded us — skip.
-        //
-        // batchId is '' only for legacy/test dispatches that predate FX-05;
-        // fall back to the old (effectively no-op) comparison in that case so
-        // nothing crashes, but real production dispatches always set batchId.
-        if ($this->batchId !== '') {
-            $latestBatchId = Redis::get("telegram_batch_job:{$this->chatId}:{$this->botToken}");
-            if ($latestBatchId !== null && $latestBatchId !== false && $latestBatchId !== $this->batchId) {
-                Log::info('Skipping stale Telegram batch job', [
-                    'chatId'         => $this->chatId,
-                    'myBatchId'      => $this->batchId,
-                    'latestBatchId'  => $latestBatchId,
+        // #region agent log
+        $runId = 'initial';
+        $this->debugLog($runId, 'H1', 'ProcessTelegramBatchJob.php:34', 'job_handle_enter', [
+            'sessionKey' => $this->sessionKey,
+            'chatId' => $this->chatId,
+            'hasBatchId' => $this->batchId !== '',
+        ]);
+        // #endregion
+        try {
+            // Stale-batch detection: this job was dispatched with its own immutable
+            // $batchId at enqueue time. bufferMessage() updates the "latest batch"
+            // pointer in Redis every time a new message arrives. If the current
+            // latest is NOT our batchId, a newer burst superseded us — skip.
+            //
+            // batchId is '' only for legacy/test dispatches that predate FX-05;
+            // fall back to the old (effectively no-op) comparison in that case so
+            // nothing crashes, but real production dispatches always set batchId.
+            if ($this->batchId !== '') {
+                $latestBatchId = Redis::get("telegram_batch_job:{$this->chatId}:{$this->botToken}");
+                // #region agent log
+                $this->debugLog($runId, 'H2', 'ProcessTelegramBatchJob.php:53', 'latest_batch_lookup', [
+                    'latestBatchId' => is_string($latestBatchId) ? $latestBatchId : (string) $latestBatchId,
+                    'myBatchId' => $this->batchId,
                 ]);
+                // #endregion
+                if ($latestBatchId !== null && $latestBatchId !== false && $latestBatchId !== $this->batchId) {
+                    Log::info('Skipping stale Telegram batch job', [
+                        'chatId'         => $this->chatId,
+                        'myBatchId'      => $this->batchId,
+                        'latestBatchId'  => $latestBatchId,
+                    ]);
+                    return;
+                }
+            }
+
+            $session = $this->getSession();
+            // #region agent log
+            $this->debugLog($runId, 'H3', 'ProcessTelegramBatchJob.php:69', 'session_loaded', [
+                'sessionExists' => $session !== null,
+                'status' => is_array($session) ? ($session['status'] ?? null) : null,
+                'messageCount' => is_array($session) ? count($session['messages'] ?? []) : 0,
+            ]);
+            // #endregion
+
+            if ($session === null || ($session['status'] ?? '') !== 'buffering') {
                 return;
             }
-        }
 
-        $session = $this->getSession();
-
-        if ($session === null || ($session['status'] ?? '') !== 'buffering') {
-            return;
-        }
-
-        // Flatten buffered burst into a single combined update.
-        $combined = $this->assembleCombinedUpdate($session);
-
-        // Clear the intake session immediately so the key doesn't linger.
-        $this->clearSession();
-
-        // Call the agent. The finally block sends a fallback reply if the agent
-        // throws before any ReplyTool call has sent something to the user.
-        $replySent = false;
-
-        try {
-            /** @var TelegramAgentFactory $factory */
-            $factory = app(TelegramAgentFactory::class);
-            $agent   = $factory->make($this->chatId, $this->botToken);
-            $agent->handle($combined, $this->botToken);
-            $replySent = true;
-        } catch (\Throwable $e) {
-            Log::error('TelegramAgent threw during batch job', [
-                'chatId' => $this->chatId,
-                'error'  => $e->getMessage(),
-                'trace'  => $e->getTraceAsString(),
+            // Flatten buffered burst into a single combined update.
+            $combined = $this->assembleCombinedUpdate($session);
+            // #region agent log
+            $this->debugLog($runId, 'H4', 'ProcessTelegramBatchJob.php:83', 'combined_update_assembled', [
+                'textLength' => strlen((string) ($combined['message']['text'] ?? '')),
+                'hasPhoto' => isset($combined['message']['photo']),
             ]);
-        } finally {
-            if (! $replySent) {
-                $this->sendFallbackReply();
-            }
-        }
+            // #endregion
 
-        Log::info('Telegram batch job finished', [
-            'chatId'   => $this->chatId,
-            'messages' => count($session['messages'] ?? []),
-        ]);
+            // Clear the intake session immediately so the key doesn't linger.
+            $this->clearSession();
+
+            // Call the agent. The finally block sends a fallback reply if the agent
+            // throws before any ReplyTool call has sent something to the user.
+            $replySent = false;
+
+            try {
+                /** @var TelegramAgentFactory $factory */
+                $factory = app(TelegramAgentFactory::class);
+                $agent   = $factory->make($this->chatId, $this->botToken);
+                $agent->handle($combined, $this->botToken);
+                $replySent = true;
+            } catch (\Throwable $e) {
+                Log::error('TelegramAgent threw during batch job', [
+                    'chatId' => $this->chatId,
+                    'error'  => $e->getMessage(),
+                    'trace'  => $e->getTraceAsString(),
+                ]);
+                // #region agent log
+                $this->debugLog($runId, 'H5', 'ProcessTelegramBatchJob.php:108', 'agent_handle_throwable', [
+                    'error' => $e->getMessage(),
+                    'class' => $e::class,
+                ]);
+                // #endregion
+            } finally {
+                if (! $replySent) {
+                    $this->sendFallbackReply();
+                }
+            }
+
+            Log::info('Telegram batch job finished', [
+                'chatId'   => $this->chatId,
+                'messages' => count($session['messages'] ?? []),
+            ]);
+        } catch (\Throwable $e) {
+            // #region agent log
+            $this->debugLog($runId, 'H1', 'ProcessTelegramBatchJob.php:125', 'job_handle_uncaught_throwable', [
+                'error' => $e->getMessage(),
+                'class' => $e::class,
+            ]);
+            // #endregion
+            throw $e;
+        }
     }
 
     /**
@@ -183,6 +231,40 @@ class ProcessTelegramBatchJob implements ShouldQueue
                 'chatId' => $this->chatId,
                 'error'  => $e->getMessage(),
             ]);
+        }
+    }
+
+    public function failed(\Throwable $e): void
+    {
+        // Handle worker-level timeout/fatal paths where handle() finally blocks
+        // may not run, so the user would otherwise see no Telegram response.
+        $this->sendFallbackReply();
+        // #region agent log
+        $this->debugLog('post-fix', 'H12', 'ProcessTelegramBatchJob.php:211', 'job_failed_handler_invoked', [
+            'chatId' => $this->chatId,
+            'error' => $e->getMessage(),
+            'class' => $e::class,
+        ]);
+        // #endregion
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function debugLog(string $runId, string $hypothesisId, string $location, string $message, array $data = []): void
+    {
+        try {
+            file_put_contents('/Volumes/Work/Workspace/AiModel/.cursor/debug-477860.log', json_encode([
+                'sessionId' => '477860',
+                'runId' => $runId,
+                'hypothesisId' => $hypothesisId,
+                'location' => $location,
+                'message' => $message,
+                'data' => $data,
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ], JSON_THROW_ON_ERROR) . PHP_EOL, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable) {
+            // no-op: debug logging must never affect job processing
         }
     }
 }

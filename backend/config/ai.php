@@ -119,7 +119,7 @@ return [
             'url' => env('FIREWORKS_URL', 'https://api.fireworks.ai/inference/v1'),
             'models' => [
                 'text' => [
-                    'default' => env('FIREWORKS_MODEL', 'accounts/fireworks/models/minimax-m2p7'),
+                    'default' => env('FIREWORKS_MODEL', 'accounts/fireworks/models/kimi-k2p6'),
                 ],
             ],
         ],

@@ -32,6 +32,13 @@ final class ReplyTool implements Tool
     public function handle(Request $request): string
     {
         $text = mb_substr((string) $request->string('text', ''), 0, 4096);
+        // #region agent log
+        $this->debugLog('initial', 'H11', 'ReplyTool.php:36', 'reply_tool_invoked', [
+            'chatId' => $this->chatId,
+            'textPreview' => mb_substr($text, 0, 220),
+            'textLength' => mb_strlen($text),
+        ]);
+        // #endregion
 
         try {
             $response = Http::post(
@@ -61,6 +68,26 @@ final class ReplyTool implements Tool
             ]);
 
             return json_encode(['delivered' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function debugLog(string $runId, string $hypothesisId, string $location, string $message, array $data = []): void
+    {
+        try {
+            file_put_contents('/Volumes/Work/Workspace/AiModel/.cursor/debug-477860.log', json_encode([
+                'sessionId' => '477860',
+                'runId' => $runId,
+                'hypothesisId' => $hypothesisId,
+                'location' => $location,
+                'message' => $message,
+                'data' => $data,
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ], JSON_THROW_ON_ERROR) . PHP_EOL, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable) {
+            // no-op: debug logging must never affect runtime behavior
         }
     }
 }

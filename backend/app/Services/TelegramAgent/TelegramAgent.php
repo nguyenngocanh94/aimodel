@@ -194,6 +194,15 @@ final class TelegramAgent implements Agent, Conversational, HasMiddleware, HasTo
             $promptText,
             provider: $chain,
         );
+        // #region agent log
+        $this->debugLog('initial', 'H10', 'TelegramAgent.php:198', 'telegram_agent_prompt_completed', [
+            'chatId' => $this->chatId,
+            'providerChain' => $chain,
+            'promptTextPreview' => mb_substr($promptText, 0, 160),
+            'responseTextPreview' => mb_substr((string) $response->text, 0, 200),
+            'responseTextLength' => mb_strlen((string) $response->text),
+        ]);
+        // #endregion
 
         // ReplyTool sends explicit replies during tool execution.
         // Only forward $response->text if it's non-empty (end-of-turn narration).
@@ -252,6 +261,26 @@ final class TelegramAgent implements Agent, Conversational, HasMiddleware, HasTo
                 'chatId' => $chatId,
                 'error'  => $e->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function debugLog(string $runId, string $hypothesisId, string $location, string $message, array $data = []): void
+    {
+        try {
+            file_put_contents('/Volumes/Work/Workspace/AiModel/.cursor/debug-477860.log', json_encode([
+                'sessionId' => '477860',
+                'runId' => $runId,
+                'hypothesisId' => $hypothesisId,
+                'location' => $location,
+                'message' => $message,
+                'data' => $data,
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ], JSON_THROW_ON_ERROR) . PHP_EOL, FILE_APPEND | LOCK_EX);
+        } catch (Throwable) {
+            // no-op: debug logging must never affect runtime behavior
         }
     }
 }

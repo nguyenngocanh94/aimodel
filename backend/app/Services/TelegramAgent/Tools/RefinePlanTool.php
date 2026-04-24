@@ -115,11 +115,49 @@ final class RefinePlanTool implements Tool
         );
 
         try {
+            $providerArg = array_values(array_map(
+                'strval',
+                (array) config('ai.failover.text', [config('ai.default') ?? 'fireworks'])
+            ));
+            // #region agent log
+            \Illuminate\Support\Facades\Log::info('debug.llm.refine.request', [
+                'sessionId' => '477860',
+                'runId' => 'post-fix',
+                'hypothesisId' => 'H14',
+                'location' => 'RefinePlanTool.php:124',
+                'provider' => $providerArg,
+                'promptLength' => mb_strlen($prompt),
+                'promptPreview' => mb_substr($prompt, 0, 500),
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ]);
+            // #endregion
             $response = $agent->prompt(
                 prompt: 'REFINE_NOW',
-                provider: (string) (config('ai.default') ?? 'fireworks'),
+                provider: $providerArg,
             );
+            // #region agent log
+            \Illuminate\Support\Facades\Log::info('debug.llm.refine.response', [
+                'sessionId' => '477860',
+                'runId' => 'post-fix',
+                'hypothesisId' => 'H14',
+                'location' => 'RefinePlanTool.php:138',
+                'responseTextLength' => mb_strlen((string) ($response->text ?? '')),
+                'responseTextPreview' => mb_substr((string) ($response->text ?? ''), 0, 500),
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ]);
+            // #endregion
         } catch (Throwable $e) {
+            // #region agent log
+            \Illuminate\Support\Facades\Log::error('debug.llm.refine.error', [
+                'sessionId' => '477860',
+                'runId' => 'post-fix',
+                'hypothesisId' => 'H14',
+                'location' => 'RefinePlanTool.php:149',
+                'error' => $e->getMessage(),
+                'exceptionClass' => $e::class,
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ]);
+            // #endregion
             return json_encode([
                 'error'   => 'llm_error',
                 'message' => 'Lỗi khi gọi LLM: ' . $e->getMessage(),

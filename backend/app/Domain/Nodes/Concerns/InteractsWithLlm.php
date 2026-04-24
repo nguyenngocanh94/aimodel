@@ -103,6 +103,20 @@ trait InteractsWithLlm
             : null;
 
         $agent = new AnonymousAgent($systemPrompt, [], []);
+        $startedAtMs = (int) round(microtime(true) * 1000);
+        // #region agent log
+        $this->debugLogLlm('initial', 'H6', 'InteractsWithLlm.php:111', 'llm_text_request_start', [
+            'template' => static::class,
+            'providerArgType' => is_array($providerArg) ? 'chain' : 'single',
+            'provider' => is_string($providerArg) ? $providerArg : null,
+            'providerChain' => is_array($providerArg) ? $providerArg : [],
+            'model' => $model,
+            'promptLength' => mb_strlen($prompt),
+            'systemPromptLength' => mb_strlen($systemPrompt),
+            'hasTokenSink' => $ctx->hasTokenDeltaSink(),
+            'maxTokens' => $maxTokens,
+        ]);
+        // #endregion
 
         // LP-C3: switch to stream() when the context has an attached token-delta
         // sink (e.g., the run-page SSE subscriber). Each TextDelta is forwarded
@@ -110,30 +124,70 @@ trait InteractsWithLlm
         // non-streaming path is kept for CLI / queued workers that have no
         // subscriber and don't need the per-token overhead.
         if ($ctx->hasTokenDeltaSink()) {
-            $response = $agent->stream(
+            try {
+                $response = $agent->stream(
+                    $prompt,
+                    provider: $providerArg,
+                    model: $model,
+                );
+
+                $response->each(function ($event) use ($ctx): void {
+                    if ($event instanceof TextDelta) {
+                        $ctx->emitTokenDelta($event->delta, $event->messageId);
+                    }
+                });
+
+                $text = (string) $response->text;
+                // #region agent log
+                $this->debugLogLlm('initial', 'H7', 'InteractsWithLlm.php:146', 'llm_text_request_success_stream', [
+                    'template' => static::class,
+                    'durationMs' => (int) round(microtime(true) * 1000) - $startedAtMs,
+                    'responseLength' => mb_strlen($text),
+                ]);
+                // #endregion
+                // After iteration, StreamableAgentResponse populates $response->text
+                // by combining all TextDelta events (see vendor L142-144).
+                return $text;
+            } catch (\Throwable $e) {
+                // #region agent log
+                $this->debugLogLlm('initial', 'H8', 'InteractsWithLlm.php:155', 'llm_text_request_error_stream', [
+                    'template' => static::class,
+                    'durationMs' => (int) round(microtime(true) * 1000) - $startedAtMs,
+                    'error' => $e->getMessage(),
+                    'exceptionClass' => $e::class,
+                ]);
+                // #endregion
+                throw $e;
+            }
+        }
+
+        try {
+            $response = $agent->prompt(
                 $prompt,
                 provider: $providerArg,
                 model: $model,
             );
 
-            $response->each(function ($event) use ($ctx): void {
-                if ($event instanceof TextDelta) {
-                    $ctx->emitTokenDelta($event->delta, $event->messageId);
-                }
-            });
-
-            // After iteration, StreamableAgentResponse populates $response->text
-            // by combining all TextDelta events (see vendor L142-144).
-            return (string) $response->text;
+            $text = (string) $response->text;
+            // #region agent log
+            $this->debugLogLlm('initial', 'H7', 'InteractsWithLlm.php:175', 'llm_text_request_success_prompt', [
+                'template' => static::class,
+                'durationMs' => (int) round(microtime(true) * 1000) - $startedAtMs,
+                'responseLength' => mb_strlen($text),
+            ]);
+            // #endregion
+            return $text;
+        } catch (\Throwable $e) {
+            // #region agent log
+            $this->debugLogLlm('initial', 'H8', 'InteractsWithLlm.php:184', 'llm_text_request_error_prompt', [
+                'template' => static::class,
+                'durationMs' => (int) round(microtime(true) * 1000) - $startedAtMs,
+                'error' => $e->getMessage(),
+                'exceptionClass' => $e::class,
+            ]);
+            // #endregion
+            throw $e;
         }
-
-        $response = $agent->prompt(
-            $prompt,
-            provider: $providerArg,
-            model: $model,
-        );
-
-        return (string) $response->text;
     }
 
     /**
@@ -203,14 +257,44 @@ trait InteractsWithLlm
         $agent = $agentFactory !== null
             ? $agentFactory($systemPrompt, $schema)
             : new StructuredAnonymousAgent($systemPrompt, [], [], $schema);
-        $response = $agent->prompt(
-            $prompt,
-            provider: $provider,
-            model: $model,
-        );
+        $startedAtMs = (int) round(microtime(true) * 1000);
+        // #region agent log
+        $this->debugLogLlm('initial', 'H6', 'InteractsWithLlm.php:238', 'llm_structured_request_start', [
+            'template' => static::class,
+            'provider' => $provider,
+            'model' => $model,
+            'promptLength' => mb_strlen($prompt),
+            'systemPromptLength' => mb_strlen($systemPrompt),
+        ]);
+        // #endregion
+        try {
+            $response = $agent->prompt(
+                $prompt,
+                provider: $provider,
+                model: $model,
+            );
+        } catch (\Throwable $e) {
+            // #region agent log
+            $this->debugLogLlm('initial', 'H8', 'InteractsWithLlm.php:251', 'llm_structured_request_error', [
+                'template' => static::class,
+                'durationMs' => (int) round(microtime(true) * 1000) - $startedAtMs,
+                'error' => $e->getMessage(),
+                'exceptionClass' => $e::class,
+            ]);
+            // #endregion
+            throw $e;
+        }
 
         if ($response instanceof StructuredAgentResponse) {
             $structured = $response->structured ?? [];
+            // #region agent log
+            $this->debugLogLlm('initial', 'H7', 'InteractsWithLlm.php:264', 'llm_structured_request_success', [
+                'template' => static::class,
+                'durationMs' => (int) round(microtime(true) * 1000) - $startedAtMs,
+                'hasStructuredPayload' => $structured !== [],
+                'structuredType' => gettype($structured),
+            ]);
+            // #endregion
             if ($structured === []) {
                 Log::warning('InteractsWithLlm: structured output missing', [
                     'template' => static::class,
@@ -226,6 +310,13 @@ trait InteractsWithLlm
             'provider' => $provider,
             'model'    => $model,
         ]);
+        // #region agent log
+        $this->debugLogLlm('initial', 'H7', 'InteractsWithLlm.php:288', 'llm_structured_request_non_structured_response', [
+            'template' => static::class,
+            'durationMs' => (int) round(microtime(true) * 1000) - $startedAtMs,
+            'responseClass' => $response::class,
+        ]);
+        // #endregion
         return [];
     }
 
@@ -292,5 +383,35 @@ trait InteractsWithLlm
             'field'      => $field,
             'migrate_to' => "llm.{$field}",
         ]);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function debugLogLlm(string $runId, string $hypothesisId, string $location, string $message, array $data = []): void
+    {
+        $payload = [
+            'sessionId' => '477860',
+            'runId' => $runId,
+            'hypothesisId' => $hypothesisId,
+            'location' => $location,
+            'message' => $message,
+            'data' => $data,
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ];
+
+        // #region agent log
+        Log::info('debug.llm', $payload);
+        // #endregion
+
+        try {
+            file_put_contents(
+                '/Volumes/Work/Workspace/AiModel/.cursor/debug-477860.log',
+                json_encode($payload, JSON_THROW_ON_ERROR) . PHP_EOL,
+                FILE_APPEND | LOCK_EX
+            );
+        } catch (\Throwable) {
+            // no-op: fallback Log::info above already captures this event.
+        }
     }
 }

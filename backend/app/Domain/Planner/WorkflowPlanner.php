@@ -41,7 +41,10 @@ final class WorkflowPlanner
     {
         $catalog = $this->buildCatalog();
         $providerName = $input->provider ?? (string) (config('ai.default') ?? 'fireworks');
-        $modelName = $input->model ?? '';
+        $providerArg = $input->provider !== null && $input->provider !== ''
+            ? $input->provider
+            : array_values(array_map('strval', (array) config('ai.failover.text', [$providerName])));
+        $modelName = $input->model ?? 'accounts/fireworks/models/kimi-k2p6';
 
         /** @var list<PlannerAttempt> $attempts */
         $attempts = [];
@@ -69,7 +72,7 @@ final class WorkflowPlanner
                 );
             }
 
-            [$raw, $structured] = $this->invokeLlm($input, $currentPrompt, $providerName, $modelName);
+            [$raw, $structured] = $this->invokeLlm($input, $currentPrompt, $providerArg, $modelName);
 
             // Hydrate WorkflowPlan from the already-decoded structured response.
             // The schema is enforced by the gateway, so fence-strip / lenient
@@ -173,7 +176,7 @@ final class WorkflowPlanner
     /**
      * @return array{0: string, 1: array<string, mixed>} [rawText, structuredPayload]
      */
-    private function invokeLlm(PlannerInput $input, string $prompt, string $providerName, string $modelName): array
+    private function invokeLlm(PlannerInput $input, string $prompt, string|array $provider, string $modelName): array
     {
         // WorkflowPlannerAgent implements HasProviderOptions so the system
         // prompt is cached against Anthropic (LC3). On non-Anthropic providers,
@@ -190,17 +193,60 @@ final class WorkflowPlanner
         // a nominal marker. For hermeticity in tests, Http::fake catches the
         // call before it leaves the process.
         $userTurn = 'PLAN_NOW';
+        // #region agent log
+        Log::info('debug.llm.planner.request', [
+            'sessionId' => '477860',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'H13',
+            'location' => 'WorkflowPlanner.php:196',
+            'provider' => $provider,
+            'model' => $modelName === '' ? null : $modelName,
+            'userTurn' => $userTurn,
+            'promptLength' => mb_strlen($prompt),
+            'promptPreview' => mb_substr($prompt, 0, 500),
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ]);
+        // #endregion
 
-        $response = $agent->prompt(
-            prompt: $userTurn,
-            provider: $providerName,
-            model: $modelName === '' ? null : $modelName,
-        );
+        try {
+            $response = $agent->prompt(
+                prompt: $userTurn,
+                provider: $provider,
+                model: $modelName === '' ? null : $modelName,
+            );
+        } catch (Throwable $e) {
+            // #region agent log
+            Log::error('debug.llm.planner.error', [
+                'sessionId' => '477860',
+                'runId' => 'post-fix',
+                'hypothesisId' => 'H13',
+                'location' => 'WorkflowPlanner.php:216',
+                'provider' => $provider,
+                'model' => $modelName === '' ? null : $modelName,
+                'error' => $e->getMessage(),
+                'exceptionClass' => $e::class,
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ]);
+            // #endregion
+            throw $e;
+        }
 
         $raw = $response instanceof AgentResponse ? $response->text : (string) $response;
         $structured = $response instanceof StructuredAgentResponse
             ? (is_array($response->structured) ? $response->structured : [])
             : [];
+        // #region agent log
+        Log::info('debug.llm.planner.response', [
+            'sessionId' => '477860',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'H13',
+            'location' => 'WorkflowPlanner.php:236',
+            'rawLength' => mb_strlen($raw),
+            'rawPreview' => mb_substr($raw, 0, 500),
+            'structuredKeys' => array_keys($structured),
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ]);
+        // #endregion
 
         return [$raw, $structured];
     }

@@ -52,6 +52,15 @@ final class BehaviorSkillComposer
 
         $catalogSection = $this->renderCatalog($catalogPreview);
         $toolsLine      = implode(', ', self::TOOL_NAMES);
+        // #region agent log
+        $this->debugLog('initial', 'H9', 'BehaviorSkillComposer.php:58', 'telegram_prompt_composed', [
+            'chatId' => $chatId,
+            'toolNames' => self::TOOL_NAMES,
+            'skillCountApplied' => count($principles),
+            'catalogCount' => count($catalogPreview),
+            'messageTextPreview' => mb_substr((string) ($update['message']['text'] ?? $update['message']['caption'] ?? ''), 0, 160),
+        ]);
+        // #endregion
 
         return <<<PROMPT
         Bạn là Trợ lý Workflow của hệ thống AiModel, nói chuyện qua Telegram (chat {$chatId}).
@@ -70,6 +79,26 @@ final class BehaviorSkillComposer
 
         Tóm tắt: tìm workflow phù hợp, trích xuất tham số, gọi RunWorkflowTool. Đừng tự viết nội dung sáng tạo thay cho workflow.
         PROMPT;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function debugLog(string $runId, string $hypothesisId, string $location, string $message, array $data = []): void
+    {
+        try {
+            file_put_contents('/Volumes/Work/Workspace/AiModel/.cursor/debug-477860.log', json_encode([
+                'sessionId' => '477860',
+                'runId' => $runId,
+                'hypothesisId' => $hypothesisId,
+                'location' => $location,
+                'message' => $message,
+                'data' => $data,
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ], JSON_THROW_ON_ERROR) . PHP_EOL, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable) {
+            // no-op: debug logging must never affect runtime behavior
+        }
     }
 
     /**
